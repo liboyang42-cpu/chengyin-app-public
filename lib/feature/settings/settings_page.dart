@@ -1,3 +1,6 @@
+import '../../l10n/strings.dart';
+import '../../l10n/locale_preference.dart';
+import '../../core/widgets/cy_native_action_sheet.dart';
 import '../../core/theme/cy_palette.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -116,6 +119,30 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     if (mounted) context.go(kHomeRoute);
   }
 
+  Future<void> _chooseLanguage() async {
+    final strings = stringsOf(context);
+    final choice = await showCyNativeActionSheet<String>(
+      context: context,
+      title: strings.language,
+      cancelLabel: strings.cancel,
+      actions: <CyNativeAction<String>>[
+        CyNativeAction(value: 'system', label: strings.followSystem),
+        CyNativeAction(value: 'zh', label: strings.chineseLanguage),
+        CyNativeAction(value: 'en', label: strings.englishLanguage),
+      ],
+    );
+    if (choice == null || !mounted) return;
+    try {
+      await ref.read(localePreferenceProvider.notifier)
+          .select(choice == 'system' ? null : choice);
+    } catch (_) {
+      if (mounted) {
+        CyNativeNotice.show(context, stringsOf(context).languageSaveError,
+          isError: true);
+      }
+    }
+  }
+
   Widget _cell({
     required IconData icon,
     required String title,
@@ -134,6 +161,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(authControllerProvider).user;
+    final strings = stringsOf(context);
+    final language = ref.watch(localePreferenceProvider)?.languageCode;
     return CupertinoPageScaffold(
       navigationBar: const CupertinoNavigationBar(),
       child: Material(
@@ -143,7 +172,17 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           child: ListView(
             padding: const EdgeInsets.only(bottom: CyTokens.space6),
             children: <Widget>[
-              const CyPageTitle('设置'),
+              CyPageTitle(strings.settings),
+              _cell(
+                icon: Icons.language,
+                title: strings.language,
+                subtitle: switch (language) {
+                  'en' => strings.englishLanguage,
+                  'zh' => strings.chineseLanguage,
+                  _ => strings.followSystem,
+                },
+                onTap: _chooseLanguage,
+              ),
               _ProfileCard(user: user, onEdit: _goProfile),
               Padding(
                 padding: const EdgeInsets.only(top: CyTokens.space2),

@@ -43,6 +43,8 @@ void main() {
   const String token = 'merchant-invite-token-123456';
 
   testWidgets('游客团队邀请保留完整深链，登录后仍以原 token 处理', (WidgetTester tester) async {
+      tester.platformDispatcher.localesTestValue = const [Locale('zh')];
+      addTearDown(tester.platformDispatcher.clearLocalesTestValue);
     final container = ProviderContainer(
       retry: (int _, Object _) => null,
       overrides: <dynamic>[

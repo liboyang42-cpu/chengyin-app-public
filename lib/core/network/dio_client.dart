@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import '../config/env.dart';
 import 'token_store.dart';
+import 'request_session_scope.dart';
 
 /// 统一网络层:基址 + JWT 注入 + 错误归一。**feature 层不直接发 http**。
 class DioClient {
@@ -18,12 +19,29 @@ class DioClient {
     dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
+          final scope = options.extra[RequestSessionScope.extraKey] as RequestSessionScope?;
+          void rejectStale() => handler.reject(DioException(
+            requestOptions: options,
+            type: DioExceptionType.cancel,
+            message: 'Session changed before request dispatch',
+          ));
+          if (scope != null && !scope.isCurrent()) {
+            rejectStale();
+            return;
+          }
           String? token;
           try {
             token = await _tokenStore.read();
           } catch (_) {
             // 安全存储暂不可读时仍允许匿名接口工作；需要登录的接口会由
             // 服务端返回 401，并进入现有的统一登出路径。
+          }
+          // Recheck after keychain await. The credential below is pinned to
+          // this read, never re-read later when a different account may exist.
+          if (scope != null && (!scope.isCurrent() ||
+              (scope.requireAuthentication && (token == null || token.isEmpty)))) {
+            rejectStale();
+            return;
           }
           if (token != null && token.isNotEmpty) {
             options.headers['Authorization'] = token;
@@ -33,13 +51,29 @@ class DioClient {
         onError: (e, handler) async {
           // 401:token 失效 → 清 token + 通知上层登出(由 go_router 跳回 /login)。
           // 暂不做"无感续期"(后端无 refresh token 端点;有了再在此重放)。
-          if (e.response?.statusCode == 401) {
-            try {
-              await _tokenStore.clear();
-            } catch (_) {
-              // 钥匙串暂不可写不得阻断登出通知或吞掉原始 401。
-            }
-            onUnauthorized?.call();
+          if (e.response?.statusCode == 401 && e.requestOptions.path != '/api/logout') {
+            // Compare the failed request's credential while excluding login
+            // writes: an old response must not erase a replacement session.
+            await _tokenStore.sessionOperation(() async {
+              final failedToken = e.requestOptions.headers['Authorization'];
+              // An anonymous denial is not evidence that a signed-in session
+              // expired; it must not cancel a login currently in progress.
+              if (failedToken is! String || failedToken.isEmpty) return;
+              String? currentToken;
+              try {
+                currentToken = await _tokenStore.read();
+              } catch (_) {
+                // Cannot establish identity safely; preserve the session.
+                return;
+              }
+              if (failedToken != currentToken) return;
+              try {
+                await _tokenStore.clear();
+              } catch (_) {
+                // Still notify local logout for the matching expired session.
+              }
+              onUnauthorized?.call();
+            });
           }
           handler.next(e);
         },
@@ -53,10 +87,10 @@ class DioClient {
     final resp = await dio.post<ResponseBody>(
       path,
       data: body,
-      options: Options(
+      options: RequestSessionScope.options(Options(
         responseType: ResponseType.stream,
         headers: {'Accept': 'text/event-stream'},
-      ),
+      )),
     );
     final stream = resp.data!.stream
         .cast<List<int>>()

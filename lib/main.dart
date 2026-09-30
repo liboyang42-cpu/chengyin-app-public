@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 
 import 'core/network/provider_retry.dart';
+import 'l10n/app_localizations.dart';
+import 'l10n/locale_preference.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'feature/auth/auth_controller.dart';
@@ -34,6 +36,7 @@ Future<void> main() async {
   //   于是后端故意拒绝的接口会被反复重打,且重试期间状态停在 AsyncLoading,
   //   全站写好的错误态要三十多秒才出得来。详见 chengyinRetry 的注释。
   final container = ProviderContainer(retry: chengyinRetry);
+  await container.read(localePreferenceProvider.notifier).restore();
   // 启动即尝试用已存 token 恢复登录态(异步,期间路由停在 splash)。
   container.read(authControllerProvider.notifier).bootstrap();
   runApp(
@@ -49,7 +52,10 @@ class ChengyinApp extends ConsumerWidget {
     final router = ref.watch(appRouterProvider);
     final ThemeData materialTheme = AppTheme.dark();
     return CupertinoApp.router(
-      title: '城瘾',
+      onGenerateTitle: (context) => AppLocalizations.of(context).appName,
+      locale: ref.watch(localePreferenceProvider),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localeListResolutionCallback: resolveAppLocale,
       debugShowCheckedModeBanner: false,
       color: materialTheme.scaffoldBackgroundColor,
       theme: CupertinoThemeData(
@@ -65,13 +71,7 @@ class ChengyinApp extends ConsumerWidget {
         scaffoldBackgroundColor: materialTheme.scaffoldBackgroundColor,
         barBackgroundColor: materialTheme.scaffoldBackgroundColor,
       ),
-      // 根已经是 CupertinoApp,但页面里还有 57 处 Material 组件(RefreshIndicator
-      // 等)要求 MaterialLocalizations,拿不到就直接断言崩。MaterialApp 时代提供的
-      // 也是 DefaultMaterialLocalizations,这里补回来即行为不变;等 Material 组件
-      // 清干净后可以删。
-      localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
-        DefaultMaterialLocalizations.delegate,
-      ],
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
       builder: (BuildContext context, Widget? child) =>
           Theme(data: materialTheme, child: child ?? const SizedBox.shrink()),
       routerConfig: router,

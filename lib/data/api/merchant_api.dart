@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 
 import '../../core/network/dio_client.dart';
+import '../../core/network/request_session_scope.dart';
 import '../models/merchant.dart';
 import '../models/merchant_dashboard.dart';
 import '../models/merchant_ledger.dart';
@@ -1274,7 +1275,7 @@ class MerchantApi {
     String path,
     Map<String, dynamic> body,
   ) async {
-    final resp = await _client.dio.post<Map<String, dynamic>>(path, data: body);
+    final resp = await _client.dio.post<Map<String, dynamic>>(path, data: body, options: RequestSessionScope.options());
     final Map<String, dynamic> res = resp.data ?? <String, dynamic>{};
     if ((res['code'] as num?)?.toInt() != 200) {
       throw MerchantApiException((res['msg'] ?? '请求失败').toString());
@@ -1534,7 +1535,7 @@ class MerchantApi {
     String path,
     Map<String, dynamic> body,
   ) async {
-    final resp = await _client.dio.post<Map<String, dynamic>>(path, data: body);
+    final resp = await _client.dio.post<Map<String, dynamic>>(path, data: body, options: RequestSessionScope.options());
     final Map<String, dynamic> res = resp.data ?? <String, dynamic>{};
     if ((res['code'] as num?)?.toInt() != 200) {
       throw MerchantApiException((res['msg'] ?? '加载失败').toString());

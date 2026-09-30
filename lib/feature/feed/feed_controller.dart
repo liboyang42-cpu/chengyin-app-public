@@ -13,6 +13,7 @@ final feedProvider =
 class FeedNotifier extends AsyncNotifier<List<Topic>> {
   static const int _pageSize = 10;
   int _page = 1;
+  int _generation = 0;
   bool _hasMore = true;
   bool _loadingMore = false;
   bool _loadMoreFailed = false;
@@ -23,19 +24,24 @@ class FeedNotifier extends AsyncNotifier<List<Topic>> {
   @override
   Future<List<Topic>> build() async {
     // 每次重建(含下拉刷新)复位分页状态,避免与在途 loadMore 串台
+    final generation = ++_generation;
     _page = 1;
+    _hasMore = false;
     _loadingMore = false;
     _loadMoreFailed = false;
     final first = await ref
-        .read(topicApiProvider)
+        .watch(topicApiProvider)
         .list(pageNum: 1, pageSize: _pageSize);
-    _hasMore = first.length >= _pageSize;
+    if (ref.mounted && generation == _generation) {
+      _hasMore = first.length >= _pageSize;
+    }
     return first;
   }
 
   /// 滚到底加载下一页。失败可重试(reset 后再调)。
   Future<void> loadMore() async {
-    if (!_hasMore || _loadingMore) return;
+    if (!_hasMore || _loadingMore || state.isLoading) return;
+    final generation = _generation;
     _loadingMore = true;
     _loadMoreFailed = false;
     final requestedPage = _page + 1;
@@ -44,20 +50,20 @@ class FeedNotifier extends AsyncNotifier<List<Topic>> {
           .read(topicApiProvider)
           .list(pageNum: requestedPage, pageSize: _pageSize);
       // provider 已销毁(autoDispose)或期间发生过刷新(页码已被重置)→ 丢弃本次结果
-      if (!ref.mounted || requestedPage != _page + 1) return;
+      if (!ref.mounted || generation != _generation || requestedPage != _page + 1) return;
       _page = requestedPage;
       if (next.length < _pageSize) _hasMore = false;
       // 拼接基于 await 后的最新列表,而非进入时的快照
       final current = state.value ?? <Topic>[];
       state = AsyncData<List<Topic>>(<Topic>[...current, ...next]);
     } catch (_) {
-      if (ref.mounted) {
+      if (ref.mounted && generation == _generation) {
         _loadMoreFailed = true;
         // 重新 emit 同一份列表,触发 UI 重建以显示 footer 失败态
         state = AsyncData<List<Topic>>(state.value ?? <Topic>[]);
       }
     } finally {
-      if (ref.mounted) _loadingMore = false;
+      if (ref.mounted && generation == _generation) _loadingMore = false;
     }
   }
 }

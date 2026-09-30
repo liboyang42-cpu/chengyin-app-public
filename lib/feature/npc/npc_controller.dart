@@ -1,8 +1,11 @@
 import 'dart:convert';
+import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers.dart';
+import '../../core/network/session_data.dart';
+import '../../core/network/request_session_scope.dart';
 import '../../data/models/npc.dart';
 
 // --- 全局 NPC 常驻状态 ---
@@ -22,26 +25,42 @@ class GlobalNpcState {
 }
 
 class GlobalNpcNotifier extends Notifier<GlobalNpcState> {
+  int _generation = 0;
+
   @override
   GlobalNpcState build() {
-    // ★ 自加载:原先由 map_page / profile_page 各自在 build() 里
-    //   `Future.microtask(load)` 触发 —— 每次重建都发一次请求。
-    //   放在这里只在 provider 首次被 watch 时跑一次。
-    Future.microtask(load);
+    // Preserve existing guest loading. Rebuild when the API's
+    // session dependency changes, without retaining an earlier response.
+    ref.watch(aiNpcApiProvider);
+    final generation = ++_generation;
+    ref.onDispose(() { _generation++; });
+    Future.microtask(() {
+      if (ref.mounted && generation == _generation) load();
+    });
     return const GlobalNpcState();
   }
 
   Future<void> load() async {
-    if (state.loading) return;
+    if (!ref.mounted || state.loading) return;
+    final generation = _generation;
     state = state.copyWith(loading: true);
     try {
       final api = ref.read(aiNpcApiProvider);
-      final profiles = await api.fetchProfiles(scope: 'global');
+      final scope = RequestSessionScope(
+        () => ref.mounted && generation == _generation,
+        requireAuthentication: false,
+      );
+      final profiles = await RequestSessionScope.run(
+        scope, () => api.fetchProfiles(scope: 'global'),
+      );
+      if (!ref.mounted || generation != _generation) return;
       state = GlobalNpcState(
         profile: profiles.isNotEmpty ? profiles.first : null,
       );
     } catch (_) {
-      state = const GlobalNpcState(); // 静默降级
+      if (ref.mounted && generation == _generation) {
+        state = const GlobalNpcState(); // 静默降级
+      }
     }
   }
 }
@@ -95,30 +114,58 @@ class NpcSessionNotifier extends Notifier<NpcSessionState> {
   final int _activityId;
 
   @override
-  NpcSessionState build() => const NpcSessionState();
+  NpcSessionState build() {
+    _cancelPending();
+    _scope = null;
+    final generation = ++_generation;
+    ref.onDispose(() { _generation++; _cancelPending(); });
+    try {
+      final session = watchSessionDataScope(ref);
+      _scope = RequestSessionScope(() => generation == _generation && session.isCurrent());
+    } on SessionDataUnavailable { /* No private session while signed out. */ }
+    return const NpcSessionState();
+  }
+
+  int _generation = 0;
+  RequestSessionScope? _scope;
+  StreamIterator<String>? _chat;
+  final _bubbleTimers = <Timer>[];
+
+  void _cancelPending() {
+    final chat = _chat;
+    _chat = null;
+    if (chat != null) unawaited(chat.cancel());
+    for (final timer in _bubbleTimers) { timer.cancel(); }
+    _bubbleTimers.clear();
+  }
 
   Future<void> loadProfiles() async {
+    final scope = _scope;
+    if (scope == null || !scope.isCurrent()) return;
     try {
       final api = ref.read(aiNpcApiProvider);
-      final npcs = await api.fetchProfiles(
+      final npcs = await RequestSessionScope.run(scope, () => api.fetchProfiles(
         scope: 'activity',
         activityId: _activityId,
-      );
+      ));
+      if (!scope.isCurrent()) return;
       state = state.copyWith(npcs: npcs);
     } catch (_) {}
   }
 
   /// 事件触发 → 拉冒泡话术 → 推入队列
   Future<void> onEvent(NpcEventType event, {int? nodeId}) async {
-    if (state.npcs.isEmpty) return;
+    final scope = _scope;
+    if (state.npcs.isEmpty || scope == null || !scope.isCurrent()) return;
     final primary = state.npcs.first;
     try {
       final api = ref.read(aiNpcApiProvider);
-      final line = await api.fetchEventLine(
+      final line = await RequestSessionScope.run(scope, () => api.fetchEventLine(
         profileId: primary.profileId,
         eventType: event.apiValue,
         nodeId: nodeId,
-      );
+      ));
+      if (!scope.isCurrent()) return;
       if (line.line.isNotEmpty) {
         state = state.copyWith(
           bubbleQueue: [...state.bubbleQueue, line],
@@ -127,9 +174,12 @@ class NpcSessionNotifier extends Notifier<NpcSessionState> {
         // ★ 没有这行,队列只进不出:UI 渲染的是 bubbleQueue.first,
         //   第一条冒泡会永远停在屏幕上,之后所有事件的话术都看不到。
         //   (popBubble 在此之前零调用方 —— 写了但没人调。)
-        Future.delayed(_bubbleTtl, () {
-          if (ref.mounted) popBubble();
+        late final Timer timer;
+        timer = Timer(_bubbleTtl, () {
+          _bubbleTimers.remove(timer);
+          if (scope.isCurrent()) popBubble();
         });
+        _bubbleTimers.add(timer);
       }
     } catch (_) {}
   }
@@ -143,44 +193,58 @@ class NpcSessionNotifier extends Notifier<NpcSessionState> {
 
   /// 追问: SSE 流式累加 delta
   Future<void> sendChat(String message) async {
-    if (state.npcs.isEmpty || state.loading) return;
+    final scope = _scope;
+    if (state.npcs.isEmpty || state.loading || scope == null || !scope.isCurrent()) return;
     state = state.copyWith(loading: true, clearDelta: true);
     final primary = state.npcs.first;
     final buf = StringBuffer();
+    StreamIterator<String>? iterator;
     try {
-      final api = ref.read(aiNpcApiProvider);
-      final stream = api.chatStream(
-        activityId: _activityId,
-        profileId: primary.profileId,
-        message: message,
-      );
-      await for (final data in stream) {
-        try {
-          final json = jsonDecode(data) as Map<String, dynamic>;
-          if (json['done'] == true) {
-            // 完成: 将完整回复加入历史
-            final fullLine = NpcLine(
-              profileId: primary.profileId,
-              name: primary.name,
-              avatar: primary.avatar,
-              line: buf.toString(),
-            );
-            state = state.copyWith(
-              history: [...state.history, fullLine],
-              loading: false,
-              clearDelta: true,
-            );
-            return;
-          }
-          final delta = json['delta'] as String?;
-          if (delta != null) {
-            buf.write(delta);
-            state = state.copyWith(streamDelta: buf.toString());
-          }
-        } catch (_) {}
-      }
+      await RequestSessionScope.run(scope, () async {
+        final api = ref.read(aiNpcApiProvider);
+        final stream = api.chatStream(
+          activityId: _activityId,
+          profileId: primary.profileId,
+          message: message,
+        );
+        final current = StreamIterator<String>(stream);
+        iterator = current;
+        _chat = current;
+        while (await current.moveNext()) {
+          if (!scope.isCurrent()) return;
+          final data = current.current;
+          try {
+            final json = jsonDecode(data) as Map<String, dynamic>;
+            if (json['done'] == true) {
+              // 完成: 将完整回复加入历史
+              final fullLine = NpcLine(
+                profileId: primary.profileId,
+                name: primary.name,
+                avatar: primary.avatar,
+                line: buf.toString(),
+              );
+              state = state.copyWith(
+                history: [...state.history, fullLine],
+                loading: false,
+                clearDelta: true,
+              );
+              return;
+            }
+            final delta = json['delta'] as String?;
+            if (delta != null) {
+              buf.write(delta);
+              state = state.copyWith(streamDelta: buf.toString());
+            }
+          } catch (_) {}
+        }
+      });
     } catch (_) {
-      state = state.copyWith(loading: false, clearDelta: true);
+      // Failed/stale streams never contribute a completed reply.
+    } finally {
+      final current = iterator;
+      if (current != null) await current.cancel();
+      if (identical(_chat, current)) _chat = null;
+      if (scope.isCurrent()) state = state.copyWith(loading: false, clearDelta: true);
     }
   }
 }

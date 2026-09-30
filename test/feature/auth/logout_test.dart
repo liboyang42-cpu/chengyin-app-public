@@ -1,3 +1,4 @@
+import 'package:chengyin_app/core/feature_flags.dart';
 // 退出登录。
 //
 // ★ App 此前**只清本地 token,从不通知服务端**。
@@ -10,10 +11,55 @@
 //   这是「尽力而为」不是「必须成功」——两条一起才对,少一条都是 bug。
 
 import 'dart:io';
+import 'dart:async';
+import 'package:chengyin_app/core/network/token_store.dart';
+import 'package:chengyin_app/core/providers.dart';
+import 'package:chengyin_app/data/api/auth_api.dart';
+import 'package:chengyin_app/data/api/config_api.dart';
+import 'package:chengyin_app/data/models/user.dart';
+import 'package:chengyin_app/feature/auth/auth_controller.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'package:flutter_test/flutter_test.dart';
 
+class _Store extends TokenStore {
+  _Store() : super(const FlutterSecureStorage());
+  String? token = 'synthetic-session';
+  int clears = 0;
+  @override
+  Future<String?> read() async => token;
+  @override
+  Future<void> clear() async { clears++; token = null; }
+}
+
+class _Auth extends AuthController {
+  @override
+  AuthState build() => AuthState(initialized: true,
+      user: User(id: 1, nickname: 'Fixture', avatar: '', role: 'player'));
+}
+
+class _Api implements AuthApi {
+  final started = Completer<void>();
+  final response = Completer<void>();
+  int calls = 0;
+  @override
+  Future<void> logout() {
+    calls++;
+    started.complete();
+    return response.future;
+  }
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _Config implements ConfigApi {
+  @override
+  Future<Map<String, dynamic>> fetchFeatures() async => {};
+}
+
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   final String api = File('lib/data/api/auth_api.dart').readAsStringSync();
   final String ctrl = File(
     'lib/feature/auth/auth_controller.dart',
@@ -32,39 +78,37 @@ void main() {
     );
   });
 
-  test('★ 服务端失败不许阻断本地退出 —— 网络断了也得能退出去', () {
-    // 判据:调用被 try 包住,且 catch 之后仍然执行清理。
-    final int at = ctrl.indexOf('authApiProvider).logout()');
-    expect(at, greaterThan(0));
-
-    final String before = ctrl.substring(0, at);
-    final int tryAt = before.lastIndexOf('try {');
-    final int fnAt = before.lastIndexOf('Future<void> logout()');
-    expect(tryAt, greaterThan(fnAt), reason: '服务端调用没被 try 包住 —— 一失败用户就退不出去了');
-
-    final String after = ctrl.substring(at);
-    final int catchAt = after.indexOf('} catch');
-    final int clearAt = after.indexOf('_signOutLocally()');
-    expect(catchAt, greaterThan(0), reason: '没有 catch 分支');
-    expect(
-      clearAt,
-      greaterThan(catchAt),
-      reason:
-          '清本地 token 必须在 catch **之后** —— '
-          '放在 try 里的话,服务端一失败就跳过了清理',
-    );
-  });
-
-  test('★ 清本地这一步不在 try 里 —— 顺序错了等于没修', () {
-    // 常见写法是把两步都塞进同一个 try:
-    //   try { await api.logout(); await store.clear(); } catch (_) {}
-    // 那样服务端一失败,clear 根本不会执行 —— 和完全不改一样。
-    final int fnAt = ctrl.indexOf('Future<void> logout()');
-    final String body = ctrl.substring(fnAt, fnAt + 900);
-    final int catchAt = body.indexOf('} catch');
-    final int clearAt = body.indexOf('_signOutLocally()');
-    expect(clearAt, greaterThan(catchAt));
-  });
+  for (final serverFails in [false, true]) {
+    test('logout clears locally after server ${serverFails ? "failure" : "success"}', () async {
+      final store = _Store();
+      final api = _Api();
+      final container = ProviderContainer(overrides: [
+        tokenStoreProvider.overrideWithValue(store),
+        authApiProvider.overrideWithValue(api),
+        configApiProvider.overrideWithValue(_Config()),
+        authControllerProvider.overrideWith(_Auth.new),
+      ]);
+      addTearDown(container.dispose);
+      final controller = container.read(authControllerProvider.notifier);
+      final logout = controller.logout();
+      expect(container.read(authControllerProvider).isLoggedIn, isFalse,
+          reason: 'Pending server revocation must not trap the user on a signed-in screen');
+      await api.started.future;
+      expect(api.calls, 1);
+      expect(store.token, 'synthetic-session',
+          reason: 'Server revocation still needs the original credential');
+      if (serverFails) {
+        api.response.completeError(StateError('synthetic offline failure'));
+      } else {
+        api.response.complete();
+      }
+      await logout;
+      expect(store.clears, 1, reason: 'Server failure must not skip local cleanup');
+      expect(store.token, isNull);
+      expect(container.read(authControllerProvider).isLoggedIn, isFalse);
+      expect(container.read(authControllerProvider).initialized, isTrue);
+    });
+  }
 
   test('★ 401 只做本地失效，不得再请求 logout 造成递归', () {
     final String providers = File('lib/core/providers.dart').readAsStringSync();

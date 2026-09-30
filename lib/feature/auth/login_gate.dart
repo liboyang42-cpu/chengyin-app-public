@@ -9,6 +9,7 @@ import '../../core/widgets/cy_native_sheet.dart';
 import '../../core/widgets/cy_widgets.dart';
 import '../legal/legal_doc_page.dart';
 import 'auth_controller.dart';
+import '../../l10n/strings.dart';
 import 'phone_login_sheet.dart';
 
 /// 登录分界线助手:游客浏览免登录,执行需要账号的动作(报名/发布/加入俱乐部/
@@ -106,12 +107,12 @@ class _LoginSheetState extends ConsumerState<_LoginSheet> {
               children: <Widget>[
                 // 抓手由 sheet presenter 自带(S2);这里留等高空间保持标题落点。
                 const SizedBox(height: CyTokens.space4),
-                const CySectionTitle('登录城瘾'),
+                CySectionTitle(stringsOf(context).loginTitle),
                 const SizedBox(height: CyTokens.space1_5),
                 // 副标与 CySectionTitle 同侧左对齐:标题左、副标居中会显得
                 // 落点是随手写的(critic 二遍判据)。协议行保持居中页脚形态。
                 Text(
-                  '登录后即可报名、发布、加入俱乐部',
+                  stringsOf(context).settingsResidualLoginBenefits,
                   style: CyType.caption1.copyWith(color: palette.textSecondary),
                 ),
                 const SizedBox(height: CyTokens.space5),
@@ -144,7 +145,7 @@ class _LoginSheetState extends ConsumerState<_LoginSheet> {
                           else
                             const Icon(Icons.wechat, size: 20),
                           const SizedBox(width: CyTokens.space2),
-                          const Text('微信登录'),
+                          Text(stringsOf(context).wechatLogin),
                         ],
                       ),
                     ),
@@ -159,7 +160,7 @@ class _LoginSheetState extends ConsumerState<_LoginSheet> {
                       onPressed: loading
                           ? null
                           : () => setState(() => _phoneExpanded = true),
-                      child: const Text('手机号登录'),
+                      child: Text(stringsOf(context).phoneLogin),
                     ),
                   ),
                   // ★ 判据用 Theme.of(context).platform,不用 dart:io 的 Platform.isIOS。
@@ -227,7 +228,7 @@ class _PhoneLoginFormInline extends StatelessWidget {
               child: const Icon(CupertinoIcons.chevron_left),
             ),
             Text(
-              '手机号登录',
+              stringsOf(context).phoneLogin,
               style: CyType.headline.copyWith(color: palette.textPrimary),
             ),
           ],
@@ -311,12 +312,12 @@ class _AppleSignInControlState extends State<AppleSignInControl> {
           child: Semantics(
             button: true,
             enabled: enabled,
-            label: '通过 Apple 登录',
+            label: stringsOf(context).appleLogin,
             child: ExcludeSemantics(
               child: SignInWithAppleButton(
                 height: height,
                 style: appleStyle,
-                text: '通过 Apple 登录',
+                text: stringsOf(context).appleLogin,
                 onPressed: enabled ? widget.onPressed : null,
               ),
             ),

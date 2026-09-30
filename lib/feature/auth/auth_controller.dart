@@ -7,6 +7,8 @@ import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import '../../core/providers.dart';
 import '../../core/feature_flags.dart';
 import '../../data/models/user.dart';
+import '../../l10n/strings_provider.dart';
+import '../../core/network/request_session_scope.dart';
 
 /// 微信开放平台 App AppId(原生微信登录用)。
 /// TODO(native-login): 换成真实开放平台 AppId(`wx` 开头),并同步:
@@ -68,12 +70,37 @@ class AuthState {
 }
 
 class AuthController extends Notifier<AuthState> {
+  int _generation = 0;
+  Future<void> _storageTail = Future<void>.value();
+
   @override
-  AuthState build() => const AuthState();
+  AuthState build() {
+    ref.onDispose(() => _generation++);
+    return const AuthState();
+  }
+
+  bool _current(int generation) => generation == _generation;
+
+  RequestSessionScope requestScope(int expectedUserId) {
+    final generation = _generation;
+    return RequestSessionScope(() => _current(generation) && !state.loading && state.user?.id == expectedUserId);
+  }
+
+  Future<T> _serializeStorage<T>(Future<T> Function() action, {bool lockToken = true}) {
+    final store = ref.read(tokenStoreProvider);
+    final operation = _storageTail.then((_) => lockToken ? store.sessionOperation(action) : action());
+    _storageTail = operation.then<void>((_) {}, onError: (Object _, StackTrace __) {});
+    return operation;
+  }
+
+  void _finishLoading(int generation) {
+    if (_current(generation)) state = state.copyWith(loading: false);
+  }
 
   /// 启动时用已存 token 拉 /api/userInfo 恢复登录态;失败则清 token。
   /// 无论成败,最终 initialized=true 放行路由。
   Future<void> bootstrap() async {
+    final generation = ++_generation;
     String? token;
     try {
       // 钥匙串读偶发不返回(securityd 卡死),有界等待后按游客放行,
@@ -85,9 +112,10 @@ class AuthController extends Notifier<AuthState> {
     } catch (_) {
       // 钥匙串在模拟器、设备恢复或签名变化后可能暂时不可读。
       // 这不应把 App 永久锁在启动页；按游客态放行，后续仍可重新登录。
-      state = const AuthState(initialized: true);
+      if (_current(generation)) state = const AuthState(initialized: true);
       return;
     }
+    if (!_current(generation)) return;
     if (token == null || token.isEmpty) {
       state = const AuthState(initialized: true);
       _refreshFeatureFlagsInBackground();
@@ -95,31 +123,36 @@ class AuthController extends Notifier<AuthState> {
     }
     try {
       final body = await ref.read(authApiProvider).userInfo();
+      if (!_current(generation)) return;
       final ok = (body['code'] as num?)?.toInt() == 200;
       final data = body['appUser'];
-      if (ok && data is Map<String, dynamic>) {
+      if (ok && data is Map<String, dynamic> && User.fromJson(data).id > 0) {
         state = AuthState(user: User.fromJson(data), initialized: true);
         _refreshFeatureFlagsInBackground();
       } else {
-        await _clearStoredTokenBestEffort();
+        await _clearStoredTokenBestEffort(generation);
+        if (!_current(generation)) return;
         ref.read(featureFlagsProvider.notifier).clear();
         state = const AuthState(initialized: true);
         _refreshFeatureFlagsInBackground();
       }
     } catch (_) {
-      await _clearStoredTokenBestEffort();
+      if (!_current(generation)) return;
+      await _clearStoredTokenBestEffort(generation);
+      if (!_current(generation)) return;
       state = const AuthState(initialized: true);
       ref.read(featureFlagsProvider.notifier).clear();
       _refreshFeatureFlagsInBackground();
     }
   }
 
-  Future<void> _clearStoredTokenBestEffort() async {
+  Future<void> _clearStoredTokenBestEffort(int generation) async {
     try {
-      await ref.read(tokenStoreProvider).clear();
+      await _serializeStorage(() async {
+        if (_current(generation)) await ref.read(tokenStoreProvider).clear();
+      });
     } catch (_) {
-      // 本地凭据存储不可用时仍要放行启动/登出流程；
-      // 后续请求会由服务端 401 再次拒绝失效 token。
+      // Keychain failures must not keep the user logged in locally.
     }
   }
 
@@ -143,8 +176,9 @@ class AuthController extends Notifier<AuthState> {
       // ★ 不再写「请改用手机号登录」—— 手机号路当前同样走不通
       //   (后端 `sms.aliyun.*` 未配置,验证码发不出去,B1 账号域报告 P2-2)。
       //   引导只指向真实可达的出口:iOS 设备上 Apple 登录恒在。
-      return '暂时无法使用微信登录,请用「通过 Apple 登录」,或稍后再试';
+      return ref.read(appStringsProvider).authWechatUnavailable;
     }
+    final generation = ++_generation;
     state = state.copyWith(loading: true);
     final fluwx = Fluwx();
     try {
@@ -155,9 +189,11 @@ class AuthController extends Notifier<AuthState> {
       );
 
       // 2) 没装微信直接报错,避免空等。
-      if (!await fluwx.isWeChatInstalled) {
-        state = state.copyWith(loading: false);
-        return '未安装微信,请改用其他方式登录';
+      final installed = await fluwx.isWeChatInstalled;
+      if (!_current(generation)) return null;
+      if (!installed) {
+        _finishLoading(generation);
+        return ref.read(appStringsProvider).authWechatNotInstalled;
       }
 
       // 3) authBy 只负责把授权请求发给微信;真正的 code 通过响应流异步回来。
@@ -180,10 +216,11 @@ class AuthController extends Notifier<AuthState> {
         final sent = await fluwx.authBy(
           which: NormalAuth(scope: 'snsapi_userinfo', state: 'chengyin_login'),
         );
+        if (!_current(generation)) return null;
         if (!sent) {
           cancelable.cancel();
-          state = state.copyWith(loading: false);
-          return '微信授权拉起失败';
+          _finishLoading(generation);
+          return ref.read(appStringsProvider).authWechatLaunchFailed;
         }
         // 等微信回调(限时,避免用户切走后永远 loading)。
         code = await codeCompleter.future.timeout(
@@ -196,16 +233,19 @@ class AuthController extends Notifier<AuthState> {
 
       // 用户取消 / 拿不到 code:静默结束,不报错。
       if (code == null || code.isEmpty) {
-        state = state.copyWith(loading: false);
+        _finishLoading(generation);
         return null;
       }
 
+      if (!_current(generation)) return null;
+
       // 4) 换 token(与 loginWithPhone 同款)。
       final body = await ref.read(authApiProvider).loginWithWechatApp(code);
-      return _consumeLoginBody(body);
+      return await _consumeLoginBody(body, generation);
     } catch (_) {
-      state = state.copyWith(loading: false);
-      return '网络错误,请稍后重试';
+      if (!_current(generation)) return null;
+      _finishLoading(generation);
+      return ref.read(appStringsProvider).networkError;
     }
   }
 
@@ -216,6 +256,7 @@ class AuthController extends Notifier<AuthState> {
   /// ⚠️ 后端 `apple.clientId` 生产实测未配置(`/api/login/apple` 返回
   ///   「Apple登录未配置」,2026-09-19),配置前本通道端到端不可用。
   Future<String?> loginWithApple() async {
+    final generation = ++_generation;
     state = state.copyWith(loading: true);
     try {
       final credential = await SignInWithApple.getAppleIDCredential(
@@ -224,17 +265,19 @@ class AuthController extends Notifier<AuthState> {
           AppleIDAuthorizationScopes.fullName,
         ],
       );
+      if (!_current(generation)) return null;
       final identityToken = credential.identityToken;
       if (identityToken == null || identityToken.isEmpty) {
-        state = state.copyWith(loading: false);
-        return 'Apple 登录失败:未获取到凭证';
+        _finishLoading(generation);
+        return ref.read(appStringsProvider).authAppleMissingCredential;
       }
       final body = await ref
           .read(authApiProvider)
           .loginWithApple(identityToken);
-      return _consumeLoginBody(body);
+      return await _consumeLoginBody(body, generation);
     } on SignInWithAppleAuthorizationException catch (e) {
-      state = state.copyWith(loading: false);
+      if (!_current(generation)) return null;
+      _finishLoading(generation);
       if (e.code == AuthorizationErrorCode.canceled) {
         // ★ 「取消」≠ 只有用户主动取消这一种:设备上**没有登录 Apple 账户**时,
         //   系统面板根本不会出现,授权同样以 canceled 结束(B1 账号域报告 P2-1,
@@ -242,31 +285,45 @@ class AuthController extends Notifier<AuthState> {
         //   两种情况前端拿不到可区分的信号,所以给一条不指责的中性提示,
         //   把唯一可行动的出口写在句里。宁可让真取消多看一眼提示,
         //   也不能让「点了没反应」继续是死寂。
-        return 'Apple 登录没有完成。若这台设备还没登录 Apple 账户,'
-            '请先在系统「设置 → Apple 账户」登录后再试';
+        return ref.read(appStringsProvider).authAppleIncomplete;
       }
-      return 'Apple 登录失败,请稍后重试';
+      return ref.read(appStringsProvider).authAppleFailed;
     } catch (_) {
-      state = state.copyWith(loading: false);
-      return '网络错误,请稍后重试';
+      if (!_current(generation)) return null;
+      _finishLoading(generation);
+      return ref.read(appStringsProvider).networkError;
     }
   }
 
   /// 统一消费登录返回体:取 token 持久化 + 刷新登录态。
   /// 与 [loginWithPhone] 的 token 处理逻辑一致。
-  Future<String?> _consumeLoginBody(Map<String, dynamic> body) async {
+  Future<String?> _consumeLoginBody(Map<String, dynamic> body, int generation) async {
+    if (!_current(generation)) return null;
+    final strings = ref.read(appStringsProvider);
     final ok = (body['code'] as num?)?.toInt() == 200;
     if (!ok) {
-      state = state.copyWith(loading: false);
-      return (body['msg'] ?? '登录失败').toString();
+      _finishLoading(generation);
+      return (body['msg'] ?? strings.authLoginFailed).toString();
     }
-    final token = body['token'] as String?;
-    final data = (body['data'] as Map<String, dynamic>?) ?? <String, dynamic>{};
-    if (token != null && token.isNotEmpty) {
+    final token = body['token'];
+    final data = body['data'];
+    if (token is! String || token.trim().isEmpty ||
+        data is! Map<String, dynamic>) {
+      _finishLoading(generation);
+      return strings.authInvalidLoginResponse;
+    }
+    final user = User.fromJson(data);
+    if (user.id <= 0) {
+      _finishLoading(generation);
+      return strings.authInvalidLoginResponse;
+    }
+    await _serializeStorage(() async {
+      if (!_current(generation)) return;
       await ref.read(tokenStoreProvider).write(token);
-    }
-    state = AuthState(user: User.fromJson(data), initialized: true);
-    _refreshFeatureFlagsInBackground();
+      if (!_current(generation)) return;
+      state = AuthState(user: user, initialized: true);
+      _refreshFeatureFlagsInBackground();
+    });
     return null;
   }
 
@@ -274,70 +331,66 @@ class AuthController extends Notifier<AuthState> {
   /// ⚠️ 后端端点已实现,但短信通道生产实测未配置(见
   ///   docs/research/login-channels-sim-20260919.md),现网无法走到本方法。
   Future<String?> loginWithPhone(String phone, String code) async {
+    final generation = ++_generation;
     state = state.copyWith(loading: true);
     try {
       final body = await ref.read(authApiProvider).loginWithPhone(phone, code);
-      final ok = (body['code'] as num?)?.toInt() == 200;
-      if (!ok) {
-        state = state.copyWith(loading: false);
-        return (body['msg'] ?? '登录失败').toString();
-      }
-      // 后端:token 在 AjaxResult 顶层,用户在 data
-      final token = body['token'] as String?;
-      final data =
-          (body['data'] as Map<String, dynamic>?) ?? <String, dynamic>{};
-      if (token != null && token.isNotEmpty) {
-        await ref.read(tokenStoreProvider).write(token);
-      }
-      state = AuthState(user: User.fromJson(data), initialized: true);
-      _refreshFeatureFlagsInBackground();
-      return null;
+      return await _consumeLoginBody(body, generation);
     } catch (_) {
-      state = state.copyWith(loading: false);
-      return '网络错误,请稍后重试';
+      if (!_current(generation)) return null;
+      _finishLoading(generation);
+      return ref.read(appStringsProvider).networkError;
     }
   }
 
-  Future<void> logout() async {
-    // ★ 先通知服务端作废 token(`/api/logout` → delLoginAppUser)。
-    //   不调它的话,这份凭据在服务端**一直有效** —— 手机丢了或在别人设备上
-    //   退出后,那个 token 仍然能用。
-    //
-    // ⚠️ 但这是**尽力而为**,不是必须成功:服务端失败绝不能阻断本地退出,
-    //   否则网络一断,用户就被困在已登录状态里退不出去。
-    try {
-      await ref.read(authApiProvider).logout();
-    } catch (_) {
-      // 通知失败也照常清本地 —— 用户点了退出就必须退成。
-    }
-    await _signOutLocally();
-  }
+  Future<void> logout() => _signOutLocally(notifyServer: true);
 
-  /// 服务端已经用 401 宣告当前会话失效时，只需要本地退出。
-  /// 不能再请求 `/api/logout`，否则失效 token 会再次收到 401，
-  /// 重入 Dio 的 onUnauthorized 链路。
+  /// A 401 must never recursively call the logout endpoint.
   Future<void> expireSession() => _signOutLocally();
 
-  Future<void> _signOutLocally() async {
-    await _clearStoredTokenBestEffort();
-    ref.read(featureFlagsProvider.notifier).clear();
+  Future<void> _signOutLocally({bool notifyServer = false}) {
+    final generation = ++_generation;
+    // Route away immediately, even while server revocation is pending.
     state = const AuthState(initialized: true);
-    _refreshFeatureFlagsInBackground();
+    ref.read(featureFlagsProvider.notifier).clear();
+    return _serializeStorage(() async {
+      if (notifyServer) {
+        try {
+          // Keep new login writes behind revocation so it cannot revoke a
+          // replacement token. Dio supplies the bounded network timeout.
+          await ref.read(authApiProvider).logout();
+        } catch (_) {
+          // Best effort: local logout still completes when offline.
+        }
+      }
+      try {
+        await ref.read(tokenStoreProvider).sessionOperation(() => ref.read(tokenStoreProvider).clear());
+      } catch (_) {
+        // Local state remains signed out if keychain deletion fails.
+      }
+      if (_current(generation)) _refreshFeatureFlagsInBackground();
+    }, lockToken: false);
   }
 
   void _refreshFeatureFlagsInBackground() {
+    unawaited(ref.read(pendingInviterProvider).replay());
     unawaited(ref.read(featureFlagsProvider.notifier).load());
   }
 
   /// 重新拉取用户信息刷新本地角色(RBAC 单一真源在服务端)。
   /// 成为俱乐部主理人(become-leader)等操作后,本地 user.role 会过期,调用本方法回读。
   Future<void> refreshRole() async {
+    final generation = _generation;
+    final userId = state.user?.id;
+    if (userId == null) return;
     try {
       final body = await ref.read(authApiProvider).userInfo();
       final ok = (body['code'] as num?)?.toInt() == 200;
       final data = body['appUser'];
-      if (ok && data is Map<String, dynamic>) {
-        state = state.copyWith(user: User.fromJson(data));
+      if (_current(generation) && ok && data is Map<String, dynamic>) {
+        final user = User.fromJson(data);
+        if (user.id != userId) return;
+        state = state.copyWith(user: user);
       }
     } catch (_) {
       // 回读失败不阻塞流程:角色真源在后端,下次登录会拉回正确值。

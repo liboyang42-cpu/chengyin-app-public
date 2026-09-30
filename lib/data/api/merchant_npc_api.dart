@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import '../../core/network/dio_client.dart';
+import '../../core/network/request_session_scope.dart';
 import '../models/merchant_npc.dart';
 
 /// 门店 NPC:商家自助配置 + 玩家侧对话。
@@ -170,17 +171,20 @@ class MerchantNpcApi {
     final resp = await _client.dio.post<Map<String, dynamic>>(
       path,
       data: body,
+      options: RequestSessionScope.options(),
     );
     final Map<String, dynamic> payload = resp.data ?? <String, dynamic>{};
     if ((payload['code'] as num?)?.toInt() != 200) {
-      throw MerchantNpcException((payload['msg'] as String?) ?? '请求失败');
+      throw MerchantNpcException((payload['msg'] as String?) ?? '请求失败', isLocalFallback: payload['msg'] == null);
     }
     return (payload['data'] as Map<String, dynamic>?) ?? <String, dynamic>{};
   }
 }
 
 class MerchantNpcException implements Exception {
-  const MerchantNpcException(this.message);
+  const MerchantNpcException(this.message, {this.isLocalFallback = false});
+
+  final bool isLocalFallback;
 
   final String message;
 
