@@ -45,7 +45,7 @@ const List<int> _idCardWeights = <int>[
   4,
   2,
 ];
-const String _idCardCheckCodes = '10X9876543';
+const String _idCardCheckCodes = '10X98765432';
 
 /// 去首尾与内部空白、末位 x 转大写。手写 X 几乎必然是小写,不归一化会把合法号判成非法。
 String normalizeIdCard(Object? value) =>

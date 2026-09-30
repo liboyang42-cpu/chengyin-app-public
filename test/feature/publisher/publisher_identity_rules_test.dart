@@ -18,7 +18,7 @@ String idWith17(String first17) {
   const weights = <int>[
     7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2,
   ];
-  const codes = '10X9876543';
+  const codes = '10X98765432';
   var sum = 0;
   for (var i = 0; i < 17; i++) {
     sum += int.parse(first17[i]) * weights[i];
