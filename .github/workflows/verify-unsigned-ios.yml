@@ -60,8 +60,11 @@ jobs:
           assert version["dartSdkVersion"] == "3.12.2", version
           PY
           flutter doctor -v
-      - name: Resolve locked Dart dependencies
-        run: flutter pub get --enforce-lockfile
+      - name: Resolve Dart dependencies and report lockfile repair
+        run: |
+          flutter pub get
+          git diff -- pubspec.lock
+          flutter pub get --enforce-lockfile
       - name: Build unsigned iOS release
         run: flutter build ios --release --no-codesign
       - name: Check unsigned app output
