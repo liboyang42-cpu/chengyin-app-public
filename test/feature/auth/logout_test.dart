@@ -1,3 +1,4 @@
+import 'package:chengyin_app/core/feature_flags.dart';
 // 退出登录。
 //
 // ★ App 此前**只清本地 token,从不通知服务端**。
@@ -34,7 +35,7 @@ class _Store extends TokenStore {
 
 class _Auth extends AuthController {
   @override
-  AuthState build() => const AuthState(initialized: true,
+  AuthState build() => AuthState(initialized: true,
       user: User(id: 1, nickname: 'Fixture', avatar: '', role: 'player'));
 }
 
