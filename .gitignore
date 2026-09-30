@@ -1,0 +1,61 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+#.vscode/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+/coverage/
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# 跑 golden 测试时生成的对比图(masterImage/testImage/*Diff)。
+# 历史上被误提交了 208 张,导致每次跑测试工作区都是脏的。
+test/golden/failures/
+# Gradle 构建产物(根 /build/ 之外的模块产物)。
+android/build/
+*.pem
+*.p12
+*.p8
+*.jks
+*.keystore
+*.mobileprovision
+.env
+.env.*
+*.har
+*.private.*

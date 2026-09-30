@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	TODO(apple-signin): Sign in with Apple 需要此 entitlement。
+	CODE_SIGN_ENTITLEMENTS 已写进 project.pbxproj(Debug/Release/Profile 三处),
+	此文件已真正接入工程,不再需要手动在 Xcode 里加 Capability。
+	仍需在 Apple Developer 后台为 App ID 勾选 "Sign in with Apple" 能力。
+	-->
+	<key>com.apple.developer.applesignin</key>
+	<array>
+		<string>Default</string>
+	</array>
+	<!--
+	微信登录/支付回跳需要 Universal Links(微信 iOS SDK 2020 起强制)。
+	域名须与 auth_controller.dart 的 kWechatUniversalLink 一致,
+	且要在开放平台「移动应用」里登记同一个 Universal Link。
+
+	⚠️ 两处外部前置,缺任一则真机回跳失败:
+	  ① Apple Developer 后台为该 App ID 勾选 Associated Domains 能力
+	     (没勾则带此 entitlement 的包**签名会失败**)
+	  ② 服务器 https://api.example.invalid/.well-known/apple-app-site-association
+	     返回 application/json,内容含 "TEAMID.com.chengyinhub.chengyinApp"
+	     (TEAMID 要等企业开发者账号下来才知道)
+	-->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:api.example.invalid</string>
+	</array>
+</dict>
+</plist>

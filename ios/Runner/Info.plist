@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleDisplayName</key>
+	<string>城瘾</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>chengyin_app</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(FLUTTER_BUILD_NAME)</string>
+	<key>CFBundleSignature</key>
+	<string>????</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>weixin</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>wxYOURAPPID</string>
+			</array>
+		</dict>
+	</array>
+	<key>CFBundleVersion</key>
+	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>weixin</string>
+		<string>weixinULAPI</string>
+		<!-- 地图导航走 https://maps.apple.com(苹果地图),系统 scheme 不需要声明;
+		     高德 amapuri/iosamap 已随 Task 1.4 拆除 —— 见 lib/core/map/map_launcher.dart。 -->
+	</array>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>用于扫描节点二维码、实时预览滤镜并拍照完成打卡和拍摄城市邮票</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>用于判断你是否到达节点完成到店打卡</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>用于选择照片完成拍照打卡</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>用于录制你的五句话样本，生成本店 AI 形象的声音；以及在店铺分身对话里按住说话向它提问</string>
+	<key>NSMotionUsageDescription</key>
+	<string>用于检测设备是否保持静止，完成静止挑战</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>用于把你生成的漫游分享海报保存到系统相册</string>
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+		<key>UISceneConfigurations</key>
+		<dict>
+			<key>UIWindowSceneSessionRoleApplication</key>
+			<array>
+				<dict>
+					<key>UISceneClassName</key>
+					<string>UIWindowScene</string>
+					<key>UISceneConfigurationName</key>
+					<string>flutter</string>
+					<key>UISceneDelegateClassName</key>
+					<string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>
+					<key>UISceneStoryboardFile</key>
+					<string>Main</string>
+				</dict>
+			</array>
+		</dict>
+	</dict>
+	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
+	<!-- 音频后台播放(锁屏/控制中心控制由 just_audio_background 提供)。
+	     只声明 audio 这一种;定位仍是前台按需采集,不加后台定位。 -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+	</array>
+	<key>UILaunchStoryboardName</key>
+	<string>LaunchScreen</string>
+	<key>UIMainStoryboardFile</key>
+	<string>Main</string>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+	</array>
+	<!-- ⚠️ 与 iPhone 那条保持一致:**只允许正竖屏**。
+	     倒竖屏(PortraitUpsideDown)在真机上会把底部固定 CTA 甩到顶上,
+	     而全站页面都是「底部固定主按钮」的版式。
+	     2026-08-20 实测:这里原本多了 UpsideDown,是 Flutter 模板残留 ——
+	     与 iPhone 键、AndroidManifest(screenOrientation=portrait)、
+	     main.dart 的锁向**四处口径三个样**。 -->
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+	</array>
+</dict>
+</plist>

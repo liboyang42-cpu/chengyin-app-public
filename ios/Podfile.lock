@@ -1,0 +1,50 @@
+PODS:
+  - apple_maps_flutter (0.0.1):
+    - Flutter
+  - Flutter (1.0.0)
+  - fluwx (0.0.1):
+    - Flutter
+    - fluwx/pay (= 0.0.1)
+  - fluwx/pay (0.0.1):
+    - Flutter
+    - WechatOpenSDK-XCFramework (~> 2.0.5)
+  - mjn_liquid_ui (0.2.13):
+    - Flutter
+  - sign_in_with_apple (0.0.1):
+    - Flutter
+  - WechatOpenSDK-XCFramework (2.0.5)
+
+DEPENDENCIES:
+  - apple_maps_flutter (from `.symlinks/plugins/apple_maps_flutter/ios`)
+  - Flutter (from `Flutter`)
+  - fluwx (from `.symlinks/plugins/fluwx/ios`)
+  - mjn_liquid_ui (from `.symlinks/plugins/mjn_liquid_ui/ios`)
+  - sign_in_with_apple (from `.symlinks/plugins/sign_in_with_apple/ios`)
+
+SPEC REPOS:
+  trunk:
+    - WechatOpenSDK-XCFramework
+
+EXTERNAL SOURCES:
+  apple_maps_flutter:
+    :path: ".symlinks/plugins/apple_maps_flutter/ios"
+  Flutter:
+    :path: Flutter
+  fluwx:
+    :path: ".symlinks/plugins/fluwx/ios"
+  mjn_liquid_ui:
+    :path: ".symlinks/plugins/mjn_liquid_ui/ios"
+  sign_in_with_apple:
+    :path: ".symlinks/plugins/sign_in_with_apple/ios"
+
+SPEC CHECKSUMS:
+  apple_maps_flutter: 2237d66a8e242082a2d88134af372f7b3375d7a6
+  Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
+  fluwx: 2ef787502fccb3f3596b380509001a8ea71cbbff
+  mjn_liquid_ui: 1a5d96b2fb2e86a12c9a499e3aff874d1848924e
+  sign_in_with_apple: c5dcc141574c8c54d5ac99dd2163c0c72ad22418
+  WechatOpenSDK-XCFramework: ff342ae616bb86df3d236aca38059dfd4bc4a949
+
+PODFILE CHECKSUM: 3c63482e143d1b91d2d2560aee9fb04ecc74ac7e
+
+COCOAPODS: 1.16.2

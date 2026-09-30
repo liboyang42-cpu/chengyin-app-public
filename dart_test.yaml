@@ -1,0 +1,9 @@
+# 只在开发机上能跑的测试,用 tag 标出来。
+# CI 现在跑在自托管的 Mac 上,只排除 needs-local-env;needs-macos-fonts 已经能在
+# CI 上正常跑(见 .github/workflows/ci.yml),留着这个 tag 是为了在非 macOS 机器上
+# 本地跑测试时能排除掉。
+tags:
+  needs-local-env:
+    # 依赖本机的兄弟仓(后端 / 小程序)、本机脚本或注入的密钥。
+  needs-macos-fonts:
+    # 依赖 macOS 系统中文字体的度量;换字体后布局尺寸变化导致假红。

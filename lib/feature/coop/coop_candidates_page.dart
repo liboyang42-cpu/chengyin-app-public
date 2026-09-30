@@ -1,0 +1,282 @@
+import '../../core/theme/cy_palette.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+
+import '../../core/widgets/cy_confirm.dart';
+import '../../core/widgets/cy_native_button.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../core/providers.dart';
+import '../../core/theme/cy_tokens.dart';
+import '../../core/widgets/cy_widgets.dart';
+import '../../core/widgets/status_view.dart';
+import '../../data/models/coop_candidate.dart';
+import '../../core/widgets/cy_native_notice.dart';
+import 'coop_guard.dart';
+
+final coopCandidatesProvider = FutureProvider.autoDispose
+    .family<CoopCandidates, int>((ref, int topicId) {
+      return ref.watch(coopApiProvider).candidates(topicId);
+    });
+
+/// 候选池(主题发布者视角)。对齐小程序 `pages/coop/candidates`。
+class CoopCandidatesPage extends ConsumerWidget {
+  const CoopCandidatesPage({super.key, required this.topicId});
+
+  final int topicId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    const String title = '承接候选';
+    const String needLogin = '登录后查看承接候选';
+    final Widget? gate = coopLoginGate(
+      context,
+      ref,
+      navTitle: title,
+      message: needLogin,
+    );
+    if (gate != null) return gate;
+    final async = ref.watch(coopCandidatesProvider(topicId));
+    return CupertinoPageScaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      navigationBar: const CupertinoNavigationBar(middle: Text(title)),
+      child: Material(
+        color: Colors.transparent,
+        child: SafeArea(
+          bottom: false,
+          child: async.when(
+            loading: () => const Center(child: CupertinoActivityIndicator()),
+            error: (Object e, _) {
+              if (isCoopUnauthorized(e)) {
+                return coopLoginStatus(
+                  context,
+                  ref,
+                  message: needLogin,
+                  refetch: () =>
+                      ref.invalidate(coopCandidatesProvider(topicId)),
+                );
+              }
+              final msg = coopErrorSub(e);
+              // ★ 「仅主题发布者可查看候选池」是权限态 —— 重试多少次都不会变,不给重试。
+              if (msg.contains('仅主题发布者')) {
+                return const StatusView(
+                  message: '只有主题发布者能看候选池',
+                  sub: '你不是这个主题的发布者',
+                  large: true,
+                );
+              }
+              return StatusView(
+                message: '候选池没能加载出来',
+                sub: msg,
+                large: true,
+                onRetry: () => ref.invalidate(coopCandidatesProvider(topicId)),
+              );
+            },
+            data: (CoopCandidates c) {
+              if (c.isEmpty) {
+                return const StatusView(
+                  message: '还没有承接候选',
+                  sub: '俱乐部申请承接或商家报名后,会出现在这里',
+                  large: true,
+                );
+              }
+              return RefreshIndicator.adaptive(
+                onRefresh: () async =>
+                    ref.invalidate(coopCandidatesProvider(topicId)),
+                child: ListView(
+                  padding: const EdgeInsets.all(CyTokens.pageX),
+                  children: <Widget>[
+                    if (c.clubApplies.isNotEmpty) ...<Widget>[
+                      const CySectionTitle('俱乐部申请'),
+                      const SizedBox(height: CyTokens.space2),
+                      ...c.clubApplies.map(
+                        (ClubApply a) => _ApplyTile(apply: a, topicId: topicId),
+                      ),
+                      const SizedBox(height: CyTokens.space4),
+                    ],
+                    if (c.registrations.isNotEmpty) ...<Widget>[
+                      const CySectionTitle('已报名候选'),
+                      const SizedBox(height: CyTokens.space2),
+                      ...c.registrations.map(
+                        (CandidateRegistration r) =>
+                            _RegistrationTile(reg: r, topicId: topicId),
+                      ),
+                    ],
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// ★ 「确认候选」= 占住这个竞争位,不是成交(§3.6)——
+///   后端不生成合作单,只把这个报名标记为选中;真正成交要靠发布者
+///   接着去发一份带条款的合作邀约(接受后才生成合作单)。所以按下去之后
+///   不是"完成",而是"进入下一步",提示语必须说清楚,不能只报「已确认」。
+class _RegistrationTile extends ConsumerStatefulWidget {
+  const _RegistrationTile({required this.reg, required this.topicId});
+  final CandidateRegistration reg;
+  final int topicId;
+
+  @override
+  ConsumerState<_RegistrationTile> createState() => _RegistrationTileState();
+}
+
+class _RegistrationTileState extends ConsumerState<_RegistrationTile> {
+  bool _busy = false;
+  bool _confirmed = false;
+
+  Future<void> _confirm() async {
+    final bool ok = await cyConfirm(
+      context,
+      title: '确认「${widget.reg.name}」为本次候选?',
+      content: '确认只是占住这个位置,不等于成交——接下来还要向对方发出带条款的合作邀约,对方接受才算合作达成。',
+      confirmText: '确认候选',
+    );
+    if (!ok || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      await ref.read(coopApiProvider).confirmCandidate(widget.reg.id);
+      ref.invalidate(coopCandidatesProvider(widget.topicId));
+      if (!mounted) return;
+      setState(() => _confirmed = true);
+      await cyConfirm(
+        context,
+        title: '已选定该候选',
+        content: '请向该商家发出带条款的合作邀约,对方接受后才成合作单。',
+        confirmText: '知道了',
+        showCancel: false,
+      );
+      if (!mounted) return;
+      context.push('/coop/invite/${widget.topicId}');
+    } catch (e) {
+      if (!mounted) return;
+      CyNativeNotice.show(
+        context,
+        e.toString().replaceFirst('Exception: ', ''),
+        isError: true,
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return CyCell(
+      title: widget.reg.name,
+      trailing: _confirmed
+          ? const Text('已确认')
+          : CyNativeButton(
+              width: 120,
+              label: '确认候选',
+              role: CyNativeButtonRole.secondary,
+              loading: _busy,
+              onPressed: _busy ? null : _confirm,
+            ),
+    );
+  }
+}
+
+class _ApplyTile extends ConsumerStatefulWidget {
+  const _ApplyTile({required this.apply, required this.topicId});
+  final ClubApply apply;
+  final int topicId;
+
+  @override
+  ConsumerState<_ApplyTile> createState() => _ApplyTileState();
+}
+
+class _ApplyTileState extends ConsumerState<_ApplyTile> {
+  bool _busy = false;
+
+  Future<void> _decline() async {
+    final bool ok = await cyConfirm(
+      context,
+      title: '婉拒「${widget.apply.clubName}」的申请?',
+      content: '婉拒后对方可以再次申请。',
+      confirmText: '婉拒',
+      danger: true,
+    );
+    if (!ok || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      await ref.read(coopApiProvider).declineApply(widget.apply.id);
+      ref.invalidate(coopCandidatesProvider(widget.topicId));
+      if (!mounted) return;
+      CyNativeNotice.show(context, '已婉拒');
+    } catch (e) {
+      if (!mounted) return;
+      CyNativeNotice.show(
+        context,
+        e.toString().replaceFirst('Exception: ', ''),
+        isError: true,
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final a = widget.apply;
+    final textTheme = Theme.of(context).textTheme;
+    return Container(
+      margin: const EdgeInsets.only(bottom: CyTokens.space2),
+      padding: const EdgeInsets.all(CyTokens.space3),
+      decoration: BoxDecoration(
+        color: CyPalette.of(context).bgSurface,
+        borderRadius: BorderRadius.circular(CyTokens.radiusMd),
+        border: Border.all(color: CyPalette.of(context).borderSubtle),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              CyAvatar(url: a.clubLogo, fallback: a.clubName.characters.first),
+              const SizedBox(width: CyTokens.space2),
+              Expanded(child: Text(a.clubName, style: textTheme.titleSmall)),
+              CyTag(label: a.statusText),
+            ],
+          ),
+          // 留言为空时整行不渲染,不留一个空的引号框。
+          if ((a.message ?? '').trim().isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: CyTokens.space2),
+              child: Text(
+                a.message!.trim(),
+                style: textTheme.bodySmall?.copyWith(
+                  color: CyPalette.of(context).textSecondary,
+                ),
+              ),
+            ),
+          const SizedBox(height: CyTokens.space2),
+          // ★ 只有待处理才给按钮 —— 已转邀约/已婉拒/已撤回点下去后端必拒。
+          if (a.actionable)
+            SizedBox(
+              width: double.infinity,
+              child: CyNativeButton(
+                label: '婉拒',
+                role: CyNativeButtonRole.destructive,
+                loading: _busy,
+                onPressed: _busy ? null : _decline,
+              ),
+            )
+          else
+            Text(
+              a.status == 3 ? '已转为邀约,去「邀约」里继续' : '这条申请已处理',
+              style: textTheme.bodySmall?.copyWith(
+                color: CyPalette.of(context).textTertiary,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}

@@ -1,0 +1,78 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <!-- ★★ RECORD_AUDIO 的来龙去脉,改之前先读完:
+         · 原来是 tools:node="remove" —— B3 只拍静态照片且 CameraController(enableAudio:false),
+           camera_android_camerax 自带的录音权限属于「用不到却要来」,必须从最终清单移除。
+         · 2026-09-05 改回声明:P2 的门店声音克隆要商家录五句话,这是**真的要用麦克风**。
+         · 2026-09-10 起有第二个使用方:自由探索屏④「按住说话」向店铺分身提问
+           (lib/feature/play/free_explore/shop_npc_voice.dart)。它同样被后端闸挡着
+           (shopChatOn 默认关、ASR 只有 Noop 实现),所以下面那条「先于功能可见」仍然成立。
+         ⚠️ 与当初移除它的理由不冲突 —— 那时是「没有任何功能用它」,现在有了。
+         ⚠️ 但要注意:声音克隆在生产是关着的(ai.providers.cosyvoice.enabled=false),
+           入口按 available() 隐藏。也就是说这个权限会**先于功能可见**出现在权限清单里。
+           上架审核会问「你要麦克风干什么」——所以 P2 的 App 包不该在合规签字前提交商店。 -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" tools:node="remove"/>
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <application
+        android:label="chengyin_app"
+        android:name="${applicationName}"
+        android:allowNativeHeapPointerTagging="false"
+        android:icon="@mipmap/ic_launcher">
+        <activity
+            android:name=".MainActivity"
+            android:screenOrientation="portrait"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:taskAffinity=""
+            android:theme="@style/LaunchTheme"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize">
+            <!-- Specifies an Android theme to apply to this Activity as soon as
+                 the Android process has started. This theme is visible to the user
+                 while the Flutter UI initializes. After that, this theme continues
+                 to determine the Window background behind the Flutter UI. -->
+            <meta-data
+              android:name="io.flutter.embedding.android.NormalTheme"
+              android:resource="@style/NormalTheme"
+              />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+        <!-- Don't delete the meta-data below.
+             This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
+        <meta-data
+            android:name="flutterEmbedding"
+            android:value="2" />
+    </application>
+    <!-- Required to query activities that can process text, see:
+         https://developer.android.com/training/package-visibility and
+         https://developer.android.com/reference/android/content/Intent#ACTION_PROCESS_TEXT.
+
+         In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.PROCESS_TEXT"/>
+            <data android:mimeType="text/plain"/>
+        </intent>
+        <!-- 唤起外部地图做导航。
+             ⚠️ Android 11+ 有包可见性限制:不声明的话解析不到目标 App,
+             「导航过去」点了什么都不发生**且不报错** ——
+             和 iOS 的 LSApplicationQueriesSchemes 是同一个坑的两个平台版本。
+             见 lib/core/map/map_launcher.dart 的兜底链。 -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="geo"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="https"/>
+        </intent>
+    </queries>
+</manifest>

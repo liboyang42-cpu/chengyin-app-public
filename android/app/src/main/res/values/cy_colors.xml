@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 品牌紫。取自小程序 images/cy_logo_mark.png 的主色。 -->
+    <color name="cy_brand">#7C5CFF</color>
+    <!-- 启动底 = App 首屏底色(CyTokens.bgPage)。两处必须一致,否则冷启动白闪。 -->
+    <color name="cy_launch_bg">#000000</color>
+</resources>

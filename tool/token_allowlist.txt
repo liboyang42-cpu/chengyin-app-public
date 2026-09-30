@@ -1,0 +1,82 @@
+# 格式：<wxss token> | <为什么 App 需要它>
+# 只收 App 已消费的公共设计语义；组件私有 token 默认不进，确有消费时逐条说明。
+
+--cy-color-bg-page | CyTokens.bgPage 与 CyPalette 页面背景
+--cy-color-bg-surface | CyTokens.bgSurface 与 CyPalette 卡片表面
+--cy-color-bg-surface-subtle | CyTokens.bgSurfaceSubtle 与 CyPalette 次级表面
+--cy-color-bg-elevated | CyTokens.bgElevated 与 CyPalette 浮层表面
+--cy-color-bg-surface-strong | CyTokens.bgSurfaceStrong 的深色完成态表面
+--cy-color-bg-glass | CyTokens.bgGlass 与 CyPalette 玻璃浮层
+--cy-color-text-primary | CyTokens.textPrimary 与 CyPalette 主文字
+--cy-color-text-secondary | CyTokens.textSecondary 的标准次级文字
+--cy-color-text-tertiary | CyTokens.textTertiary 与 CyPalette 三级文字
+--cy-color-text-placeholder | CyTokens.textPlaceholder 与 CyPalette 占位文字
+--cy-color-text-disabled | CyTokens.textDisabled 与 CyPalette 禁用文字
+--cy-color-text-inverse | CyTokens.textInverse 与 CyPalette 反色文字
+--cy-color-border-subtle | CyTokens.borderSubtle 与 CyPalette 轻描边
+--cy-color-border-strong | CyTokens.borderStrong 与 CyPalette 强描边
+--cy-color-state-pressed | CyTokens.statePressed 的按压蒙层
+--cy-color-overlay | CyTokens.overlay 与 CyPalette 页面遮罩
+--cy-color-action-primary-bg | CyTokens.actionPrimaryBg 与 CyPalette.actionPrimaryBg 的主操作背景
+--cy-color-action-primary-fg | CyTokens.actionPrimaryFg 与 CyPalette.actionPrimaryFg 的主操作前景
+--cy-color-action-secondary-bg | CyTokens.actionSecondaryBg 与 CyPalette.actionSecondaryBg 的次操作背景
+--cy-color-action-secondary-fg-on-dark | CyTokens.actionSecondaryFg 的暗面固定前景
+--cy-color-brand | CyTokens.brand 与 CyPalette 主题强调色
+--cy-color-brand-soft | CyTokens.brandSoft 与 CyPalette 强调软底
+--cy-color-input-idle-bg | CyTokens.inputBgEmpty 与 CyPalette 空输入背景
+--cy-color-input-filled-bg | CyTokens.inputBgFilled 与 CyPalette 已填输入背景
+--cy-color-input-placeholder | CyTokens.inputPlaceholder 的输入占位色
+--cy-color-input-text | CyTokens.inputText 的输入正文色
+--cy-color-status-info | CyTokens.statusInfo 的信息状态色
+--cy-color-status-warning | CyTokens.statusWarning 的警告状态色
+--cy-color-status-success | CyTokens.statusSuccess 的成功状态色
+--cy-color-status-danger | CyTokens.statusDanger 的危险状态色
+--cy-color-playkit-taste | AdvancedPlayKitView 盲品状态强调色
+--cy-color-playkit-music | AdvancedPlayKitView 音乐播放强调色
+--cy-color-playkit-slow | AdvancedPlayKitView 跨日慢任务强调色
+--cy-type-micro | CyTokens.typeMicro 的最小字阶
+--cy-type-caption | CyTokens.typeCaption 的辅助字阶
+--cy-type-label | CyTokens.typeLabel 的标签字阶
+--cy-type-body | CyTokens.typeBody 的正文字阶
+--cy-type-button | CyTokens.typeButton 的按钮字阶
+--cy-type-card-title | CyTokens.typeCardTitle 的卡片标题字阶
+--cy-type-section-title | CyTokens.typeSectionTitle 的模块标题字阶
+--cy-type-display | CyTokens.typeDisplay 的展示字阶
+--cy-type-page-title | CyTokens.typePageTitle 的页面标题字阶
+--cy-radius-sm | CyTokens.radiusSm 的小圆角
+--cy-radius-md | CyTokens.radiusMd 的中圆角
+--cy-radius-lg | CyTokens.radiusLg 的大圆角
+--cy-radius-xl | CyTokens.radiusXl 的超大圆角
+--cy-radius-pill | CyTokens.radiusPill 的胶囊圆角
+--cy-space-1 | CyTokens.space1 的基础间距
+--cy-space-1-5 | CyTokens.space1_5 的半档间距
+--cy-space-2 | CyTokens.space2 的基础间距
+--cy-space-2-5 | CyTokens.space2_5 的半档间距
+--cy-space-3 | CyTokens.space3 的基础间距
+--cy-space-3-5 | CyTokens.space3_5 的半档间距
+--cy-space-4 | CyTokens.space4 的基础间距
+--cy-space-5 | CyTokens.space5 的大间距
+--cy-space-6 | CyTokens.space6 的大间距
+--cy-space-7 | CyTokens.space7 的大间距
+--cy-space-8 | CyTokens.space8 的 Hero 间距
+--cy-btn-h | CyTokens.btnH 的标准按钮高度
+--cy-btn-h-sm | CyTokens.btnHSm 的小按钮高度
+--cy-btn-pad-x | CyTokens.btnPadX 的按钮横向内距
+--cy-bg-subtle | CyTokens.bgSubtle 与 CyPalette 次级微亮底
+--cy-page-x | CyTokens.pageX 的页面安全边距
+--cy-leading-tight | CyTokens.leadingTight 的紧凑行高
+--cy-leading-normal | CyTokens.leadingNormal 的标准行高
+--cy-leading-loose | CyTokens.leadingLoose 的宽松行高
+--cy-shadow-card | CyTokens.cardElevation 的卡片阴影语义；复合值留在手写层
+--cy-comp-card-border | CyPalette.light.cardBorder 的商家日间透明卡片外沿；关键字留在手写层
+--cy-comp-card-shadow-day | CyPalette.light.cardShadow 的商家日间卡片投影；复合值留在手写层
+--cy-comp-cell-fill-bg | CyPalette.light.bgSurfaceStrong 的商家日间填充面
+--cy-text-secondary | CyPalette.light.textSecondary 的日间旧名快照语义
+
+# 动效档位：App 侧 Duration/Curve 的唯一来源，替代散落的裸 Duration(milliseconds:)。
+--cy-motion-press | CyMotion.press 按压回弹，触觉级时长
+--cy-motion-fast | CyMotion.fast 的 Chip / Tab / 按钮态切换
+--cy-motion-standard | CyMotion.standard 的局部状态与浮层弹出
+--cy-motion-slow | CyMotion.slow 的 sheet 上滑与页面级过场
+--cy-motion-celebrate | CyMotion.celebrate 的完成与徽章时刻
+--cy-motion-fade-swap | CyMotion.fadeSwap 的内容淡切

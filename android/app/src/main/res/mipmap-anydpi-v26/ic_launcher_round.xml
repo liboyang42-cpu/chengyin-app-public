@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- ★ 前景必须留安全边距:系统会按各家 launcher 的形状裁切,
+         并且**只保证中心 66% 可见**。铺满的前景会被切掉边角。
+         ic_launcher_foreground 已按 72/108 的比例画好。 -->
+    <background android:drawable="@color/cy_brand" />
+    <foreground android:drawable="@mipmap/ic_launcher_foreground" />
+</adaptive-icon>

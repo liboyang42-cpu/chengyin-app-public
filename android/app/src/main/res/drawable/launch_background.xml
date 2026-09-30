@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Modify this file to customize your launch splash screen -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 启动底必须与 App 首屏一致(CyTokens.bgPage = #000000)。
+         原来是 @android:color/white —— 冷启动会先白闪一下再跳黑。
+         iOS 侧同一个问题(LaunchScreen.storyboard 的 backgroundColor)已一并修。 -->
+    <item android:drawable="@color/cy_launch_bg" />
+
+    <item>
+        <bitmap
+            android:gravity="center"
+            android:src="@mipmap/ic_launcher_foreground" />
+    </item>
+
+    <!-- You can insert your own image assets here -->
+    <!-- <item>
+        <bitmap
+            android:gravity="center"
+            android:src="@mipmap/launch_image" />
+    </item> -->
+</layer-list>
