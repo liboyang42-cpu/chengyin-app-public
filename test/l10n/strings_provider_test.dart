@@ -13,9 +13,12 @@ void main() {
     tester.platformDispatcher.localesTestValue = <Locale>[const Locale('zh')];
     addTearDown(tester.platformDispatcher.clearLocalesTestValue);
     final container = ProviderContainer();
-    addTearDown(container.dispose);
     final subscription = container.listen(appStringsProvider, (_, _) {});
-    addTearDown(subscription.close);
+    addTearDown(() async {
+      subscription.close();
+      container.dispose();
+      await tester.pump();
+    });
     expect(container.read(appStringsProvider).localeName, 'zh');
 
     tester.platformDispatcher.localesTestValue = <Locale>[const Locale('en')];
@@ -25,6 +28,7 @@ void main() {
     tester.platformDispatcher.localesTestValue = <Locale>[const Locale('zh')];
     await tester.pump();
     expect(container.read(appStringsProvider).localeName, 'zh');
+    await tester.pump();
   });
 
   testWidgets('explicit language survives system changes until follow system',
@@ -32,9 +36,12 @@ void main() {
     tester.platformDispatcher.localesTestValue = <Locale>[const Locale('zh')];
     addTearDown(tester.platformDispatcher.clearLocalesTestValue);
     final container = ProviderContainer();
-    addTearDown(container.dispose);
     final subscription = container.listen(appStringsProvider, (_, _) {});
-    addTearDown(subscription.close);
+    addTearDown(() async {
+      subscription.close();
+      container.dispose();
+      await tester.pump();
+    });
     final preferences = container.read(localePreferenceProvider.notifier);
     await preferences.select('en');
     expect(container.read(appStringsProvider).localeName, 'en');
@@ -44,6 +51,6 @@ void main() {
     expect(container.read(appStringsProvider).localeName, 'en');
     await preferences.select(null);
     expect(container.read(appStringsProvider).localeName, 'zh');
-
+    await tester.pump();
   });
 }

@@ -69,6 +69,7 @@ const Map<String, int> kAllowedLiterals = <String, int>{
   'feature/play/free_explore/widgets/story_line_view.dart|500ms': 1, // 单行故事显示时长
   'feature/play/free_explore/chapter_story_page.dart|30ms': 1, // 故事开场延迟
   // 秒级：倒计时 / 轮询 / 超时 / TTL，不是 UI 过渡
+  'l10n/locale_preference.dart|2s': 1, // Secure-storage restore timeout; not a visual transition.
   'core/analytics/tracker.dart|5s': 1, // 埋点 flush 间隔
   'core/config/env.dart|15s': 1, // 连接超时
   'core/config/env.dart|20s': 1, // 接收超时

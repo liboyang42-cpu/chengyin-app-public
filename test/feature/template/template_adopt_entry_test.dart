@@ -134,6 +134,8 @@ void main() {
   //   `/template/edit`(整页需登录路由),守卫把整页换成首页。
   //   口径与「发布 FAB」一致:先弹登录,登完留在详情页继续。
   testWidgets('★ 游客点「套用这个玩法」先弹登录,不静默回首页', (WidgetTester tester) async {
+      tester.platformDispatcher.localesTestValue = const [Locale('zh')];
+      addTearDown(tester.platformDispatcher.clearLocalesTestValue);
     await _pumpGuestDetail(tester);
     expect(
       find.byKey(const Key('template-adopt')),

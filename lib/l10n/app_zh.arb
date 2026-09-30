@@ -178,5 +178,75 @@
         "type": "int"
       }
     }
-  }
+  },
+  "merchantSubscriptionEmpty": "暂时没有生效中的权益",
+  "merchantSubscriptionPromotion": "推广位权益",
+  "merchantSubscriptionUnavailable": "App 内暂不提供购买",
+  "merchantSubscriptionBrand": "品牌主页权益",
+  "merchantSubscriptionEnable": "开通高级模板权益",
+  "merchantSubscriptionActive": "已生效的权益",
+  "originalServerMessage": "服务端原始信息",
+  "@originalServerMessage": {
+    "description": "App-owned interface text; never translate user-generated content."
+  },
+  "merchantSubscriptionPaymentUnknown": "订单已创建,支付状态待确认",
+  "merchantSubscriptionPremiumLabel": "高级模板",
+  "merchantSubscriptionPremium": "高级模板权益",
+  "merchantSubscriptionExpires": "有效期至 {date}",
+  "@merchantSubscriptionExpires": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "merchantSubscriptionNoOrderNumber": "订单已创建,但回执里没有订单号,状态待确认",
+  "merchantSubscriptionClosed": "订单已关闭,请重新选择权益",
+  "merchantSubscriptionAwaitingPayment": "订单已创建,尚未完成支付",
+  "merchantSubscriptionCityNode": "城市据点",
+  "merchantSubscriptionPermanent": "永久有效",
+  "merchantSubscriptionUnderstood": "知道了",
+  "merchantSubscriptionUnavailableBody": "当前版本暂不提供高级模板权益购买。",
+  "merchantSubscriptionQuota": "已用 {used} / {limit}(剩 {remaining})",
+  "@merchantSubscriptionQuota": {
+    "placeholders": {
+      "used": {
+        "type": "int"
+      },
+      "limit": {
+        "type": "int"
+      },
+      "remaining": {
+        "type": "int"
+      }
+    }
+  },
+  "loginExpired": "登录已过期，请重新进入",
+  "@loginExpired": {
+    "description": "App-owned interface text; never translate user-generated content."
+  },
+  "merchantSubscriptionCustomEvent": "活动定制权益",
+  "merchantSubscriptionTitle": "增值服务",
+  "merchantSubscriptionEntitlement": "权益",
+  "merchantSubscriptionUsed": "已用 {used} / {limit}",
+  "@merchantSubscriptionUsed": {
+    "placeholders": {
+      "used": {
+        "type": "int"
+      },
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "errorOriginalMessage": "原始错误信息",
+  "@errorOriginalMessage": {
+    "description": "Error presentation summary/label; original external detail remains verbatim."
+  },
+  "merchantSubscriptionCapabilities": "能力与配额",
+  "operationFailed": "操作未完成，请重试",
+  "@operationFailed": {
+    "description": "App-owned interface text; never translate user-generated content."
+  },
+  "merchantSubscriptionGranted": "权益已到账"
 }

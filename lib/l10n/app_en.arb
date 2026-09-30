@@ -51,5 +51,33 @@
         "type": "int"
       }
     }
-  }
+  },
+  "merchantSubscriptionEmpty": "No active access yet",
+  "merchantSubscriptionPromotion": "Promotion placement access",
+  "merchantSubscriptionUnavailable": "Purchases are unavailable in this app",
+  "merchantSubscriptionBrand": "Brand page access",
+  "merchantSubscriptionEnable": "Get premium template access",
+  "merchantSubscriptionActive": "Active access",
+  "originalServerMessage": "Original server message",
+  "merchantSubscriptionPaymentUnknown": "The order was created. Payment status is unconfirmed.",
+  "merchantSubscriptionPremiumLabel": "Premium templates",
+  "merchantSubscriptionPremium": "Premium template access",
+  "merchantSubscriptionExpires": "Valid until {date}",
+  "merchantSubscriptionNoOrderNumber": "The order was created, but its receipt has no order number. Its status is unconfirmed.",
+  "merchantSubscriptionClosed": "The order is closed. Choose the access you need again.",
+  "merchantSubscriptionAwaitingPayment": "The order was created. Payment is not complete.",
+  "merchantSubscriptionCityNode": "City locations",
+  "merchantSubscriptionPermanent": "No expiry",
+  "merchantSubscriptionUnderstood": "OK",
+  "merchantSubscriptionUnavailableBody": "This version does not offer premium template purchases.",
+  "merchantSubscriptionQuota": "Used {used} / {limit} ({remaining} remaining)",
+  "loginExpired": "Your session has expired. Sign in again.",
+  "merchantSubscriptionCustomEvent": "Custom event access",
+  "merchantSubscriptionTitle": "Additional services",
+  "merchantSubscriptionEntitlement": "Access",
+  "merchantSubscriptionUsed": "Used {used} / {limit}",
+  "errorOriginalMessage": "Original error message",
+  "merchantSubscriptionCapabilities": "Features and quotas",
+  "operationFailed": "Could not complete this action. Try again.",
+  "merchantSubscriptionGranted": "Access is active"
 }

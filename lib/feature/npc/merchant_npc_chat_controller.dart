@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers.dart';
+import '../../core/network/session_data.dart';
+import '../../core/network/request_session_scope.dart';
 import '../../data/api/merchant_npc_api.dart';
 import '../../data/models/merchant_npc.dart';
 
@@ -35,10 +37,14 @@ class ChatMessage {
     required this.text,
     required this.fromNpc,
     this.failed = false,
+    this.isLocalFallback = false,
+    this.isLocalRequestFailure = false,
     this.audioUrl,
   });
 
   final String text;
+  final bool isLocalFallback;
+  final bool isLocalRequestFailure;
   final bool fromNpc;
 
   /// 这条回复的合成语音。★ **null 是常态** ——
@@ -70,11 +76,24 @@ class MerchantNpcChatController extends Notifier<MerchantNpcChatState> {
   /// 由面板作为固定首条气泡渲染 —— 放进 state 会让「重试」「历史」这些
   /// 操作要处处小心别把它当成一条真回复。
   @override
-  MerchantNpcChatState build() => const MerchantNpcChatState();
+  MerchantNpcChatState build() {
+    _pendingRequestId = null;
+    _scope = null;
+    final generation = ++_generation;
+    ref.onDispose(() { _generation++; });
+    try {
+      final session = watchSessionDataScope(ref);
+      _scope = RequestSessionScope(() => generation == _generation && session.isCurrent());
+    } on SessionDataUnavailable { /* Guests cannot start private conversations. */ }
+    return const MerchantNpcChatState();
+  }
+
+  int _generation = 0;
+  RequestSessionScope? _scope;
 
   Future<void> send(String raw) async {
     final String message = raw.trim();
-    if (message.isEmpty || state.sending) return;
+    if (message.isEmpty || state.sending || _scope?.isCurrent() != true) return;
 
     _pendingRequestId = newChatRequestId();
     state = state.copyWith(
@@ -89,7 +108,7 @@ class MerchantNpcChatController extends Notifier<MerchantNpcChatState> {
 
   /// 重试最后一次失败的提问。用同一个 requestId,不重复计费。
   Future<void> retry() async {
-    if (state.sending || _pendingRequestId == null) return;
+    if (state.sending || _pendingRequestId == null || _scope?.isCurrent() != true) return;
     final ChatMessage? lastAsk = _lastUserMessage;
     if (lastAsk == null) return;
     // 把上一条失败回复摘掉再重试,否则会堆两条"没答上来"。
@@ -108,20 +127,22 @@ class MerchantNpcChatController extends Notifier<MerchantNpcChatState> {
   }
 
   Future<void> _run(String message) async {
+    final scope = _scope!;
+    final requestId = _pendingRequestId!;
+    final api = ref.read(merchantNpcApiProvider);
     try {
-      final NpcChatResult result = await ref
-          .read(merchantNpcApiProvider)
-          .chat(
+      final NpcChatResult result = await RequestSessionScope.run(scope, () => api.chat(
             merchantId: _merchantId,
             message: message,
-            requestId: _pendingRequestId!,
-          );
-      if (!ref.mounted) return;
+            requestId: requestId,
+          ));
+      if (!scope.isCurrent()) return;
       _append(
         // ★ 直接显示后端给的 safeText。它已过出参内容安全,
         //   客户端不再加工 —— 加工等于把审核结果改了。
         ChatMessage(
           text: result.displayText,
+          isLocalFallback: (result.safeText ?? '').trim().isEmpty,
           fromNpc: true,
           failed: !result.succeeded,
           // ★ 只有成功的回复才带语音。被内容安全拦下时 safeText 是兜底话术,
@@ -131,10 +152,11 @@ class MerchantNpcChatController extends Notifier<MerchantNpcChatState> {
       );
       if (result.succeeded) _pendingRequestId = null;
     } catch (e) {
-      if (!ref.mounted) return;
+      if (!scope.isCurrent()) return;
       _append(
         ChatMessage(
           text: e.toString().replaceFirst('Exception: ', ''),
+          isLocalRequestFailure: e is MerchantNpcException && e.isLocalFallback,
           fromNpc: true,
           failed: true,
         ),

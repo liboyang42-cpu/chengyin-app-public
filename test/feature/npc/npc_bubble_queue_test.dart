@@ -1,3 +1,4 @@
+import '../../support/fixed_auth.dart';
 // NPC 事件冒泡队列:进得去,也必须出得来。
 //
 // ★★ 为什么单独钉这一条:UI 渲染的是 `bubbleQueue.first`,而 `popBubble()`
@@ -42,6 +43,7 @@ void main() {
   testWidgets('冒泡入队后会自动出队 —— 不会卡住第一条', (WidgetTester tester) async {
     final ProviderContainer container = ProviderContainer(
       overrides: <dynamic>[
+        signedInAuthOverride(),
         aiNpcApiProvider.overrideWithValue(_FakeAiNpcApi()),
       ].cast(),
     );

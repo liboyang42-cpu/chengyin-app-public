@@ -1,3 +1,5 @@
+import 'package:chengyin_app/l10n/app_localizations_zh.dart';
+import 'package:chengyin_app/l10n/strings_provider.dart';
 // B1 账号/资料域修复线 REPORT-sim-account 的行为门禁(2026-09-19)。
 //
 // 覆盖报告里四条游客可见问题:
@@ -233,6 +235,8 @@ void main() {
     }
 
     testWidgets('/invites 游客深链留在邀请页', (WidgetTester tester) async {
+      tester.platformDispatcher.localesTestValue = const [Locale('zh')];
+      addTearDown(tester.platformDispatcher.clearLocalesTestValue);
       final ProviderContainer container = await boot(tester);
       container.read(appRouterProvider).go('/invites');
       await tester.pump();
@@ -304,7 +308,9 @@ void main() {
     test('微信未配置:不再把用户指向同样走不通的手机号路', () async {
       // isWechatConfigured 恒 false(kWechatAppId 仍是占位符),
       // 该分支在触网/触 SDK 之前返回,直接跑真实 AuthController。
-      final ProviderContainer container = ProviderContainer();
+      final ProviderContainer container = ProviderContainer(overrides: [
+        appStringsProvider.overrideWithValue(AppLocalizationsZh()),
+      ]);
       addTearDown(container.dispose);
       final String? msg = await container
           .read(authControllerProvider.notifier)
@@ -318,7 +324,10 @@ void main() {
       final int at = src.indexOf('AuthorizationErrorCode.canceled');
       expect(at, greaterThan(0));
       final String body = src.substring(at, at + 700);
-      expect(body.contains('Apple 登录没有完成'), isTrue);
+      expect(body.contains('authAppleIncomplete'), isTrue);
+      expect(AppLocalizationsZh().authAppleIncomplete,
+          'Apple 登录没有完成。若这台设备还没登录 Apple 账户,'
+          '请先在系统「设置 → Apple 账户」登录后再试');
     });
   });
 }

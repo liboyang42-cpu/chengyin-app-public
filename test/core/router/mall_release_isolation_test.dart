@@ -121,6 +121,8 @@ void main() {
   //   设计意图(游客可浏览购物车)要成立得由后端放开读接口 —— App 侧做不到,
   //   所以这里改成守住**线上真实口径**:401 → 登录引导 + 真能走通的登录出口。
   testWidgets('游客进购物车撞 401：走登录引导，不谎报网络故障', (WidgetTester tester) async {
+      tester.platformDispatcher.localesTestValue = const [Locale('zh')];
+      addTearDown(tester.platformDispatcher.clearLocalesTestValue);
     final api = _CountingMallApi(cartNeedsLogin: true);
     final container = ProviderContainer(
       retry: (int _, Object _) => null,

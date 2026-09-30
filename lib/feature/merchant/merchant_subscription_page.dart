@@ -1,3 +1,10 @@
+import '../../core/network/request_session_scope.dart';
+import '../auth/auth_controller.dart';
+import '../../core/network/session_data.dart';
+import '../../data/api/merchant_api.dart';
+import '../../l10n/strings.dart';
+import '../../l10n/app_localizations.dart';
+import '../../l10n/error_presentation.dart';
 import '../../core/theme/cy_palette.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
@@ -15,28 +22,30 @@ import 'merchant_error_view.dart';
 /// 我的付费权益:`POST /api/merchant/subscription`。空列表 = 没有生效权益,不是加载失败。
 final merchantSubscriptionsProvider =
     FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) {
-      return ref.watch(merchantApiProvider).mySubscriptions();
+      final api = ref.watch(merchantApiProvider);
+      return readSessionData(ref, api.mySubscriptions);
     });
 
 /// 商业化能力与收费开关:`POST /api/merchant/commerce/capabilities`。
 final merchantCommerceCapabilitiesProvider =
     FutureProvider.autoDispose<Map<String, dynamic>>((ref) {
-      return ref.watch(merchantApiProvider).commerceCapabilities();
+      final api = ref.watch(merchantApiProvider);
+      return readSessionData(ref, () => api.commerceCapabilities());
     });
 
 /// 权益类型字典。对齐后端 `MerchantCommerceService` 的 BIZ_* 常量。
-String subscriptionTypeLabel(String? type) {
+String subscriptionTypeLabel(String? type, {AppLocalizations? strings}) {
   switch (type) {
     case 'premium_template':
-      return '高级模板权益';
+      return (strings?.merchantSubscriptionPremium ?? '高级模板权益');
     case 'promotion_slot':
-      return '推广位权益';
+      return (strings?.merchantSubscriptionPromotion ?? '推广位权益');
     case 'brand_home':
-      return '品牌主页权益';
+      return (strings?.merchantSubscriptionBrand ?? '品牌主页权益');
     case 'custom_event':
-      return '活动定制权益';
+      return (strings?.merchantSubscriptionCustomEvent ?? '活动定制权益');
     default:
-      return type ?? '权益';
+      return type ?? (strings?.merchantSubscriptionEntitlement ?? '权益');
   }
 }
 
@@ -45,21 +54,32 @@ class MerchantSubscriptionPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final session = ref.watch(sessionDataKeyProvider);
+    if (session.loading || !session.initialized || session.userId == null) {
+      return CupertinoPageScaffold(
+        navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).merchantSubscriptionTitle)),
+        child: Center(child: session.loading || !session.initialized
+            ? const CupertinoActivityIndicator()
+            : Text(stringsOf(context).loginTitle)),
+      );
+    }
     final subs = ref.watch(merchantSubscriptionsProvider);
     final caps = ref.watch(merchantCommerceCapabilitiesProvider);
     return CupertinoPageScaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      navigationBar: const CupertinoNavigationBar(middle: Text('增值服务')),
+      navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).merchantSubscriptionTitle)),
       child: Material(
         color: Colors.transparent,
         child: SafeArea(
           bottom: false,
           child: subs.when(
+            skipLoadingOnReload: false,
+            skipLoadingOnRefresh: false,
             loading: () => const Center(child: CupertinoActivityIndicator()),
             error: (Object e, _) => merchantErrorView(
               context,
               e,
-              what: '增值服务',
+              what: stringsOf(context).merchantSubscriptionTitle,
               onRetry: () => ref.invalidate(merchantSubscriptionsProvider),
             ),
             data: (List<Map<String, dynamic>> rows) =>
@@ -71,11 +91,11 @@ class MerchantSubscriptionPage extends ConsumerWidget {
                   child: ListView(
                     padding: const EdgeInsets.all(CyTokens.pageX),
                     children: <Widget>[
-                      const CySectionTitle('已生效的权益'),
+                      CySectionTitle(stringsOf(context).merchantSubscriptionActive),
                       const SizedBox(height: CyTokens.space2),
                       if (rows.isEmpty)
                         Text(
-                          '暂时没有生效中的权益',
+                          stringsOf(context).merchantSubscriptionEmpty,
                           style: Theme.of(context).textTheme.bodyMedium
                               ?.copyWith(
                                 color: CyPalette.of(context).textSecondary,
@@ -86,18 +106,20 @@ class MerchantSubscriptionPage extends ConsumerWidget {
                           (Map<String, dynamic> s) => _SubscriptionCard(sub: s),
                         ),
                       const SizedBox(height: CyTokens.space4),
-                      const CySectionTitle('能力与配额'),
+                      CySectionTitle(stringsOf(context).merchantSubscriptionCapabilities),
                       const SizedBox(height: CyTokens.space2),
                       caps.when(
+                        skipLoadingOnReload: false,
+                        skipLoadingOnRefresh: false,
                         loading: () => const CupertinoActivityIndicator(),
                         error: (Object e, _) => Text(
-                          e.toString().replaceFirst('Exception: ', ''),
+                          presentError(e, stringsOf(context), originalApiMessage: e is MerchantApiException ? e.message : legacyApiMessage(e)).noticeText,
                           style: TextStyle(
                             color: CyPalette.of(context).textSecondary,
                           ),
                         ),
                         data: (Map<String, dynamic> c) =>
-                            _CapabilitiesCard(data: c),
+                            _CapabilitiesCard(key: ValueKey(session), data: c),
                       ),
                     ],
                   ),
@@ -118,6 +140,7 @@ class _SubscriptionCard extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final String type = subscriptionTypeLabel(
       sub['subscriptionType'] as String?,
+      strings: stringsOf(context),
     );
     final Object? endDate = sub['endDate'];
     final int? maxUsage = (sub['maxUsage'] as num?)?.toInt();
@@ -139,7 +162,7 @@ class _SubscriptionCard extends StatelessWidget {
             const SizedBox(height: CyTokens.space1),
             // endDate 缺席(NULL)在后端语义里就是"永久" —— 不是没读到。
             Text(
-              endDate == null ? '永久有效' : '有效期至 $endDate',
+              endDate == null ? stringsOf(context).merchantSubscriptionPermanent : stringsOf(context).merchantSubscriptionExpires(endDate.toString()),
               style: textTheme.bodySmall?.copyWith(
                 color: CyPalette.of(context).textSecondary,
               ),
@@ -148,7 +171,7 @@ class _SubscriptionCard extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(top: CyTokens.space1),
                 child: Text(
-                  '已用 ${usedCount ?? 0} / $maxUsage',
+                  stringsOf(context).merchantSubscriptionUsed(usedCount ?? 0, maxUsage),
                   style: textTheme.bodySmall?.copyWith(
                     color: CyPalette.of(context).textSecondary,
                   ),
@@ -162,7 +185,7 @@ class _SubscriptionCard extends StatelessWidget {
 }
 
 class _CapabilitiesCard extends ConsumerStatefulWidget {
-  const _CapabilitiesCard({required this.data});
+  const _CapabilitiesCard({super.key, required this.data});
   final Map<String, dynamic> data;
 
   @override
@@ -181,29 +204,36 @@ class _CapabilitiesCardState extends ConsumerState<_CapabilitiesCard> {
 
   Future<void> _order() async {
     if (_busy) return;
+    final identity = ref.read(sessionDataKeyProvider);
+    final owner = identity.userId;
+    if (owner == null || identity.loading || !identity.initialized) return;
+    final session = ref.read(authControllerProvider.notifier).requestScope(owner);
+    final scope = RequestSessionScope(() => mounted &&
+        ref.read(sessionDataKeyProvider) == identity && session.isCurrent());
+    if (!scope.isCurrent()) return;
+    final api = ref.read(merchantApiProvider);
     setState(() => _busy = true);
     try {
-      final Map<String, dynamic> order = await ref
-          .read(merchantApiProvider)
-          .createCommerceOrder(<String, dynamic>{
+      final Map<String, dynamic> order = await RequestSessionScope.run(scope,
+          () => api.createCommerceOrder(<String, dynamic>{
             'bizType': 'premium_template',
             'requestId': _requestId,
-          });
-      if (!mounted) return;
-      final ({String text, bool isError}) outcome = await _readBackOrder(
-        order,
+          }));
+      if (!scope.isCurrent()) return;
+      final ({String text, bool isError})? outcome = await _readBackOrder(
+        order, api, scope,
       );
-      if (!mounted) return;
+      if (!scope.isCurrent() || outcome == null) return;
       CyNativeNotice.show(context, outcome.text, isError: outcome.isError);
     } catch (e) {
-      if (!mounted) return;
+      if (!scope.isCurrent()) return;
       CyNativeNotice.show(
         context,
-        e.toString().replaceFirst('Exception: ', ''),
+        presentError(e, stringsOf(context), originalApiMessage: e is MerchantApiException ? e.message : legacyApiMessage(e)).noticeText,
         isError: true,
       );
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (scope.isCurrent()) setState(() => _busy = false);
     }
   }
 
@@ -214,36 +244,40 @@ class _CapabilitiesCardState extends ConsumerState<_CapabilitiesCard> {
   /// **不调起微信支付**买数字权益(设计文档 `docs/ios27-design-language.md`
   /// 表 9:虚拟道具禁用,走 IAP;iOS 直接不摆购买按钮),所以这里只做
   /// 「建单 + 回读 `commerce/order/status`」,状态照原样说给用户。
-  Future<({String text, bool isError})> _readBackOrder(
+  Future<({String text, bool isError})?> _readBackOrder(
     Map<String, dynamic> order,
+    MerchantApi api,
+    RequestSessionScope scope,
   ) async {
+    if (!scope.isCurrent()) return null;
+    final strings = stringsOf(context);
     final String immediate = _knownStatus(order['paymentStatus']);
     if (immediate == 'success') {
-      _refreshQuota();
-      return (text: '权益已到账', isError: false);
+      _refreshQuota(scope);
+      return (text: strings.merchantSubscriptionGranted, isError: false);
     }
     if (immediate == 'failed') {
-      return (text: '订单已关闭,请重新选择权益', isError: true);
+      return (text: strings.merchantSubscriptionClosed, isError: true);
     }
     final String orderSn = (order['orderSn'] ?? '').toString();
     if (orderSn.isEmpty) {
       // 没有订单号就查不了状态 —— 说不知道,不编一个「已创建」。
-      return (text: '订单已创建,但回执里没有订单号,状态待确认', isError: true);
+      return (text: strings.merchantSubscriptionNoOrderNumber, isError: true);
     }
-    final String status = await ref
-        .read(merchantApiProvider)
-        .commerceOrderStatus(orderSn);
+    final String status = await RequestSessionScope.run(scope,
+        () => api.commerceOrderStatus(orderSn));
+    if (!scope.isCurrent()) return null;
     switch (status) {
       case 'success':
-        _refreshQuota();
-        return (text: '权益已到账', isError: false);
+        _refreshQuota(scope);
+        return (text: strings.merchantSubscriptionGranted, isError: false);
       case 'failed':
-        return (text: '订单已关闭,请重新选择权益', isError: true);
+        return (text: strings.merchantSubscriptionClosed, isError: true);
       case 'pending':
-        return (text: '订单已创建,尚未完成支付', isError: false);
+        return (text: strings.merchantSubscriptionAwaitingPayment, isError: false);
       default:
         // 读不懂的状态是「待确认」,不是失败:说成失败会让人重复下单。
-        return (text: '订单已创建,支付状态待确认', isError: true);
+        return (text: strings.merchantSubscriptionPaymentUnknown, isError: true);
     }
   }
 
@@ -254,7 +288,8 @@ class _CapabilitiesCardState extends ConsumerState<_CapabilitiesCard> {
         : 'unknown';
   }
 
-  void _refreshQuota() {
+  void _refreshQuota(RequestSessionScope scope) {
+    if (!scope.isCurrent()) return;
     ref.invalidate(merchantSubscriptionsProvider);
     ref.invalidate(merchantCommerceCapabilitiesProvider);
   }
@@ -262,9 +297,9 @@ class _CapabilitiesCardState extends ConsumerState<_CapabilitiesCard> {
   Future<void> _showUnavailableInfo() async {
     await cyConfirm(
       context,
-      title: 'App 内暂不提供购买',
-      content: '当前版本暂不提供高级模板权益购买。',
-      confirmText: '知道了',
+      title: stringsOf(context).merchantSubscriptionUnavailable,
+      content: stringsOf(context).merchantSubscriptionUnavailableBody,
+      confirmText: stringsOf(context).merchantSubscriptionUnderstood,
       showCancel: false,
     );
   }
@@ -281,7 +316,7 @@ class _CapabilitiesCardState extends ConsumerState<_CapabilitiesCard> {
         children: <Widget>[
           Expanded(child: Text(label, style: textTheme.bodyMedium)),
           Text(
-            '已用 $used / $limit(剩 $remaining)',
+            stringsOf(context).merchantSubscriptionQuota(used, limit, remaining),
             style: textTheme.bodySmall?.copyWith(
               color: CyPalette.of(context).textSecondary,
             ),
@@ -312,8 +347,8 @@ class _CapabilitiesCardState extends ConsumerState<_CapabilitiesCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          _quota(context, '高级模板', premium),
-          _quota(context, '城市据点', cityNode),
+          _quota(context, stringsOf(context).merchantSubscriptionPremiumLabel, premium),
+          _quota(context, stringsOf(context).merchantSubscriptionCityNode, cityNode),
           const SizedBox(height: CyTokens.space1),
           SizedBox(
             width: double.infinity,
@@ -323,7 +358,7 @@ class _CapabilitiesCardState extends ConsumerState<_CapabilitiesCard> {
                   : selfCheckoutAvailable
                   ? _order
                   : _showUnavailableInfo,
-              label: selfCheckoutAvailable ? '开通高级模板权益' : 'App 内暂不提供购买',
+              label: selfCheckoutAvailable ? stringsOf(context).merchantSubscriptionEnable : stringsOf(context).merchantSubscriptionUnavailable,
               role: CyNativeButtonRole.secondary,
               loading: selfCheckoutAvailable && _busy,
             ),

@@ -164,6 +164,8 @@ void main() {
   testWidgets(
     '游客点「开始创建」先弹登录,不静默回首页',
     (WidgetTester tester) async {
+      tester.platformDispatcher.localesTestValue = const [Locale('zh')];
+      addTearDown(tester.platformDispatcher.clearLocalesTestValue);
       final _Harness harness = await _pumpApp(tester, loggedIn: false);
 
       harness.router.push('/template/intro');
