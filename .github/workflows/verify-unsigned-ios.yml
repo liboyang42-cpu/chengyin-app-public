@@ -1,0 +1,91 @@
+name: Unsigned iOS release verification
+on:
+  workflow_dispatch:
+  # Bootstrap this unmerged workflow without changing main. No PR-wide trigger.
+  push:
+    branches: [codex/verify-unsigned-ios]
+    paths:
+      - '.github/workflows/verify-unsigned-ios.yml'
+      - 'ios/**'
+      - 'lib/**'
+      - 'third_party/**'
+      - 'assets/**'
+      - 'pubspec.yaml'
+      - 'pubspec.lock'
+      - 'l10n.yaml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: unsigned-ios-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: ${{ !github.event.repository.private && github.repository == 'liboyang42-cpu/chengyin-app-public' }}
+    runs-on: macos-26
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    env:
+      COCOAPODS_DISABLE_STATS: 'true'
+      CI: 'true'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          flutter-version: '3.44.2'
+          channel: stable
+          cache: false
+      - name: Record exact snapshot and toolchain
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git log -1 --format='%H %s'
+          sw_vers
+          uname -m
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+          ruby --version
+          pod --version
+          flutter --version --machine > "$RUNNER_TEMP/flutter-version.json"
+          cat "$RUNNER_TEMP/flutter-version.json"
+          python3 - "$RUNNER_TEMP/flutter-version.json" <<'PY'
+          import json, sys
+          version = json.load(open(sys.argv[1]))
+          assert version["frameworkVersion"] == "3.44.2", version
+          assert version["dartSdkVersion"] == "3.12.2", version
+          PY
+          flutter doctor -v
+      - name: Resolve locked Dart dependencies
+        run: flutter pub get --enforce-lockfile
+      - name: Build unsigned iOS release
+        run: flutter build ios --release --no-codesign
+      - name: Check unsigned app output
+        run: |
+          test -d build/ios/iphoneos/Runner.app
+          test -f build/ios/iphoneos/Runner.app/Runner
+          file build/ios/iphoneos/Runner.app/Runner
+          test ! -d build/ios/iphoneos/Runner.app/_CodeSignature
+          test ! -f build/ios/iphoneos/Runner.app/embedded.mobileprovision
+          du -sh build/ios/iphoneos/Runner.app
+          {
+            echo "Verified commit: $GITHUB_SHA"
+            echo "Command: flutter build ios --release --no-codesign"
+            echo "Unsigned Runner.app only; no IPA, device, signing, or release acceptance."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Record resolved native dependencies and generated changes
+        if: always()
+        run: |
+          for lock in ios/Podfile.lock ios/Runner.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved ios/Runner.xcworkspace/xcshareddata/swiftpm/Package.resolved; do
+            if test -f "$lock"; then
+              echo "$lock"
+              cat "$lock"
+            fi
+          done
+          git status --short
+          git diff --stat
+          git diff -- pubspec.lock ios/Podfile.lock
