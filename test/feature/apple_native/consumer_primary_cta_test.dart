@@ -68,7 +68,7 @@ RegistrationDetail _usableTicket() =>
 
 void main() {
   testWidgets('登录页主操作与次操作都使用原生玻璃按钮', (WidgetTester tester) async {
-    await tester.pumpWidget(_host(const LoginPage()));
+    await tester.pumpWidget(_host(const LoginPage(intent: 'existing')));
     await tester.pump();
 
     final Finder wechat = find.widgetWithText(CyNativeButton, '微信登录');

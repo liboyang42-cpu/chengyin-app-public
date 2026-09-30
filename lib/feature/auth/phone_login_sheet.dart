@@ -8,6 +8,7 @@ import '../../core/theme/cy_tokens.dart';
 import '../../core/widgets/cy_native_sheet.dart';
 import '../../core/widgets/cy_widgets.dart';
 import 'auth_controller.dart';
+import '../../l10n/strings.dart';
 
 /// 打开手机号登录弹层。
 Future<void> showPhoneLoginSheet(BuildContext context) {
@@ -45,7 +46,7 @@ class _PhoneLoginSheet extends StatelessWidget {
               children: <Widget>[
                 // 抓手由 sheet presenter 自带(S2);这里留等高空间保持标题落点。
                 const SizedBox(height: CyTokens.space4),
-                const CySectionTitle('手机号登录'),
+                CySectionTitle(stringsOf(context).phoneLogin),
                 // 登录成功只关弹窗,留在原页继续刚才的动作(报名/发布等)。
                 // 若是从 /login 整页进来的,路由 redirect 会把已登录用户收敛到 /map。
                 CyPhoneLoginView(onLoggedIn: () => Navigator.of(context).pop()),
@@ -101,7 +102,7 @@ class _CyPhoneLoginViewState extends ConsumerState<CyPhoneLoginView> {
     if (_smsSending) return;
     final phone = _phone.text.trim();
     if (phone.length != 11) {
-      _showFeedback('请输入 11 位手机号', isError: true);
+      _showFeedback(stringsOf(context).phoneNumberHint, isError: true);
       return;
     }
     setState(() => _smsSending = true);
@@ -112,7 +113,7 @@ class _CyPhoneLoginViewState extends ConsumerState<CyPhoneLoginView> {
         _smsSending = false;
         _smsSent = true;
       });
-      _showFeedback('验证码已发送', isError: false);
+      _showFeedback(stringsOf(context).smsCodeSent, isError: false);
     } catch (error) {
       if (!mounted) return;
       setState(() => _smsSending = false);
@@ -121,7 +122,7 @@ class _CyPhoneLoginViewState extends ConsumerState<CyPhoneLoginView> {
           .replaceFirst(RegExp(r'^Exception:\s*'), '')
           .trim();
       _showFeedback(
-        message.isEmpty ? '验证码暂时发不出，请稍后再试' : message,
+        message.isEmpty ? stringsOf(context).smsSendFailed : message,
         isError: true,
       );
     }
@@ -131,11 +132,11 @@ class _CyPhoneLoginViewState extends ConsumerState<CyPhoneLoginView> {
     final phone = _phone.text.trim();
     final code = _code.text.trim();
     if (phone.length != 11) {
-      _showFeedback('请输入 11 位手机号', isError: true);
+      _showFeedback(stringsOf(context).phoneNumberHint, isError: true);
       return;
     }
     if (code.isEmpty) {
-      _showFeedback('请输入验证码', isError: true);
+      _showFeedback(stringsOf(context).enterVerificationCode, isError: true);
       return;
     }
     final err = await ref
@@ -174,7 +175,7 @@ class _CyPhoneLoginViewState extends ConsumerState<CyPhoneLoginView> {
           // 这里只留一段等高呼吸位。
           const SizedBox(height: CyTokens.space4),
           CyField(
-            label: '手机号',
+            label: stringsOf(context).phoneNumber,
             child: CupertinoTextField(
               controller: _phone,
               autofillHints: const <String>[AutofillHints.telephoneNumber],
@@ -190,7 +191,7 @@ class _CyPhoneLoginViewState extends ConsumerState<CyPhoneLoginView> {
               cursorColor: palette.brand,
               // hint 给格式而不是重复上面的 label —— 同一件事说两遍,
               // 而且 hint 一输入就消失,重复的那份等于白占。
-              placeholder: '请输入 11 位手机号',
+              placeholder: stringsOf(context).phoneNumberHint,
               padding: const EdgeInsets.symmetric(
                 horizontal: CyTokens.space3,
                 vertical: CyTokens.space3_5,
@@ -198,7 +199,7 @@ class _CyPhoneLoginViewState extends ConsumerState<CyPhoneLoginView> {
             ),
           ),
           CyField(
-            label: '验证码',
+            label: stringsOf(context).verificationCode,
             child: Row(
               children: <Widget>[
                 Expanded(
@@ -216,7 +217,7 @@ class _CyPhoneLoginViewState extends ConsumerState<CyPhoneLoginView> {
                     style: fieldStyle,
                     placeholderStyle: placeholderStyle,
                     cursorColor: palette.brand,
-                    placeholder: '6 位短信验证码',
+                    placeholder: stringsOf(context).smsCodeHint,
                     padding: const EdgeInsets.symmetric(
                       horizontal: CyTokens.space3,
                       vertical: CyTokens.space3_5,
@@ -227,20 +228,20 @@ class _CyPhoneLoginViewState extends ConsumerState<CyPhoneLoginView> {
                 // 真源(scene-settings-deregister)的「获取验证码」是行尾
                 // 文字动作(text-title 色、无底),不是灰胶囊 —— 灰胶囊和
                 // 禁用态在暗底上几乎分不出来。
-                CupertinoButton(
+                Flexible(child: CupertinoButton(
                   sizeStyle: CupertinoButtonSize.medium,
                   minimumSize: const Size(0, CyTokens.btnH),
                   padding: const EdgeInsets.symmetric(horizontal: 18),
                   onPressed: _smsSending ? null : _sendCode,
                   child: Text(
-                    _smsSending ? '发送中…' : (_smsSent ? '重新发送' : '获取验证码'),
+                    _smsSending ? stringsOf(context).sendingCode : (_smsSent ? stringsOf(context).resendCode : stringsOf(context).getCode),
                     style: CyType.subhead.copyWith(
                       color: _smsSending
                           ? palette.textDisabled
                           : palette.textPrimary,
                     ),
                   ),
-                ),
+                )),
               ],
             ),
           ),
@@ -266,8 +267,8 @@ class _CyPhoneLoginViewState extends ConsumerState<CyPhoneLoginView> {
             child: Semantics(
               button: true,
               enabled: !loading,
-              label: '登录',
-              value: loading ? '正在登录' : null,
+              label: stringsOf(context).signIn,
+              value: loading ? stringsOf(context).signingIn : null,
               liveRegion: loading,
               onTap: loading ? null : _login,
               excludeSemantics: true,
@@ -287,16 +288,16 @@ class _CyPhoneLoginViewState extends ConsumerState<CyPhoneLoginView> {
                             color: palette.actionPrimaryFg,
                           ),
                           const SizedBox(width: CyTokens.space2),
-                          const Text('登录'),
+                          Text(stringsOf(context).signIn),
                         ],
                       )
-                    : const Text('登录'),
+                    : Text(stringsOf(context).signIn),
               ),
             ),
           ),
           const SizedBox(height: CyTokens.space2),
           Text(
-            '验证码 5 分钟内有效',
+            stringsOf(context).codeExpiresInFiveMinutes,
             textAlign: TextAlign.center,
             style: CyType.caption2.copyWith(color: palette.textDisabled),
           ),

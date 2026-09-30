@@ -1,3 +1,4 @@
+import '../../core/network/request_session_scope.dart';
 import 'package:dio/dio.dart';
 import '../../core/network/dio_client.dart';
 import '../models/balance_detail.dart';
@@ -260,11 +261,20 @@ class RegistrationApi {
   ///   而失败文案是统一的一句,分不出是"码不对"还是"已绑过"。
   ///   所以失败时抛 [InviterBinding.remoteFailureHint],**把两种可能都说出来
   ///   并明确不用重试**,别让用户反复点一个永远不会成功的按钮。
-  Future<void> setInviter(String inviterId) async {
+  Future<void> setInviter(String inviterId) => _setInviter(inviterId);
+
+  Future<void> setInviterForSession(String inviterId, RequestSessionScope scope) =>
+      _setInviter(inviterId, scope: scope);
+
+  Future<void> _setInviter(String inviterId, {RequestSessionScope? scope}) async {
     final resp = await _client.dio.post<Map<String, dynamic>>(
       '/api/user/setInviter',
+      options: scope == null ? null : Options(extra: {RequestSessionScope.extraKey: scope}),
       data: FormData.fromMap(<String, dynamic>{'inviter_id': inviterId.trim()}),
     );
+    if (scope != null && !scope.isCurrent()) {
+      throw StateError('Session changed during invitation binding');
+    }
     final body = resp.data ?? <String, dynamic>{};
     if ((body['code'] as num?)?.toInt() != 200) {
       throw Exception(InviterBinding.remoteFailureHint);

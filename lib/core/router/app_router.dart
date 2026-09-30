@@ -303,7 +303,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         return startupLocation ?? home;
       }
       // 已登录却停在 /login → 收敛到主页
-      if (auth.isLoggedIn && loc == '/login') return home;
+      if (auth.isLoggedIn && loc == '/login') {
+        // Intent selects onboarding; server access remains authoritative.
+        return state.uri.queryParameters['intent'] == 'merchant'
+            ? kMerchantHomeRoute
+            : home;
+      }
       // 商家视角不渲染玩家五根页，同名根能力转到商家对应落点。
       if (merchant && _merchantRootRedirects.containsKey(loc)) {
         return _merchantRootRedirects[loc];
@@ -330,7 +335,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           inviterId: readInviterId(state.uri.queryParameters),
         ),
       ),
-      GoRoute(path: '/login', builder: (context, state) => const LoginPage()),
+      GoRoute(
+        path: '/login',
+        builder: (context, state) => LoginPage(
+          intent: state.uri.queryParameters['intent'],
+        ),
+      ),
       GoRoute(path: '/search', builder: (context, state) => const SearchPage()),
       GoRoute(
         path: '/search/map',

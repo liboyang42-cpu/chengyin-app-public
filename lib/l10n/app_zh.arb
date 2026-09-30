@@ -1,0 +1,182 @@
+{
+  "@@locale": "zh",
+  "appName": "城瘾",
+  "@appName": {
+    "description": "App-owned interface text; never translate user-generated content."
+  },
+  "settings": "设置",
+  "@settings": {
+    "description": "App-owned interface text; never translate user-generated content."
+  },
+  "language": "语言",
+  "@language": {
+    "description": "App-owned interface text; never translate user-generated content."
+  },
+  "followSystem": "跟随系统",
+  "@followSystem": {
+    "description": "App-owned interface text; never translate user-generated content."
+  },
+  "chineseLanguage": "简体中文",
+  "@chineseLanguage": {
+    "description": "App-owned interface text; never translate user-generated content."
+  },
+  "englishLanguage": "English",
+  "@englishLanguage": {
+    "description": "App-owned interface text; never translate user-generated content."
+  },
+  "languageSaveError": "语言设置未保存，请重试",
+  "@languageSaveError": {
+    "description": "App-owned interface text; never translate user-generated content."
+  },
+  "cancel": "取消",
+  "@cancel": {
+    "description": "App-owned interface text; never translate user-generated content."
+  },
+  "authInvalidLoginResponse": "登录响应不完整,请重试",
+  "@authInvalidLoginResponse": {
+    "description": "Authentication controller app-owned error; server messages remain unchanged."
+  },
+  "networkError": "网络异常，请稍后重试",
+  "@networkError": {
+    "description": "App-owned interface text; never translate user-generated content."
+  },
+  "authWechatNotInstalled": "未安装微信,请改用其他方式登录",
+  "@authWechatNotInstalled": {
+    "description": "Authentication controller app-owned error; server messages remain unchanged."
+  },
+  "authWechatUnavailable": "暂时无法使用微信登录,请用「通过 Apple 登录」,或稍后再试",
+  "@authWechatUnavailable": {
+    "description": "Authentication controller app-owned error; server messages remain unchanged."
+  },
+  "authAppleFailed": "Apple 登录失败,请稍后重试",
+  "@authAppleFailed": {
+    "description": "Authentication controller app-owned error; server messages remain unchanged."
+  },
+  "authLoginFailed": "登录失败",
+  "@authLoginFailed": {
+    "description": "Authentication controller app-owned error; server messages remain unchanged."
+  },
+  "authAppleIncomplete": "Apple 登录没有完成。若这台设备还没登录 Apple 账户,请先在系统「设置 → Apple 账户」登录后再试",
+  "@authAppleIncomplete": {
+    "description": "Authentication controller app-owned error; server messages remain unchanged."
+  },
+  "authWechatLaunchFailed": "微信授权拉起失败",
+  "@authWechatLaunchFailed": {
+    "description": "Authentication controller app-owned error; server messages remain unchanged."
+  },
+  "authAppleMissingCredential": "Apple 登录失败:未获取到凭证",
+  "@authAppleMissingCredential": {
+    "description": "Authentication controller app-owned error; server messages remain unchanged."
+  },
+  "appleLogin": "通过 Apple 登录",
+  "@appleLogin": {
+    "description": "App-owned interface text; never translate user-generated content."
+  },
+  "getCode": "获取验证码",
+  "@getCode": {
+    "description": "Phone login UI; the current server contract requires an 11-digit number. Locale does not change phone-region support."
+  },
+  "wechatLogin": "微信登录",
+  "@wechatLogin": {
+    "description": "App-owned interface text; never translate user-generated content."
+  },
+  "merchantRegistrationExplanation": "登录后申请入驻，审核通过后开通经营权限",
+  "@merchantRegistrationExplanation": {
+    "description": "App-owned interface text; never translate user-generated content."
+  },
+  "resendCode": "重新发送",
+  "@resendCode": {
+    "description": "Phone login UI; the current server contract requires an 11-digit number. Locale does not change phone-region support."
+  },
+  "phoneNumberHint": "请输入 11 位手机号",
+  "@phoneNumberHint": {
+    "description": "Phone login UI; the current server contract requires an 11-digit number. Locale does not change phone-region support."
+  },
+  "appTagline": "让现实世界,变得可玩",
+  "@appTagline": {
+    "description": "App-owned interface text; never translate user-generated content."
+  },
+  "doorUnavailable": "这张码暂时打不开",
+  "@doorUnavailable": {
+    "description": "App-owned login/door fallback; original server explanation remains unchanged."
+  },
+  "existingAccountLogin": "已有账号，登录",
+  "@existingAccountLogin": {
+    "description": "App-owned interface text; never translate user-generated content."
+  },
+  "playerRegistration": "玩家注册",
+  "@playerRegistration": {
+    "description": "App-owned interface text; never translate user-generated content."
+  },
+  "signingIn": "正在登录",
+  "@signingIn": {
+    "description": "Phone login UI; the current server contract requires an 11-digit number. Locale does not change phone-region support."
+  },
+  "enterVerificationCode": "请输入验证码",
+  "@enterVerificationCode": {
+    "description": "Phone login UI; the current server contract requires an 11-digit number. Locale does not change phone-region support."
+  },
+  "chooseAgain": "重新选择",
+  "@chooseAgain": {
+    "description": "App-owned interface text; never translate user-generated content."
+  },
+  "settingsResidualLoginBenefits": "登录后即可报名、发布、加入俱乐部",
+  "@settingsResidualLoginBenefits": {},
+  "phoneNumber": "手机号",
+  "@phoneNumber": {
+    "description": "Phone login UI; the current server contract requires an 11-digit number. Locale does not change phone-region support."
+  },
+  "loginTitle": "登录城瘾",
+  "@loginTitle": {
+    "description": "App-owned interface text; never translate user-generated content."
+  },
+  "signIn": "登录",
+  "@signIn": {
+    "description": "Phone login UI; the current server contract requires an 11-digit number. Locale does not change phone-region support."
+  },
+  "phoneLogin": "手机号登录",
+  "@phoneLogin": {
+    "description": "App-owned interface text; never translate user-generated content."
+  },
+  "codeExpiresInFiveMinutes": "验证码 5 分钟内有效",
+  "@codeExpiresInFiveMinutes": {
+    "description": "Phone login UI; the current server contract requires an 11-digit number. Locale does not change phone-region support."
+  },
+  "loading": "正在加载…",
+  "@loading": {
+    "description": "App-owned interface text; never translate user-generated content."
+  },
+  "smsCodeSent": "验证码已发送",
+  "@smsCodeSent": {
+    "description": "Phone login UI; the current server contract requires an 11-digit number. Locale does not change phone-region support."
+  },
+  "smsSendFailed": "验证码暂时发不出，请稍后再试",
+  "@smsSendFailed": {
+    "description": "Phone login UI; the current server contract requires an 11-digit number. Locale does not change phone-region support."
+  },
+  "sendingCode": "发送中…",
+  "@sendingCode": {
+    "description": "Phone login UI; the current server contract requires an 11-digit number. Locale does not change phone-region support."
+  },
+  "merchantRegistration": "商家注册",
+  "@merchantRegistration": {
+    "description": "App-owned interface text; never translate user-generated content."
+  },
+  "smsCodeHint": "6 位短信验证码",
+  "@smsCodeHint": {
+    "description": "Phone login UI; the current server contract requires an 11-digit number. Locale does not change phone-region support."
+  },
+  "verificationCode": "验证码",
+  "@verificationCode": {
+    "description": "Phone login UI; the current server contract requires an 11-digit number. Locale does not change phone-region support."
+  },
+  "itemCount": "{count} 项",
+  "@itemCount": {
+    "description": "Count with locale-specific plural handling.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
+}

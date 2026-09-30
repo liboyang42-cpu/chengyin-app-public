@@ -1,3 +1,5 @@
+import '../feature/account/pending_inviter.dart';
+import 'network/session_data.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../data/api/advanced_play_api.dart';
@@ -62,6 +64,21 @@ final mapPrivacyStoreProvider = Provider<MapPrivacyStore>((ref) {
 /// 冷启动邀请人归因的 `has_inviter` 闸(键名沿用真源 wx storage)。
 final inviterFlagStoreProvider = Provider<InviterFlagStore>((ref) {
   return InviterFlagStore(ref.watch(secureStorageProvider));
+});
+
+final pendingInviterProvider = Provider<PendingInviter>((ref) {
+  final storage = ref.watch(secureStorageProvider);
+  return PendingInviter(
+    read: (key) => storage.read(key: key),
+    write: (key, value) => storage.write(key: key, value: value),
+    remove: (key) => storage.delete(key: key),
+    currentUserId: () => ref.read(authControllerProvider).user?.id,
+    bind: (id) => ref.read(registrationApiProvider).setInviter(id),
+    bindForUser: (id, userId) {
+      final scope = ref.read(authControllerProvider.notifier).requestScope(userId);
+      return ref.read(registrationApiProvider).setInviterForSession(id, scope);
+    },
+  );
 });
 
 final tokenStoreProvider = Provider<TokenStore>((ref) {
@@ -215,6 +232,7 @@ final badgeWallApiProvider = Provider<BadgeWallApi>((ref) {
 });
 
 final aiNpcApiProvider = Provider<AiNpcApi>((ref) {
+  ref.watch(sessionDataKeyProvider);
   return AiNpcApi(ref.watch(dioClientProvider));
 });
 

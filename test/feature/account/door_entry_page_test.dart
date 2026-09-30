@@ -1,3 +1,5 @@
+import 'dart:async';
+
 // 门口码落地页行为测(gap-spec-player #1):冷启动 `?scene` 分流、
 // `?inviter` 归因补发、失败回落到首页并给出后端原文。
 // 宿主用桩路由,只钉「/door 该去哪」,不拉起真 /play、/topic 页。
@@ -9,6 +11,7 @@ import 'package:chengyin_app/data/models/scan_entry.dart';
 import 'package:chengyin_app/data/models/user.dart';
 import 'package:chengyin_app/feature/account/door_entry_page.dart';
 import 'package:chengyin_app/feature/account/inviter_cold_start.dart';
+import 'package:chengyin_app/feature/account/pending_inviter.dart';
 import 'package:chengyin_app/feature/auth/auth_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -18,6 +21,12 @@ import 'package:go_router/go_router.dart';
 import '../../support/fixed_auth.dart';
 
 const String _code = '0123456789abcdef0123456789abcdef';
+
+class _SwitchableAuth extends AuthController {
+  @override
+  AuthState build() => _player(42);
+  void switchTo(int id) => state = _player(id);
+}
 
 class _FakePlayApi implements PlayApi {
   _FakePlayApi(this._result, [this._error]);
@@ -31,6 +40,21 @@ class _FakePlayApi implements PlayApi {
     final Object? error = _error;
     if (error != null) throw error;
     return _result!;
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _DeferredPlayApi implements PlayApi {
+  final List<Completer<ScanEntryResult>> requests =
+      <Completer<ScanEntryResult>>[];
+
+  @override
+  Future<ScanEntryResult> scanEntry(String code) {
+    final request = Completer<ScanEntryResult>();
+    requests.add(request);
+    return request.future;
   }
 
   @override
@@ -72,7 +96,27 @@ Future<GoRouter> _pump(
   required String initialLocation,
   required List<dynamic> overrides,
 }) async {
-  final container = ProviderContainer(overrides: overrides.cast());
+  final memory = <String, String>{};
+  final container = ProviderContainer(overrides: [
+    ...overrides.cast(),
+    pendingInviterProvider.overrideWith((ref) => PendingInviter(
+      read: (key) async {
+        if (key.startsWith('has_inviter_v1_')) {
+          return await ref.read(inviterFlagStoreProvider).bound ? '1' : null;
+        }
+        return memory[key];
+      },
+      write: (key, value) async {
+        memory[key] = value;
+        if (key.startsWith('has_inviter_v1_')) {
+          await ref.read(inviterFlagStoreProvider).markBound();
+        }
+      },
+      remove: (key) async { memory.remove(key); },
+      currentUserId: () => ref.read(authControllerProvider).user?.id,
+      bind: (id) => ref.read(registrationApiProvider).setInviter(id),
+    )),
+  ]);
   addTearDown(container.dispose);
   final router = GoRouter(
     initialLocation: initialLocation,
@@ -110,6 +154,85 @@ Future<GoRouter> _pump(
 }
 
 void main() {
+  testWidgets('same code response from prior account cannot navigate current account', (tester) async {
+    final auth = _SwitchableAuth();
+    final play = _DeferredPlayApi();
+    final router = await _pump(tester,
+      initialLocation: '/door?scene=$_code',
+      overrides: <Object>[
+        authControllerProvider.overrideWith(() => auth),
+        playApiProvider.overrideWithValue(play),
+      ],
+    );
+    expect(play.requests, hasLength(1));
+    auth.switchTo(43);
+    await tester.pumpAndSettle();
+    expect(play.requests, hasLength(2));
+    play.requests[0].complete(const ScanEntryResult(action: 'purchase', topicId: 5));
+    await tester.pumpAndSettle();
+    expect(router.routeInformationProvider.value.uri.path, '/door');
+    expect(find.text('topic:5'), findsNothing);
+    play.requests[1].complete(const ScanEntryResult(action: 'purchase', topicId: 8));
+    await tester.pumpAndSettle();
+    expect(find.text('topic:8'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('离开未完成扫码页后同码重进,新请求完成正常导航', (tester) async {
+    final play = _DeferredPlayApi();
+    final router = await _pump(
+      tester,
+      initialLocation: '/door?scene=$_code',
+      overrides: <Object>[
+        authControllerProvider.overrideWith(() => FixedAuth(_player(42))),
+        playApiProvider.overrideWithValue(play),
+      ],
+    );
+    expect(play.requests, hasLength(1));
+    router.go('/feed');
+    await tester.pumpAndSettle();
+    router.go('/door?scene=$_code');
+    await tester.pumpAndSettle();
+    expect(play.requests, hasLength(2));
+    play.requests[1].complete(
+      const ScanEntryResult(action: 'purchase', topicId: 8),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('topic:8'), findsOneWidget);
+    play.requests[0].complete(
+      const ScanEntryResult(action: 'purchase', topicId: 5),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('topic:8'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('同页切换扫码参数时过期响应不能覆盖新码', (tester) async {
+    final play = _DeferredPlayApi();
+    final router = await _pump(
+      tester,
+      initialLocation: '/door?scene=$_code',
+      overrides: <Object>[
+        authControllerProvider.overrideWith(() => FixedAuth(_player(42))),
+        playApiProvider.overrideWithValue(play),
+      ],
+    );
+    router.go('/door?scene=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
+    await tester.pumpAndSettle();
+    expect(play.requests, hasLength(2));
+    play.requests[0].complete(
+      const ScanEntryResult(action: 'purchase', topicId: 5),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('topic:5'), findsNothing);
+    play.requests[1].complete(
+      const ScanEntryResult(action: 'purchase', topicId: 8),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('topic:8'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('门口码 action=play 带场次:冷启动直落游玩页', (WidgetTester tester) async {
     final fake = _FakePlayApi(
       const ScanEntryResult(

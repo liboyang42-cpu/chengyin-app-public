@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../../core/network/dio_client.dart';
+import '../../core/network/request_session_scope.dart';
 import '../models/npc.dart';
 import '../models/shop_npc_models.dart';
 
@@ -33,6 +34,7 @@ class AiNpcApi {
   }) async {
     final resp = await _client.dio.get<Map<String, dynamic>>(
       '/api/ai/npc/profile',
+      options: RequestSessionScope.options(),
       queryParameters: <String, dynamic>{
         'scope': scope,
         if (activityId != null) 'activityId': activityId,
@@ -54,6 +56,7 @@ class AiNpcApi {
   }) async {
     final resp = await _client.dio.get<Map<String, dynamic>>(
       '/api/ai/npc/event',
+      options: RequestSessionScope.options(),
       queryParameters: <String, dynamic>{
         'profileId': profileId,
         'eventType': eventType,
