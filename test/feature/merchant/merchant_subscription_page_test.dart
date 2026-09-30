@@ -110,118 +110,136 @@ void main() {
   for (final waitForStatus in [false, true]) {
     testWidgets('account switch drops late subscription ${waitForStatus ? "status" : "order"}', (tester) async {
       debugDefaultTargetPlatformOverride = TargetPlatform.android;
-      addTearDown(() => debugDefaultTargetPlatformOverride = null);
-      await tester.binding.setSurfaceSize(const Size(390, 900));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
-      final order = Completer<Map<String, dynamic>>();
-      final status = Completer<String>();
-      final api = _FakeMerchantApi(subs: [], caps: {'selfCheckoutEnabled': true},
-        orderCompleter: waitForStatus ? null : order,
-        statusCompleter: waitForStatus ? status : null);
-      final container = ProviderContainer(overrides: [
-        authControllerProvider.overrideWith(_SwitchingAuth.new),
-        merchantApiProvider.overrideWithValue(api),
-      ]);
-      addTearDown(container.dispose);
-      await tester.pumpWidget(UncontrolledProviderScope(container: container,
-        child: const MaterialApp(home: MerchantSubscriptionPage())));
-      await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('开通高级模板权益'));
-      await tester.tap(find.text('开通高级模板权益'));
-      await tester.pump();
-      expect(api.orderCallCount, 1);
-      expect(api.statusQueries.length, waitForStatus ? 1 : 0);
-      (container.read(authControllerProvider.notifier) as _SwitchingAuth).switchTo(2);
-      await tester.pumpAndSettle();
-      final countsAfterSwitch = (api.subsCalls, api.capsCalls);
-      if (waitForStatus) { status.complete('success'); }
-      else { order.complete({'paymentStatus': 'success', 'orderSn': 'A-order'}); }
-      await tester.pumpAndSettle();
-      expect((api.subsCalls, api.capsCalls), countsAfterSwitch);
-      expect(api.statusQueries.length, waitForStatus ? 1 : 0);
-      expect(find.text('权益已到账'), findsNothing);
-      expect(tester.takeException(), isNull);
+      try {
+        await tester.binding.setSurfaceSize(const Size(390, 900));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final order = Completer<Map<String, dynamic>>();
+        final status = Completer<String>();
+        final api = _FakeMerchantApi(subs: [], caps: {'selfCheckoutEnabled': true},
+          orderCompleter: waitForStatus ? null : order,
+          statusCompleter: waitForStatus ? status : null);
+        final container = ProviderContainer(overrides: [
+          authControllerProvider.overrideWith(_SwitchingAuth.new),
+          merchantApiProvider.overrideWithValue(api),
+        ]);
+        addTearDown(container.dispose);
+        await tester.pumpWidget(UncontrolledProviderScope(container: container,
+          child: const MaterialApp(home: MerchantSubscriptionPage())));
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(find.text('开通高级模板权益'));
+        await tester.tap(find.text('开通高级模板权益'));
+        await tester.pump();
+        expect(api.orderCallCount, 1);
+        expect(api.statusQueries.length, waitForStatus ? 1 : 0);
+        (container.read(authControllerProvider.notifier) as _SwitchingAuth).switchTo(2);
+        await tester.pumpAndSettle();
+        final countsAfterSwitch = (api.subsCalls, api.capsCalls);
+        if (waitForStatus) { status.complete('success'); }
+        else { order.complete({'paymentStatus': 'success', 'orderSn': 'A-order'}); }
+        await tester.pumpAndSettle();
+        expect((api.subsCalls, api.capsCalls), countsAfterSwitch);
+        expect(api.statusQueries.length, waitForStatus ? 1 : 0);
+        expect(find.text('权益已到账'), findsNothing);
+        expect(tester.takeException(), isNull);
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
     });
   }
 
   testWidgets('switch during order token read prevents dispatch with B credential', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
-    addTearDown(() => debugDefaultTargetPlatformOverride = null);
-    await tester.binding.setSurfaceSize(const Size(390, 900));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-    final store = _OrderTokenStore();
-    final client = DioClient(store);
-    final adapter = _OrderAdapter();
-    client.dio.httpClientAdapter = adapter;
-    addTearDown(() => client.dio.close());
-    final container = ProviderContainer(retry: (_, _) => null, overrides: [
-      authControllerProvider.overrideWith(_SwitchingAuth.new),
-      dioClientProvider.overrideWithValue(client),
-    ]);
-    addTearDown(container.dispose);
-    await tester.pumpWidget(UncontrolledProviderScope(container: container,
-      child: const MaterialApp(home: MerchantSubscriptionPage())));
-    await tester.pumpAndSettle();
-    store.pauseNext = true;
-    await tester.ensureVisible(find.text('开通高级模板权益'));
-    await tester.tap(find.text('开通高级模板权益'));
-    await tester.pump();
-    await store.started.future;
-    store.token = 'B-token';
-    (container.read(authControllerProvider.notifier) as _SwitchingAuth).switchTo(2);
-    await tester.pump();
-    store.release.complete('B-token');
-    await tester.pumpAndSettle();
-    expect(adapter.paths.where((path) => path == '/api/merchant/commerce/order'), isEmpty);
-    expect(adapter.paths.where((path) => path == '/api/merchant/commerce/order/status'), isEmpty);
-    expect(tester.takeException(), isNull);
+    try {
+      await tester.binding.setSurfaceSize(const Size(390, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final store = _OrderTokenStore();
+      final client = DioClient(store);
+      final adapter = _OrderAdapter();
+      client.dio.httpClientAdapter = adapter;
+      addTearDown(() => client.dio.close());
+      final container = ProviderContainer(retry: (_, _) => null, overrides: [
+        authControllerProvider.overrideWith(_SwitchingAuth.new),
+        dioClientProvider.overrideWithValue(client),
+      ]);
+      addTearDown(container.dispose);
+      await tester.pumpWidget(UncontrolledProviderScope(container: container,
+        child: const MaterialApp(home: MerchantSubscriptionPage())));
+      await tester.pumpAndSettle();
+      store.pauseNext = true;
+      await tester.ensureVisible(find.text('开通高级模板权益'));
+      await tester.tap(find.text('开通高级模板权益'));
+      // Dio schedules request interceptors on the event queue. Pump fake time
+      // until the delayed keychain read actually starts; do not await a frozen clock.
+      for (var tick = 0; tick < 20 && !store.started.isCompleted; tick++) {
+        await tester.pump(const Duration(milliseconds: 10));
+      }
+      expect(store.started.isCompleted, isTrue,
+        reason: 'The order must reach the delayed token read before switching accounts');
+      await store.started.future;
+      store.token = 'B-token';
+      (container.read(authControllerProvider.notifier) as _SwitchingAuth).switchTo(2);
+      await tester.pump();
+      store.release.complete('B-token');
+      await tester.pumpAndSettle();
+      expect(adapter.paths.where((path) => path == '/api/merchant/commerce/order'), isEmpty);
+      expect(adapter.paths.where((path) => path == '/api/merchant/commerce/order/status'), isEmpty);
+      expect(tester.takeException(), isNull);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
   });
 
   testWidgets('late subscription status after disposal does not refresh or notify', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
-    addTearDown(() => debugDefaultTargetPlatformOverride = null);
-    final status = Completer<String>();
-    final api = _FakeMerchantApi(subs: [], caps: {'selfCheckoutEnabled': true}, statusCompleter: status);
-    await _pumpPage(tester, api);
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-    await tester.ensureVisible(find.text('开通高级模板权益'));
-    await tester.tap(find.text('开通高级模板权益'));
-    await tester.pump();
-    expect(api.statusQueries, ['TPLTM_x']);
-    final before = (api.subsCalls, api.capsCalls);
-    await tester.pumpWidget(const MaterialApp(home: SizedBox()));
-    status.complete('success');
-    await tester.pumpAndSettle();
-    expect((api.subsCalls, api.capsCalls), before);
-    expect(tester.takeException(), isNull);
+    try {
+      final status = Completer<String>();
+      final api = _FakeMerchantApi(subs: [], caps: {'selfCheckoutEnabled': true}, statusCompleter: status);
+      await _pumpPage(tester, api);
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.ensureVisible(find.text('开通高级模板权益'));
+      await tester.tap(find.text('开通高级模板权益'));
+      await tester.pump();
+      expect(api.statusQueries, ['TPLTM_x']);
+      final before = (api.subsCalls, api.capsCalls);
+      await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+      status.complete('success');
+      await tester.pumpAndSettle();
+      expect((api.subsCalls, api.capsCalls), before);
+      expect(tester.takeException(), isNull);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
   });
 
   testWidgets('English access labels preserve iOS purchase restriction and raw expiry', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
-    addTearDown(() => debugDefaultTargetPlatformOverride = null);
-    final api = _FakeMerchantApi(subs: [
-      {'subscriptionType': 'premium_template', 'endDate': '2030-07-01 13:45', 'usedCount': 1, 'maxUsage': 3},
-    ], caps: {'selfCheckoutEnabled': true});
-    await tester.pumpWidget(ProviderScope(
-      overrides: [signedInAuthOverride(role: 'merchant'), merchantApiProvider.overrideWithValue(api)],
-      child: MaterialApp(
-        locale: const Locale('en'),
-        supportedLocales: AppLocalizations.supportedLocales,
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        theme: merchantGoldenTheme(),
-        home: const MerchantSubscriptionPage(),
-      ),
-    ));
-    await tester.pumpAndSettle();
-    expect(find.text('Premium template access'), findsOneWidget);
-    expect(find.text('Valid until 2030-07-01 13:45'), findsOneWidget);
-    expect(find.text('Used 1 / 3'), findsOneWidget);
-    await tester.ensureVisible(find.text('Purchases are unavailable in this app'));
-    await tester.tap(find.text('Purchases are unavailable in this app'));
-    await tester.pumpAndSettle();
-    expect(find.text('This version does not offer premium template purchases.'), findsOneWidget);
-    expect(api.orderCallCount, 0);
-    expect(tester.takeException(), isNull);
+    try {
+      final api = _FakeMerchantApi(subs: [
+        {'subscriptionType': 'premium_template', 'endDate': '2030-07-01 13:45', 'usedCount': 1, 'maxUsage': 3},
+      ], caps: {'selfCheckoutEnabled': true});
+      await tester.pumpWidget(ProviderScope(
+        overrides: [signedInAuthOverride(role: 'merchant'), merchantApiProvider.overrideWithValue(api)],
+        child: MaterialApp(
+          locale: const Locale('en'),
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          theme: merchantGoldenTheme(),
+          home: const MerchantSubscriptionPage(),
+        ),
+      ));
+      await tester.pumpAndSettle();
+      expect(find.text('Premium template access'), findsOneWidget);
+      expect(find.text('Valid until 2030-07-01 13:45'), findsOneWidget);
+      expect(find.text('Used 1 / 3'), findsOneWidget);
+      await tester.ensureVisible(find.text('Purchases are unavailable in this app'));
+      await tester.tap(find.text('Purchases are unavailable in this app'));
+      await tester.pumpAndSettle();
+      expect(find.text('This version does not offer premium template purchases.'), findsOneWidget);
+      expect(api.orderCallCount, 0);
+      expect(tester.takeException(), isNull);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
   });
   test('English access type keeps unknown server value unchanged', () {
     final strings = AppLocalizationsEn();
