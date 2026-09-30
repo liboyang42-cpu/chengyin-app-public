@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart' show Locale;
 import 'package:dio/dio.dart';
 import 'package:chengyin_app/core/providers.dart';
 import 'package:chengyin_app/core/router/app_router.dart';
