@@ -88,6 +88,6 @@ void main() {
         .having((e) => e.kind, 'kind', RegistrationReadKind.paymentParameters)
         .having((e) => e.hasServerMessage, 'origin', false),
     ));
-  }
+  });
 
 }

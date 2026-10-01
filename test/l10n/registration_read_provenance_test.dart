@@ -16,7 +16,7 @@ void main() {
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: Builder(builder: (context) {
-        expect(localizedOrderError(context, const ClubApiException('local-only-sentinel', isLocal: true)), isNot(contains('local-only-sentinel')));
+        expect(localizedOrderError(context, ClubApiException('local-only-sentinel', isLocal: true)), isNot(contains('local-only-sentinel')));
         final local = RegistrationReadFailure.fromResponse(RegistrationReadKind.detail, {'code': 500}, '票券详情加载失败');
         final remote = RegistrationReadFailure.fromResponse(RegistrationReadKind.detail,
           {'code': 500, 'msg': '票券详情加载失败'}, '票券详情加载失败');

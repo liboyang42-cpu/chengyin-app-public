@@ -23,6 +23,8 @@ class _Api implements ImApi {
 }
 class _Presenter implements ImConversationActionPresenter {
   @override
+  bool get supportsNativeActionSheet => true;
+  @override
   Future<String?> showActionSheet({required BuildContext context,
     required List<ImConversationActionItem> items}) async => 'mute';
 }

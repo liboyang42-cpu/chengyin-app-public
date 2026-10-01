@@ -3,6 +3,7 @@ class MarketingConsent {
     required this.merchantRowId,
     required this.merchantOwnerMemberId,
     required this.merchantName,
+    this.hasServerMerchantName = true,
     required this.inAppOptedIn,
     required this.couponOptedIn,
   });
@@ -10,6 +11,7 @@ class MarketingConsent {
   final int merchantRowId;
   final int merchantOwnerMemberId;
   final String merchantName;
+  final bool hasServerMerchantName;
   final bool inAppOptedIn;
   final bool couponOptedIn;
 
@@ -26,6 +28,7 @@ class MarketingConsent {
       merchantRowId: merchantRowId,
       merchantOwnerMemberId: merchantOwnerMemberId,
       merchantName: name.isEmpty ? '商家' : name,
+      hasServerMerchantName: name.isNotEmpty,
       inAppOptedIn: json['inAppOptedIn'] == true,
       couponOptedIn: json['couponOptedIn'] == true,
     );
