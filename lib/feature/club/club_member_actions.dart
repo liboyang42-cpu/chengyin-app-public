@@ -1,3 +1,5 @@
+import 'club_api_messages.dart';
+import '../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -67,14 +69,14 @@ class _ClubMemberActionsState extends ConsumerState<ClubMemberActions> {
     if (_busy) return;
     setState(() => _busy = true);
     try {
-      final String msg = await action();
+      final String msg = await clubApiAction(context, action);
       ref.invalidate(clubMembersProvider(widget.clubId));
       if (refreshDetail) ref.invalidate(clubDetailProvider(widget.clubId));
       // ★ 原样显示后端那句话。它可能是「管理员最多 2 个,请先取消其他管理员」——
       //   那句带着**可执行信息**,吞成「设置失败」等于把出路也一起吞了。
       _toast(msg);
     } catch (e) {
-      _toast(e.toString().replaceFirst('Exception: ', ''), isError: true);
+      _toast(clubApiErrorMessage(context, e), isError: true);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -83,10 +85,10 @@ class _ClubMemberActionsState extends ConsumerState<ClubMemberActions> {
   Future<void> _setRole(ClubMember member) async {
     final bool ok = await cyConfirm(
       context,
-      title: member.isAdmin ? '取消管理员' : '设为管理员',
+      title: member.isAdmin ? stringsOf(context).clubAuxRemoveAdmin : stringsOf(context).clubAuxMakeAdmin,
       content: member.isAdmin
-          ? '取消后，对方将不能再删除他人违规内容或现场出示团码。确认取消？'
-          : '管理员可协助删除违规内容、现场出示团码。确认设置？',
+          ? stringsOf(context).clubAuxRemoveAdminConfirm
+          : stringsOf(context).clubAuxMakeAdminConfirm,
       nativePresenter: widget.confirmPresenter,
     );
     if (!ok || !mounted) return;
@@ -104,8 +106,8 @@ class _ClubMemberActionsState extends ConsumerState<ClubMemberActions> {
   Future<void> _remove(ClubMember member) async {
     final bool ok = await cyConfirm(
       context,
-      title: '移除成员',
-      content: '确定将该成员移出俱乐部?',
+      title: stringsOf(context).clubAuxRemoveMember,
+      content: stringsOf(context).clubAuxRemoveMemberConfirm,
       danger: true,
       nativePresenter: widget.confirmPresenter,
     );
@@ -138,12 +140,12 @@ class _ClubMemberActionsState extends ConsumerState<ClubMemberActions> {
       fontSize: CyTokens.typeLabel,
       fontWeight: FontWeight.w500,
     );
-    return Row(
-      mainAxisSize: MainAxisSize.min,
+    return Wrap(
+      alignment: WrapAlignment.end,
       children: <Widget>[
         if (canRole)
           Semantics(
-            label: m.isAdmin ? '取消管理' : '设管理',
+            label: m.isAdmin ? stringsOf(context).clubAuxRemoveAdminAction : stringsOf(context).clubAuxMakeAdminAction,
             button: true,
             child: CupertinoButton(
               key: Key('member-role-${m.memberId}'),
@@ -151,13 +153,13 @@ class _ClubMemberActionsState extends ConsumerState<ClubMemberActions> {
               padding: const EdgeInsets.symmetric(horizontal: 8),
               onPressed: _busy ? null : () => _setRole(m),
               child: ExcludeSemantics(
-                child: Text(m.isAdmin ? '取消管理' : '设管理', style: labelStyle),
+                child: Text(m.isAdmin ? stringsOf(context).clubAuxRemoveAdminAction : stringsOf(context).clubAuxMakeAdminAction, style: labelStyle),
               ),
             ),
           ),
         if (canBan)
           Semantics(
-            label: '临时封禁',
+            label: stringsOf(context).clubAuxTemporaryBan,
             button: true,
             child: CupertinoButton(
               key: Key('member-governance-${m.memberId}'),
@@ -168,12 +170,12 @@ class _ClubMemberActionsState extends ConsumerState<ClubMemberActions> {
                   : () => context.push(
                       '/club/${widget.clubId}/governance?memberId=${m.memberId}',
                     ),
-              child: ExcludeSemantics(child: Text('临时封禁', style: labelStyle)),
+              child: ExcludeSemantics(child: Text(stringsOf(context).clubAuxTemporaryBan, style: labelStyle)),
             ),
           ),
         if (canRemove)
           Semantics(
-            label: '移除',
+            label: stringsOf(context).clubAuxRemove,
             button: true,
             child: CupertinoButton(
               key: Key('member-remove-${m.memberId}'),
@@ -182,7 +184,7 @@ class _ClubMemberActionsState extends ConsumerState<ClubMemberActions> {
               onPressed: _busy ? null : () => _remove(m),
               child: ExcludeSemantics(
                 child: Text(
-                  '移除',
+                  stringsOf(context).clubAuxRemove,
                   style: labelStyle.copyWith(
                     color: CupertinoColors.systemRed.resolveFrom(context),
                   ),

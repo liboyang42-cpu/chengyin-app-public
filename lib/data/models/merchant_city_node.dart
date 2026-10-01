@@ -3,6 +3,7 @@ class CityNode {
   const CityNode({
     required this.id,
     required this.name,
+    this.hasNameFallback = false,
     this.address,
     this.status,
     this.templateTitle,
@@ -12,6 +13,7 @@ class CityNode {
 
   final int id;
   final String name;
+  final bool hasNameFallback;
   final String? address;
   final int? status;
   final String? templateTitle;
@@ -22,6 +24,7 @@ class CityNode {
     return CityNode(
       id: ((json['poiId'] ?? json['id']) as num?)?.toInt() ?? 0,
       name: (json['name'] as String?) ?? '未命名据点',
+      hasNameFallback: json['name'] == null,
       address: json['address'] as String?,
       status: (json['status'] as num?)?.toInt(),
       templateTitle: json['templateTitle'] as String?,
@@ -36,6 +39,7 @@ class CityNodeApplication {
   const CityNodeApplication({
     required this.id,
     required this.poiName,
+    this.hasNameFallback = false,
     this.status,
     this.rejectReason,
     this.applicationType,
@@ -43,6 +47,7 @@ class CityNodeApplication {
 
   final int id;
   final String poiName;
+  final bool hasNameFallback;
 
   /// 0 待审 / 1 通过 / 2 驳回(与后端审核态一致)。
   final int? status;
@@ -71,6 +76,7 @@ class CityNodeApplication {
       id: (json['id'] as num?)?.toInt() ?? 0,
       poiName:
           (json['poiName'] as String?) ?? (json['name'] as String?) ?? '未命名地点',
+      hasNameFallback: json['poiName'] == null && json['name'] == null,
       status: ((json['auditStatus'] ?? json['status']) as num?)?.toInt(),
       rejectReason: (json['auditReason'] ?? json['rejectReason']) as String?,
       applicationType: (json['applicationType'] as num?)?.toInt(),

@@ -1,3 +1,4 @@
+import '../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -165,6 +166,7 @@ class _AssistSheet extends ConsumerStatefulWidget {
 class _AssistSheetState extends ConsumerState<_AssistSheet> {
   bool _busy = false;
   String? _error;
+  bool _hasLocalPromptError = false;
   AiNodeAssistResult? _result;
 
   /// 真源把这条叫 `prompt`,是**必填**的:
@@ -184,12 +186,14 @@ class _AssistSheetState extends ConsumerState<_AssistSheet> {
       setState(() {
         _result = null;
         _error = '请先描述想生成的节点玩法';
+        _hasLocalPromptError = true;
       });
       return;
     }
     setState(() {
       _busy = true;
       _error = null;
+      _hasLocalPromptError = false;
     });
     try {
       final Map<String, dynamic> data = await ref
@@ -233,14 +237,14 @@ class _AssistSheetState extends ConsumerState<_AssistSheet> {
     final AiNodeAssistResult? r = _result;
     if (r == null) return null;
     final List<String> names = <String>[
-      if (r.medalName != null) '勋章名',
-      if (r.hint1 != null || r.hint2 != null) '提示',
-      if (r.answerReveal != null) '答案揭示',
-      if (r.ruleInstructions != null) '规则说明',
-      if (r.storyText != null) '故事线',
+      if (r.medalName != null) stringsOf(context).merchantAiAssistMedal,
+      if (r.hint1 != null || r.hint2 != null) stringsOf(context).merchantAiAssistHints,
+      if (r.answerReveal != null) stringsOf(context).merchantAiAssistReveal,
+      if (r.ruleInstructions != null) stringsOf(context).merchantAiAssistRules,
+      if (r.storyText != null) stringsOf(context).merchantAiAssistStory,
     ];
     if (names.isEmpty) return null;
-    return 'AI 还回了${names.join('、')},这个编辑器暂时没有对应的格子,已跳过。';
+    return stringsOf(context).merchantAiAssistSkipped(names.join(stringsOf(context).merchantAiAssistSeparator));
   }
 
   @override
@@ -249,7 +253,7 @@ class _AssistSheetState extends ConsumerState<_AssistSheet> {
     final String? err = _error;
     // ★ 身份问题不给重试 —— 重试永远不会成功。
     final bool canRetry = err != null && AiGateResult.retryable(err);
-    final String? nextStep = err == null ? null : AiGateResult.nextStep(err);
+    final String? nextStep = err == null || AiGateResult.nextStep(err) == null ? null : stringsOf(context).merchantAiAssistRoleNextStep;
 
     // ⚠️ 商家域是**浅色**页(路由包了 _merchantLight)——
     //   颜色一律走 CyPalette,硬编码 CyTokens 的深色值会在白底上变黑块。
@@ -258,13 +262,13 @@ class _AssistSheetState extends ConsumerState<_AssistSheet> {
     return CupertinoPageScaffold(
       backgroundColor: p.bgPage,
       navigationBar: CupertinoNavigationBar(
-        middle: const Text('AI 帮写'),
+        middle: Text(stringsOf(context).merchantAiAssistTitle),
         leading: CupertinoButton(
           key: const Key('ai-node-close'),
           minimumSize: const Size(44, 44),
           padding: EdgeInsets.zero,
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('关闭'),
+          child: Text(stringsOf(context).merchantAiAssistClose),
         ),
       ),
       child: SafeArea(
@@ -280,10 +284,10 @@ class _AssistSheetState extends ConsumerState<_AssistSheet> {
           children: <Widget>[
             // 合规:AI 生成内容来源标注。
             const AiGeneratedNote(),
-            Text('AI 帮你写「${widget.nodeName}」', style: textTheme.titleMedium),
+            Text(stringsOf(context).merchantAiAssistHeading(widget.nodeName), style: textTheme.titleMedium),
             const SizedBox(height: CyTokens.space1),
             Text(
-              '先说一句你想让玩家在这儿做什么 —— AI 按这句话把整张表填出来。',
+              stringsOf(context).merchantAiAssistPromptHint,
               style: textTheme.bodySmall?.copyWith(color: p.textSecondary),
             ),
             const SizedBox(height: CyTokens.space3),
@@ -293,7 +297,7 @@ class _AssistSheetState extends ConsumerState<_AssistSheet> {
               minLines: 3,
               maxLines: 5,
               enabled: !_busy,
-              placeholder: '例如:让玩家在店门口找到暗号,答对送一张券',
+              placeholder: stringsOf(context).merchantAiAssistPromptExample,
               padding: const EdgeInsets.all(CyTokens.space3),
               onSubmitted: (_) => _generate(),
             ),
@@ -304,7 +308,7 @@ class _AssistSheetState extends ConsumerState<_AssistSheet> {
                 key: const Key('ai-node-generate'),
                 minimumSize: const Size.fromHeight(44),
                 onPressed: _busy ? null : _generate,
-                child: const Text('让 AI 填一次'),
+                child: Text(stringsOf(context).merchantAiAssistGenerate),
               ),
             ),
             const SizedBox(height: CyTokens.space3),
@@ -314,7 +318,7 @@ class _AssistSheetState extends ConsumerState<_AssistSheet> {
                 child: Center(child: CupertinoActivityIndicator()),
               )
             else if (err != null) ...<Widget>[
-              Text(err, style: textTheme.bodyMedium),
+              Text(_hasLocalPromptError ? stringsOf(context).merchantAiAssistPromptRequired : err, style: textTheme.bodyMedium),
               if (nextStep != null) ...<Widget>[
                 const SizedBox(height: CyTokens.space1),
                 Text(
@@ -328,25 +332,25 @@ class _AssistSheetState extends ConsumerState<_AssistSheet> {
                   key: const Key('ai-node-retry'),
                   minimumSize: const Size.fromHeight(44),
                   onPressed: _generate,
-                  child: const Text('重试'),
+                  child: Text(stringsOf(context).merchantAiAssistRetry),
                 ),
             ] else if (_result != null) ...<Widget>[
               // ★ 生成为空时说实话,别把空结果当成功塞进表单。
               if (_result!.isEmpty)
-                Text('这次没生成出内容,把想做的玩法说得再具体一点再试', style: textTheme.bodyMedium)
+                Text(stringsOf(context).merchantAiAssistEmpty, style: textTheme.bodyMedium)
               else ...<Widget>[
-                if (_result!.title != null) _Preview('标题', _result!.title!),
+                if (_result!.title != null) _Preview(stringsOf(context).merchantAiAssistPreviewTitle, _result!.title!),
                 if (_result!.description != null)
-                  _Preview('节点描述', _result!.description!),
+                  _Preview(stringsOf(context).merchantAiAssistDescription, _result!.description!),
                 if (_result!.questionName != null)
-                  _Preview('题目', _result!.questionName!),
-                if (_optionsLine != null) _Preview('选项', _optionsLine!),
+                  _Preview(stringsOf(context).merchantAiAssistQuestion, _result!.questionName!),
+                if (_optionsLine != null) _Preview(stringsOf(context).merchantAiAssistOptions, _optionsLine!),
                 if (_result!.correctAnswer != null)
-                  _Preview('正确项', _result!.correctAnswer!),
+                  _Preview(stringsOf(context).merchantAiAssistCorrect, _result!.correctAnswer!),
                 if (_result!.questionAnswer != null)
-                  _Preview('答案', _result!.questionAnswer!),
+                  _Preview(stringsOf(context).merchantAiAssistAnswer, _result!.questionAnswer!),
                 if (_result!.feedbackText != null)
-                  _Preview('反馈', _result!.feedbackText!),
+                  _Preview(stringsOf(context).merchantAiAssistFeedback, _result!.feedbackText!),
                 // ★ 服务端回得比这张表单宽:勋章名/提示/故事线/模块 本编辑器没有格子。
                 //   说出来,而不是静默丢掉 —— 否则商家会以为 AI 没生成那几项。
                 if (_skippedFields != null)
@@ -371,7 +375,7 @@ class _AssistSheetState extends ConsumerState<_AssistSheet> {
                     foregroundColor: p.actionPrimaryFg,
                     onPressed: () => Navigator.of(context).pop(_result),
                     // 说清会发生什么:填进表单,不是直接保存。
-                    child: const Text('填进表单(还能改)'),
+                    child: Text(stringsOf(context).merchantAiAssistApply),
                   ),
                 ),
               ],

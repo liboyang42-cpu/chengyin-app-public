@@ -38,10 +38,11 @@ extension CoopShareModeX on CoopShareMode {
 
 /// 一个受邀对象。
 class CoopInviteTarget {
-  const CoopInviteTarget({required this.toId, required this.name});
+  const CoopInviteTarget({required this.toId, required this.name, this.isLocalDefaultName = false});
 
   final int toId;
   final String name;
+  final bool isLocalDefaultName;
 }
 
 /// 邀约表单状态。

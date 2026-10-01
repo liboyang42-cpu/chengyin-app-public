@@ -1,0 +1,41 @@
+import 'package:flutter/widgets.dart';
+
+import '../../l10n/strings.dart';
+
+/// Display labels only: persisted club types, preferences and experience stay canonical.
+String clubFormValueLabel(BuildContext context, String value) => switch (value) {
+  '校园社团' => stringsOf(context).clubFormCampus,
+  '旅行组织' => stringsOf(context).clubFormTravel,
+  '兴趣社群' => stringsOf(context).clubFormInterest,
+  '商业活动组织方' => stringsOf(context).clubFormCommercial,
+  '内容创作团队' => stringsOf(context).clubFormContent,
+  '其他' => stringsOf(context).clubFormOther,
+  '学生组织 · 校园路线' => stringsOf(context).clubFormCampusHint,
+  '城市探索 · 户外带队' => stringsOf(context).clubFormTravelHint,
+  '同好聚集 · 城市路线' => stringsOf(context).clubFormInterestHint,
+  '品牌路线 · 商业执行' => stringsOf(context).clubFormCommercialHint,
+  '内容产出 · IP 运营' => stringsOf(context).clubFormContentHint,
+  '轻社交' => stringsOf(context).clubFormLightSocial,
+  '深度社交' => stringsOf(context).clubFormDeepSocial,
+  'RPG体验' => stringsOf(context).clubFormRpg,
+  '城市定向' => stringsOf(context).clubFormOrienteering,
+  '解谜路线' => stringsOf(context).clubFormPuzzles,
+  '沉浸式剧情' => stringsOf(context).clubFormStory,
+  '运动路线' => stringsOf(context).clubFormSports,
+  '艺术体验' => stringsOf(context).clubFormArt,
+  '美食体验' => stringsOf(context).clubFormFood,
+  '主题聚会' => stringsOf(context).clubFormParty,
+  '俱乐部类型' => stringsOf(context).clubFormType,
+  '路线方向' => stringsOf(context).clubFormDirection,
+  '俱乐部资料' => stringsOf(context).clubFormProfile,
+  '所在城市' => stringsOf(context).clubFormCity,
+  '主理人实名' => stringsOf(context).clubFormRealName,
+  '组织经验' => stringsOf(context).clubFormExperience,
+  '能力自评' => stringsOf(context).clubFormAbility,
+  '资质证明' => stringsOf(context).clubFormCertificates,
+  '没有经验' => stringsOf(context).clubFormNoExperience,
+  '1-5场' => stringsOf(context).clubFormExperienceSmall,
+  '5-20场' => stringsOf(context).clubFormExperienceMedium,
+  '20场以上' => stringsOf(context).clubFormExperienceLarge,
+  _ => value,
+};

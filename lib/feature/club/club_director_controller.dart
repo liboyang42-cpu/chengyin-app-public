@@ -5,6 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../../core/providers.dart';
+import '../../core/network/session_data.dart';
+import '../../core/network/request_session_scope.dart';
+import '../auth/auth_controller.dart';
 import '../../data/api/game_session_api.dart';
 import '../../data/models/club_director.dart';
 import 'club_login_gate.dart';
@@ -138,13 +141,24 @@ class ClubDirectorPendingWrite {
 }
 
 class ClubDirectorPendingStore {
-  ClubDirectorPendingStore(this._storage);
-  ClubDirectorPendingStore.memory() : _storage = null;
+  ClubDirectorPendingStore(this._storage, {this.ownerId});
+  ClubDirectorPendingStore.memory({this.ownerId}) : _storage = null;
+
+  final int? ownerId;
 
   final FlutterSecureStorage? _storage;
   ClubDirectorPendingWrite? _memory;
 
-  String _key(int activityId) => 'club_director_pending_v1_$activityId';
+  String _key(int activityId) => ownerId == null
+      ? 'club_director_pending_v1_$activityId'
+      : 'club_director_pending_v2_${ownerId}_$activityId';
+
+  /// Unowned legacy data is never exposed, migrated, replayed, or deleted.
+  /// Presence alone blocks new commands until ownership can be established.
+  Future<bool> hasUnownedLegacy(int activityId) async {
+    if (_storage == null || ownerId == null || activityId <= 0) return false;
+    return await _storage.read(key: 'club_director_pending_v1_$activityId') != null;
+  }
 
   Future<ClubDirectorPendingWrite?> read(int activityId) async {
     if (activityId <= 0) return null;
@@ -188,14 +202,41 @@ class ClubDirectorPendingStore {
   }
 }
 
+/// Provenance for copy created locally by this controller; never inferred from text.
+enum ClubDirectorLocalMessage {
+  legacyOwnerUnknown,
+  ownerRequired,
+  projectionMismatch,
+  recoveredPending,
+  versionPending,
+  submitting,
+  storageFailed,
+  resultPending,
+  requestPending,
+  rejected,
+  readingReceipt,
+  stillPending,
+  verificationUnavailable,
+  retryStorageFailed,
+  retrying,
+  retryPending,
+  loadUnavailable,
+  needsSession,
+  networkUnavailable,
+}
+
+enum ClubDirectorReconcileResult { confirmed, rejected }
+
 class ClubDirectorState {
   const ClubDirectorState({
     required this.activityId,
     this.load = ClubDirectorLoadState.loading,
     this.errorText = '',
+    this.localErrorMessage,
     this.projection,
     this.writeState = ClubDirectorWriteState.idle,
     this.writeMessage = '',
+    this.localWriteMessage,
     this.canRetryUnknownWrite = false,
     this.refreshTick = 0,
     this.loginRequired = false,
@@ -204,9 +245,11 @@ class ClubDirectorState {
   final int activityId;
   final ClubDirectorLoadState load;
   final String errorText;
+  final ClubDirectorLocalMessage? localErrorMessage;
   final ClubDirectorProjection? projection;
   final ClubDirectorWriteState writeState;
   final String writeMessage;
+  final ClubDirectorLocalMessage? localWriteMessage;
 
   /// 「重试原操作」出不出(小程序 `canRetryUnknownWrite`)。
   final bool canRetryUnknownWrite;
@@ -228,9 +271,11 @@ class ClubDirectorState {
   ClubDirectorState copyWith({
     ClubDirectorLoadState? load,
     String? errorText,
+    ClubDirectorLocalMessage? localErrorMessage,
     ClubDirectorProjection? projection,
     ClubDirectorWriteState? writeState,
     String? writeMessage,
+    ClubDirectorLocalMessage? localWriteMessage,
     bool? canRetryUnknownWrite,
     int? refreshTick,
     bool? loginRequired,
@@ -238,9 +283,11 @@ class ClubDirectorState {
     activityId: activityId,
     load: load ?? this.load,
     errorText: errorText ?? this.errorText,
+    localErrorMessage: localErrorMessage ?? (errorText == null ? this.localErrorMessage : null),
     projection: projection ?? this.projection,
     writeState: writeState ?? this.writeState,
     writeMessage: writeMessage ?? this.writeMessage,
+    localWriteMessage: localWriteMessage ?? (writeMessage == null ? this.localWriteMessage : null),
     canRetryUnknownWrite: canRetryUnknownWrite ?? this.canRetryUnknownWrite,
     refreshTick: refreshTick ?? this.refreshTick,
     loginRequired: loginRequired ?? this.loginRequired,
@@ -248,13 +295,17 @@ class ClubDirectorState {
 }
 
 final clubDirectorApiProvider = Provider<ClubDirectorGateway>((ref) {
+  ref.watch(sessionDataKeyProvider);
   return GameSessionApi(ref.watch(dioClientProvider));
 });
 
 final clubDirectorPendingStoreProvider = Provider<ClubDirectorPendingStore>((
   ref,
 ) {
-  return ClubDirectorPendingStore(const FlutterSecureStorage());
+  return ClubDirectorPendingStore(
+    const FlutterSecureStorage(),
+    ownerId: ref.watch(sessionDataKeyProvider).userId,
+  );
 });
 
 /// 一局的导演台。宿主在活动确定且 canDirect 时开一次 [load]。
@@ -272,11 +323,39 @@ class ClubDirectorController extends Notifier<ClubDirectorState> {
       ref.read(clubDirectorPendingStoreProvider);
 
   @override
-  ClubDirectorState build() => ClubDirectorState(activityId: activityId);
+  ClubDirectorState build() {
+    ref.watch(sessionDataKeyProvider);
+    _generation += 1;
+    _pendingCommand = null;
+    _unknownRequestId = '';
+    _loadInFlight = false;
+    return ClubDirectorState(activityId: activityId);
+  }
+
+  int _generation = 0;
+  bool get _current => ref.mounted &&
+      RequestSessionScope.current?.isCurrent() == true;
+
+  Future<T> _owned<T>(T stale, Future<T> Function() action) async {
+    if (!ref.mounted) return stale;
+    final key = ref.read(sessionDataKeyProvider);
+    final owner = key.userId;
+    if (owner == null || key.loading || !key.initialized) return stale;
+    final generation = _generation;
+    final auth = ref.read(authControllerProvider.notifier).requestScope(owner);
+    final scope = RequestSessionScope(() => ref.mounted &&
+        generation == _generation &&
+        ref.read(sessionDataKeyProvider) == key && auth.isCurrent());
+    if (!scope.isCurrent()) return stale;
+    final result = await RequestSessionScope.run(scope, action);
+    return scope.isCurrent() ? result : stale;
+  }
 
   /// 小程序 `initDirector` + `loadProjection`:先收敛上次没收敛的写,再拉投影;
   /// 投影就绪后自动核对一次(核对不重发)。
-  Future<void> load() async {
+  Future<void> load() => _owned<void>(null, _loadOwned);
+
+  Future<void> _loadOwned() async {
     if (_loadInFlight || activityId <= 0) return;
     _loadInFlight = true;
     try {
@@ -284,39 +363,62 @@ class ClubDirectorController extends Notifier<ClubDirectorState> {
         load: ClubDirectorLoadState.loading,
         errorText: '',
       );
-      _pendingCommand ??= await _restorePending();
+      final legacyBlocked = await _store.hasUnownedLegacy(activityId);
+      if (!_current) return;
+      final restored = legacyBlocked ? null : await _restorePending();
+      if (!_current) return;
+      if (legacyBlocked) {
+        _pendingCommand = null;
+        _unknownRequestId = '';
+      } else {
+        _pendingCommand ??= restored;
+      }
+      if (legacyBlocked && _pendingCommand == null) {
+        state = state.copyWith(
+          writeState: ClubDirectorWriteState.unknownWrite,
+          writeMessage: '存在无法确认归属的历史操作，写操作保持锁定',
+          localWriteMessage: ClubDirectorLocalMessage.legacyOwnerUnknown,
+          canRetryUnknownWrite: false,
+        );
+      }
       if (_pendingCommand != null) {
         _unknownRequestId = _pendingCommand!.requestId;
         state = state.copyWith(
           writeState: ClubDirectorWriteState.unknownWrite,
           writeMessage: '检测到上次未确认的操作，正在准备核对',
+          localWriteMessage: ClubDirectorLocalMessage.recoveredPending,
           canRetryUnknownWrite: true,
         );
       }
       final bool ready = await _loadProjection();
-      if (ready && state.writeLocked && _unknownRequestId.isNotEmpty) {
+      if (_current && ready && state.writeLocked && _unknownRequestId.isNotEmpty) {
         await reconcile();
       }
     } finally {
-      _loadInFlight = false;
+      if (_current) _loadInFlight = false;
     }
   }
 
   Future<GameSessionCommand?> _restorePending() async {
+    final store = _store;
     try {
-      final ClubDirectorPendingWrite? pending = await _store.read(activityId);
+      final ClubDirectorPendingWrite? pending = await store.read(activityId);
+      if (!_current) return null;
       if (pending == null) return null;
       return pending.toCommand();
     } on FormatException {
-      await _store.clear(activityId);
+      if (!_current) return null;
+      await store.clear(activityId);
       return null;
     }
   }
 
   Future<bool> _loadProjection() async {
+    if (!_current) return false;
     try {
       final ClubDirectorProjection projection = await _gateway
           .loadClubProjection(activityId: activityId);
+      if (!_current) return false;
       state = state.copyWith(
         load: ClubDirectorLoadState.ready,
         errorText: '',
@@ -325,9 +427,11 @@ class ClubDirectorController extends Notifier<ClubDirectorState> {
       );
       return true;
     } catch (error) {
+      if (!_current) return false;
       state = state.copyWith(
         load: _classifyLoadFailure(error),
         errorText: _loadFailureText(error),
+        localErrorMessage: _loadFailureMessage(error),
         loginRequired: clubLoginRequired(error),
       );
       return false;
@@ -351,6 +455,26 @@ class ClubDirectorController extends Notifier<ClubDirectorState> {
       return ClubDirectorLoadState.networkError;
     }
     return ClubDirectorLoadState.businessError;
+  }
+
+  ClubDirectorLocalMessage? _loadFailureMessage(Object error) {
+    if (error is GameSessionContractException) {
+      if (error.isLocal) {
+        return switch (error.reasonCode) {
+          'OWNER_REQUIRED' => ClubDirectorLocalMessage.ownerRequired,
+          'PROJECTION_MISMATCH' => ClubDirectorLocalMessage.projectionMismatch,
+          'SESSION_NOT_FOUND' || 'NOT_FOUND' || 'GAME_SESSION_NOT_FOUND' => ClubDirectorLocalMessage.needsSession,
+          _ => ClubDirectorLocalMessage.loadUnavailable,
+        };
+      }
+      return error.message.isEmpty ? ClubDirectorLocalMessage.loadUnavailable : null;
+    }
+    if (state.load == ClubDirectorLoadState.empty) {
+      return ClubDirectorLocalMessage.needsSession;
+    }
+    return error is DioException
+        ? ClubDirectorLocalMessage.networkUnavailable
+        : ClubDirectorLocalMessage.loadUnavailable;
   }
 
   String _loadFailureText(Object error) {
@@ -551,6 +675,18 @@ class ClubDirectorController extends Notifier<ClubDirectorState> {
     String action,
     Map<String, dynamic> payload, {
     int? nodeId,
+  }) {
+    if (!ref.mounted || state.load != ClubDirectorLoadState.ready) {
+      return Future.value(ClubDirectorWriteResult.blocked);
+    }
+    return _owned(ClubDirectorWriteResult.unknown,
+        () => _executeOwned(action, payload, nodeId: nodeId));
+  }
+
+  Future<ClubDirectorWriteResult> _executeOwned(
+    String action,
+    Map<String, dynamic> payload, {
+    int? nodeId,
   }) async {
     if (state.writeLocked) return ClubDirectorWriteResult.blocked;
     if (state.load != ClubDirectorLoadState.ready) {
@@ -560,6 +696,7 @@ class ClubDirectorController extends Notifier<ClubDirectorState> {
     if (revision == null) {
       state = state.copyWith(
         writeMessage: '状态版本待确认，请先重新加载',
+        localWriteMessage: ClubDirectorLocalMessage.versionPending,
         canRetryUnknownWrite: false,
       );
       return ClubDirectorWriteResult.blocked;
@@ -580,15 +717,19 @@ class ClubDirectorController extends Notifier<ClubDirectorState> {
     state = state.copyWith(
       writeState: ClubDirectorWriteState.submitting,
       writeMessage: '正在提交…',
+      localWriteMessage: ClubDirectorLocalMessage.submitting,
       canRetryUnknownWrite: false,
     );
     _unknownRequestId = '';
     _pendingCommand = command;
-    if (!await _savePending(command)) {
+    final saved = await _savePending(command);
+    if (!_current) return ClubDirectorWriteResult.unknown;
+    if (!saved) {
       _pendingCommand = null;
       state = state.copyWith(
         writeState: ClubDirectorWriteState.storageError,
         writeMessage: '无法安全保存本次操作，请检查存储后重试',
+        localWriteMessage: ClubDirectorLocalMessage.storageFailed,
         canRetryUnknownWrite: false,
       );
       return ClubDirectorWriteResult.blocked;
@@ -597,6 +738,7 @@ class ClubDirectorController extends Notifier<ClubDirectorState> {
       final GameSessionReceipt receipt = await _gateway.submitClubCommand(
         command,
       );
+      if (!_current) return ClubDirectorWriteResult.unknown;
       switch (receipt.outcome) {
         case GameReceiptOutcome.applied:
           return await _settleConfirmed(notifyHost: true);
@@ -608,11 +750,13 @@ class ClubDirectorController extends Notifier<ClubDirectorState> {
           state = state.copyWith(
             writeState: ClubDirectorWriteState.unknownWrite,
             writeMessage: '结果待核对，核对前已锁定全部写操作',
+            localWriteMessage: ClubDirectorLocalMessage.resultPending,
             canRetryUnknownWrite: true,
           );
           return ClubDirectorWriteResult.unknown;
       }
     } catch (_) {
+      if (!_current) return ClubDirectorWriteResult.unknown;
       // 真源的口径:拿不到**终态回执**就一律算「发没发出去不确定」—— 连业务
       // 报错也不例外(服务端明确拒绝会给一张 FAILED 回执,走上面那条分支)。
       // 把信封错误当「明确没生效」放行,才是真的危险。
@@ -620,6 +764,7 @@ class ClubDirectorController extends Notifier<ClubDirectorState> {
       state = state.copyWith(
         writeState: ClubDirectorWriteState.unknownWrite,
         writeMessage: '请求结果待核对，核对前已锁定全部写操作',
+        localWriteMessage: ClubDirectorLocalMessage.requestPending,
         canRetryUnknownWrite: true,
       );
       return ClubDirectorWriteResult.unknown;
@@ -627,12 +772,15 @@ class ClubDirectorController extends Notifier<ClubDirectorState> {
   }
 
   Future<void> _settleRejectedTerminal() async {
+    if (!_current) return;
     await _store.clear(activityId);
+    if (!_current) return;
     _pendingCommand = null;
     _unknownRequestId = '';
     state = state.copyWith(
       writeState: ClubDirectorWriteState.idle,
       writeMessage: '操作未生效，请刷新后重试',
+      localWriteMessage: ClubDirectorLocalMessage.rejected,
       canRetryUnknownWrite: false,
     );
   }
@@ -640,7 +788,9 @@ class ClubDirectorController extends Notifier<ClubDirectorState> {
   Future<ClubDirectorWriteResult> _settleConfirmed({
     bool notifyHost = false,
   }) async {
+    if (!_current) return ClubDirectorWriteResult.unknown;
     await _store.clear(activityId);
+    if (!_current) return ClubDirectorWriteResult.unknown;
     _pendingCommand = null;
     _unknownRequestId = '';
     state = state.copyWith(
@@ -656,6 +806,7 @@ class ClubDirectorController extends Notifier<ClubDirectorState> {
   }
 
   Future<bool> _savePending(GameSessionCommand command) async {
+    if (!_current) return false;
     try {
       await _store.write(ClubDirectorPendingWrite.fromCommand(command));
       return true;
@@ -670,7 +821,16 @@ class ClubDirectorController extends Notifier<ClubDirectorState> {
   }
 
   /// 「核对结果」:用原 requestId 回读,不重发。返回要提示的话(可 null)。
-  Future<String?> reconcile() async {
+  Future<String?> reconcile() async => switch (await reconcileOutcome()) {
+    ClubDirectorReconcileResult.confirmed => '结果已确认',
+    ClubDirectorReconcileResult.rejected => '操作未生效',
+    null => null,
+  };
+
+  Future<ClubDirectorReconcileResult?> reconcileOutcome() =>
+      _owned<ClubDirectorReconcileResult?>(null, _reconcileOwned);
+
+  Future<ClubDirectorReconcileResult?> _reconcileOwned() async {
     final GameSessionCommand? command = _pendingCommand;
     if (!state.writeLocked || _unknownRequestId.isEmpty || command == null) {
       return null;
@@ -679,6 +839,7 @@ class ClubDirectorController extends Notifier<ClubDirectorState> {
     state = state.copyWith(
       writeState: ClubDirectorWriteState.receiptReading,
       writeMessage: '正在核对最终结果…',
+      localWriteMessage: ClubDirectorLocalMessage.readingReceipt,
     );
     try {
       await _gateway.readClubReceipt(
@@ -686,22 +847,28 @@ class ClubDirectorController extends Notifier<ClubDirectorState> {
         requestId: requestId,
         expectedAction: command.action,
       );
+      if (!_current) return null;
       await _settleConfirmed();
-      return '结果已确认';
+      return ClubDirectorReconcileResult.confirmed;
     } on GameSessionRejectedException {
+      if (!_current) return null;
       await _settleConfirmed();
-      return '操作未生效';
+      return ClubDirectorReconcileResult.rejected;
     } on GameSessionContractException {
+      if (!_current) return null;
       state = state.copyWith(
         writeState: ClubDirectorWriteState.unknownWrite,
         writeMessage: '结果仍待核对，写操作继续锁定',
+        localWriteMessage: ClubDirectorLocalMessage.stillPending,
         canRetryUnknownWrite: true,
       );
       return null;
     } catch (_) {
+      if (!_current) return null;
       state = state.copyWith(
         writeState: ClubDirectorWriteState.unknownWrite,
         writeMessage: '暂时无法核对，写操作继续锁定',
+        localWriteMessage: ClubDirectorLocalMessage.verificationUnavailable,
         canRetryUnknownWrite: true,
       );
       return null;
@@ -709,17 +876,23 @@ class ClubDirectorController extends Notifier<ClubDirectorState> {
   }
 
   /// 「重试原操作」:同一个 requestId + 同一份 payload 重放(服务端幂等)。
-  Future<ClubDirectorWriteResult> retryPending() async {
+  Future<ClubDirectorWriteResult> retryPending() =>
+      _owned(ClubDirectorWriteResult.unknown, _retryOwned);
+
+  Future<ClubDirectorWriteResult> _retryOwned() async {
     final GameSessionCommand? command = _pendingCommand;
     if (!state.writeLocked ||
         state.writeState != ClubDirectorWriteState.unknownWrite ||
         command == null) {
       return ClubDirectorWriteResult.blocked;
     }
-    if (!await _savePending(command)) {
+    final saved = await _savePending(command);
+    if (!_current) return ClubDirectorWriteResult.unknown;
+    if (!saved) {
       state = state.copyWith(
         writeState: ClubDirectorWriteState.unknownWrite,
         writeMessage: '无法安全保存重试状态；原操作仍待核对',
+        localWriteMessage: ClubDirectorLocalMessage.retryStorageFailed,
         canRetryUnknownWrite: true,
       );
       return ClubDirectorWriteResult.blocked;
@@ -727,12 +900,14 @@ class ClubDirectorController extends Notifier<ClubDirectorState> {
     state = state.copyWith(
       writeState: ClubDirectorWriteState.submitting,
       writeMessage: '正在用原请求号重试…',
+      localWriteMessage: ClubDirectorLocalMessage.retrying,
       canRetryUnknownWrite: false,
     );
     try {
       final GameSessionReceipt receipt = await _gateway.submitClubCommand(
         command,
       );
+      if (!_current) return ClubDirectorWriteResult.unknown;
       switch (receipt.outcome) {
         case GameReceiptOutcome.applied:
           return await _settleConfirmed();
@@ -744,25 +919,31 @@ class ClubDirectorController extends Notifier<ClubDirectorState> {
           state = state.copyWith(
             writeState: ClubDirectorWriteState.unknownWrite,
             writeMessage: '结果仍待核对，写操作继续锁定',
+            localWriteMessage: ClubDirectorLocalMessage.stillPending,
             canRetryUnknownWrite: true,
           );
           return ClubDirectorWriteResult.unknown;
       }
     } on GameSessionRejectedException {
+      if (!_current) return ClubDirectorWriteResult.unknown;
       await _settleRejectedTerminal();
       await _loadProjection();
       return ClubDirectorWriteResult.rejected;
     } on GameSessionContractException {
+      if (!_current) return ClubDirectorWriteResult.unknown;
       state = state.copyWith(
         writeState: ClubDirectorWriteState.unknownWrite,
         writeMessage: '重试结果仍待核对，写操作继续锁定',
+        localWriteMessage: ClubDirectorLocalMessage.retryPending,
         canRetryUnknownWrite: true,
       );
       return ClubDirectorWriteResult.unknown;
     } catch (_) {
+      if (!_current) return ClubDirectorWriteResult.unknown;
       state = state.copyWith(
         writeState: ClubDirectorWriteState.unknownWrite,
         writeMessage: '重试结果仍待核对，写操作继续锁定',
+        localWriteMessage: ClubDirectorLocalMessage.retryPending,
         canRetryUnknownWrite: true,
       );
       return ClubDirectorWriteResult.unknown;

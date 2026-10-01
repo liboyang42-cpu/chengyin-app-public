@@ -1,3 +1,7 @@
+import 'coop_strings.dart';
+import '../../l10n/strings.dart';
+import '../auth/auth_controller.dart';
+import '../../core/network/request_session_scope.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -55,6 +59,8 @@ class CoopInvitePage extends ConsumerStatefulWidget {
 }
 
 class _CoopInvitePageState extends ConsumerState<CoopInvitePage> {
+  late final RequestSessionScope _requestScope;
+
   late CoopInviteForm _form;
   final _msgCtrl = TextEditingController();
   final _feeCtrl = TextEditingController();
@@ -64,6 +70,9 @@ class _CoopInvitePageState extends ConsumerState<CoopInvitePage> {
   @override
   void initState() {
     super.initState();
+    _requestScope = ref.read(authControllerProvider.notifier).requestScope(
+      ref.read(authControllerProvider).user?.id ?? 0,
+    );
     final bool hasPreset = _hasPreset;
     _form = CoopInviteForm(
       topicId: widget.topicId,
@@ -73,6 +82,7 @@ class _CoopInvitePageState extends ConsumerState<CoopInvitePage> {
           ? <CoopInviteTarget>[
               CoopInviteTarget(
                 toId: widget.toId!,
+                isLocalDefaultName: widget.toName?.trim().isNotEmpty != true,
                 name: widget.toName?.trim().isNotEmpty == true
                     ? widget.toName!.trim()
                     : (widget.type == CoopInviteType.club ? '该俱乐部' : '该商家'),
@@ -107,8 +117,8 @@ class _CoopInvitePageState extends ConsumerState<CoopInvitePage> {
             final CyPalette palette = CyPalette.of(sheetContext);
             return CupertinoPageScaffold(
               backgroundColor: palette.bgPage,
-              navigationBar: const CupertinoNavigationBar(
-                middle: Text('选择我发布的主题'),
+              navigationBar: CupertinoNavigationBar(
+                middle: Text(stringsOf(context).coopChooseMyTheme),
               ),
               child: SafeArea(
                 top: false,
@@ -183,8 +193,8 @@ class _CoopInvitePageState extends ConsumerState<CoopInvitePage> {
   Future<void> _openInviteSheet() async {
     if (!_form.canSubmit || _busy) return;
     final String targetText = _form.targets.length == 1
-        ? _form.targets.first.name
-        : '${_form.targets.first.name} 等 ${_form.targets.length} 个对象';
+        ? coopTargetName(context, _form.targets.first, _form.type)
+        : stringsOf(context).coopTargetsSummary(coopTargetName(context, _form.targets.first, _form.type), _form.targets.length);
     await showCupertinoSheet<void>(
       context: context,
       showDragHandle: true,
@@ -195,12 +205,12 @@ class _CoopInvitePageState extends ConsumerState<CoopInvitePage> {
             return CupertinoPageScaffold(
               backgroundColor: palette.bgPage,
               navigationBar: CupertinoNavigationBar(
-                middle: const Text('编辑邀约语'),
+                middle: Text(stringsOf(context).coopEditMessage),
                 leading: CupertinoButton(
                   minimumSize: const Size(44, 44),
                   padding: EdgeInsets.zero,
                   onPressed: () => Navigator.of(sheetContext).pop(),
-                  child: const Text('取消'),
+                  child: Text(stringsOf(context).cancel),
                 ),
               ),
               child: SafeArea(
@@ -222,18 +232,18 @@ class _CoopInvitePageState extends ConsumerState<CoopInvitePage> {
                       style: Theme.of(sheetContext).textTheme.titleLarge,
                     ),
                     const SizedBox(height: CyTokens.space1),
-                    const Text('协作邀请'),
+                    Text(stringsOf(context).coopInvitation),
                     const SizedBox(height: CyTokens.space1),
                     Text(
                       _form.topicName == null
-                          ? '关联主题 · #${_form.topicId}'
-                          : '关联主题 · ${_form.topicName}',
+                          ? stringsOf(context).coopThemeReference('#${_form.topicId}')
+                          : stringsOf(context).coopThemeReference(_form.topicName ?? ''),
                       style: Theme.of(sheetContext).textTheme.bodySmall
                           ?.copyWith(color: palette.textSecondary),
                     ),
                     const SizedBox(height: CyTokens.space3),
                     Text(
-                      '对方会在「收到的」中确认本次协作。',
+                      stringsOf(context).coopRecipientConfirms,
                       style: Theme.of(sheetContext).textTheme.bodySmall
                           ?.copyWith(color: palette.textSecondary),
                     ),
@@ -241,7 +251,7 @@ class _CoopInvitePageState extends ConsumerState<CoopInvitePage> {
                     CupertinoTextField(
                       key: const Key('coop-invite-message'),
                       controller: _msgCtrl,
-                      placeholder: '写下想对对方说的话',
+                      placeholder: stringsOf(context).coopMessagePlaceholder,
                       maxLength: 100,
                       minLines: 4,
                       maxLines: 4,
@@ -266,7 +276,7 @@ class _CoopInvitePageState extends ConsumerState<CoopInvitePage> {
                         Navigator.of(sheetContext).pop();
                         _submit();
                       },
-                      child: Text('发送邀约(${_form.targets.length})'),
+                      child: Text(stringsOf(context).coopSendCount(_form.targets.length)),
                     ),
                   ],
                 ),
@@ -276,19 +286,28 @@ class _CoopInvitePageState extends ConsumerState<CoopInvitePage> {
     );
   }
 
-  Future<void> _submit() async {
+  Future<void> _submit() => RequestSessionScope.run(
+    _requestScope,
+    () => _submitScoped(),
+  );
+
+  Future<void> _submitScoped() async {
     if (!_form.canSubmit || _busy) return;
     setState(() => _busy = true);
     final api = ref.read(coopApiProvider);
     final ok = <String>[];
+    final completedIds = <int>{};
     final failed = <String, String>{};
 
     for (final CoopInviteTarget t in _form.targets) {
       try {
         await api.invite(_form, t);
-        ok.add(t.name);
+        if (!mounted || !_requestScope.isCurrent()) return;
+        completedIds.add(t.toId);
+        ok.add(coopTargetName(context, t, _form.type));
       } catch (e) {
-        failed[t.name] = e.toString().replaceFirst('Exception: ', '');
+        if (!mounted || !_requestScope.isCurrent()) return;
+        failed[coopTargetName(context, t, _form.type)] = coopErrorSub(e, context: context);
       }
     }
 
@@ -297,7 +316,7 @@ class _CoopInvitePageState extends ConsumerState<CoopInvitePage> {
 
     // ★ 逐个报结果。全成 / 全败 / 部分成功,三种说法各不相同。
     if (failed.isEmpty) {
-      CyNativeNotice.show(context, '已发起 ${ok.length} 条，等待对方确认');
+      CyNativeNotice.show(context, stringsOf(context).coopSentCount(ok.length));
       Navigator.of(context).maybePop();
       return;
     }
@@ -306,9 +325,9 @@ class _CoopInvitePageState extends ConsumerState<CoopInvitePage> {
         .join('\n');
     await cyConfirm(
       context,
-      title: ok.isEmpty ? '邀约没有发出' : '部分邀约没发出',
-      content: ok.isEmpty ? detail : '已成功:${ok.join('、')}\n\n未成功:\n$detail',
-      confirmText: '知道了',
+      title: ok.isEmpty ? stringsOf(context).coopInviteNotSent : stringsOf(context).coopSomeInvitesNotSent,
+      content: ok.isEmpty ? detail : stringsOf(context).coopPartialSent(ok.join('、'), detail),
+      confirmText: stringsOf(context).coopGotIt,
       showCancel: false,
     );
     // 已成功的从待发列表里去掉,用户重试时不会重复发送。
@@ -316,7 +335,7 @@ class _CoopInvitePageState extends ConsumerState<CoopInvitePage> {
       setState(() {
         _form = _form.copyWith(
           targets: _form.targets
-              .where((CoopInviteTarget t) => !ok.contains(t.name))
+              .where((CoopInviteTarget t) => !completedIds.contains(t.toId))
               .toList(),
         );
       });
@@ -328,12 +347,12 @@ class _CoopInvitePageState extends ConsumerState<CoopInvitePage> {
     final Widget? gate = coopLoginGate(
       context,
       ref,
-      navTitle: '发起协作邀请',
-      message: '登录后发起协作邀请',
+      navTitle: stringsOf(context).coopNewInvitation,
+      message: stringsOf(context).coopLoginNewInvitation,
     );
     if (gate != null) return gate;
     final textTheme = Theme.of(context).textTheme;
-    final blocker = _form.blocker;
+    final blocker = coopInviteBlocker(context, _form);
     final AsyncValue<List<Topic>>? topics = _form.topicId == null
         ? ref.watch(coopInviteTopicsProvider)
         : null;
@@ -341,7 +360,7 @@ class _CoopInvitePageState extends ConsumerState<CoopInvitePage> {
 
     return CupertinoPageScaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      navigationBar: const CupertinoNavigationBar(middle: Text('发起协作邀请')),
+      navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).coopNewInvitation)),
       child: Material(
         color: Colors.transparent,
         child: SafeArea(
@@ -352,11 +371,11 @@ class _CoopInvitePageState extends ConsumerState<CoopInvitePage> {
                 child: ListView(
                   padding: const EdgeInsets.all(CyTokens.pageX),
                   children: <Widget>[
-                    const CySectionTitle('① 关联主题'),
+                    CySectionTitle(stringsOf(context).coopAssociatedTheme),
                     const SizedBox(height: CyTokens.space1),
                     if (_form.topicId != null)
                       Text(
-                        _form.topicName ?? '主题 #${_form.topicId}',
+                        _form.topicName ?? stringsOf(context).coopThemeNumber(_form.topicId.toString()),
                         style: textTheme.bodyMedium,
                       )
                     else
@@ -369,7 +388,7 @@ class _CoopInvitePageState extends ConsumerState<CoopInvitePage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: <Widget>[
                             Text(
-                              '主题没加载出来',
+                              stringsOf(context).coopThemeLoadFailed,
                               style: textTheme.bodySmall?.copyWith(
                                 color: palette.statusWarning,
                               ),
@@ -381,20 +400,20 @@ class _CoopInvitePageState extends ConsumerState<CoopInvitePage> {
                               ),
                               onPressed: () =>
                                   ref.invalidate(coopInviteTopicsProvider),
-                              child: const Text('重试'),
+                              child: Text(stringsOf(context).retry),
                             ),
                           ],
                         ),
                         data: (List<Topic> rows) => rows.isEmpty
                             ? Text(
-                                '还没有可关联的主题。先发布主题后再发起协作邀请。',
+                                stringsOf(context).coopPublishThemeFirst,
                                 style: textTheme.bodySmall?.copyWith(
                                   color: palette.textSecondary,
                                 ),
                               )
                             : Semantics(
                                 button: true,
-                                label: '选择我发布的主题',
+                                label: stringsOf(context).coopChooseMyTheme,
                                 child: CupertinoButton(
                                   key: const Key('coop-pick-topic'),
                                   minimumSize: const Size.fromHeight(44),
@@ -406,11 +425,11 @@ class _CoopInvitePageState extends ConsumerState<CoopInvitePage> {
                                   ),
                                   alignment: Alignment.centerLeft,
                                   onPressed: () => _pickTopic(rows),
-                                  child: const Row(
+                                  child: Row(
                                     children: <Widget>[
                                       Expanded(
                                         child: Text(
-                                          '选择我发布的主题',
+                                          stringsOf(context).coopChooseMyTheme,
                                           textAlign: TextAlign.left,
                                         ),
                                       ),
@@ -426,28 +445,28 @@ class _CoopInvitePageState extends ConsumerState<CoopInvitePage> {
                     const SizedBox(height: CyTokens.space2),
                     Text(
                       _form.type == CoopInviteType.club
-                          ? '俱乐部同意后，可带成员参加该路线场次'
-                          : '商家同意后，按下方条款承接主题合作',
+                          ? stringsOf(context).coopClubAcceptHint
+                          : stringsOf(context).coopMerchantAcceptHint,
                       style: textTheme.bodySmall?.copyWith(
                         color: palette.textSecondary,
                       ),
                     ),
                     const SizedBox(height: CyTokens.space4),
-                    const CySectionTitle('② 合作条款'),
+                    CySectionTitle(stringsOf(context).coopNumberedTerms),
                     const SizedBox(height: CyTokens.space2),
                     CupertinoSlidingSegmentedControl<CoopShareMode>(
                       groupValue: _form.shareMode,
                       children: <CoopShareMode, Widget>{
-                        CoopShareMode.traffic: const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 8),
-                          child: Text('引流合作'),
+                        CoopShareMode.traffic: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Text(stringsOf(context).coopTrafficCooperation),
                         ),
                         CoopShareMode.fixed: Padding(
                           padding: const EdgeInsets.symmetric(vertical: 8),
                           child: Text(
                             _form.type == CoopInviteType.club
-                                ? '固定带队费'
-                                : '按核销付费',
+                                ? stringsOf(context).coopFixedLeaderFee
+                                : stringsOf(context).coopPayPerRedemption,
                           ),
                         ),
                       },
@@ -467,8 +486,8 @@ class _CoopInvitePageState extends ConsumerState<CoopInvitePage> {
                           padding: const EdgeInsets.only(right: 14),
                           child: Text(
                             _form.type == CoopInviteType.club
-                                ? '/ 每核销 1 人'
-                                : '/ 人',
+                                ? stringsOf(context).coopPerRedeemedPerson
+                                : stringsOf(context).coopPerPerson,
                           ),
                         ),
                         keyboardType: const TextInputType.numberWithOptions(
@@ -495,7 +514,7 @@ class _CoopInvitePageState extends ConsumerState<CoopInvitePage> {
                       ),
                     ],
                     const SizedBox(height: CyTokens.space4),
-                    const CySectionTitle('③ 邀请对象'),
+                    CySectionTitle(stringsOf(context).coopRecipients),
                     const SizedBox(height: CyTokens.space3),
                     // ★ 页内选人。原来只写了一句「从别处选」——
                     //   于是这页自己**没有「选谁」这一步**,
@@ -536,14 +555,14 @@ class _CoopInvitePageState extends ConsumerState<CoopInvitePage> {
                           children: <Widget>[
                             const Icon(CupertinoIcons.person_add, size: 18),
                             const SizedBox(width: CyTokens.space1),
-                            Text('选择${_form.type.label}'),
+                            Text(stringsOf(context).coopChooseType(coopInviteTypeLabel(context, _form.type))),
                           ],
                         ),
                       ),
                     const SizedBox(height: CyTokens.space2),
                     if (_form.targets.isEmpty)
                       Text(
-                        '还没选人。也可以从「附近商家」或「伙伴」里带过来。',
+                        stringsOf(context).coopNoRecipients,
                         style: textTheme.bodySmall?.copyWith(
                           color: CyPalette.of(context).textSecondary,
                         ),
@@ -557,7 +576,7 @@ class _CoopInvitePageState extends ConsumerState<CoopInvitePage> {
                               (CoopInviteTarget target) => Semantics(
                                 container: true,
                                 selected: true,
-                                label: '已选 ${target.name}',
+                                label: stringsOf(context).coopSelectedName(coopTargetName(context, target, _form.type)),
                                 child: DecoratedBox(
                                   decoration: BoxDecoration(
                                     color: CyPalette.of(context).bgSurface,
@@ -575,12 +594,12 @@ class _CoopInvitePageState extends ConsumerState<CoopInvitePage> {
                                         padding: const EdgeInsets.only(
                                           left: CyTokens.space3,
                                         ),
-                                        child: Text(target.name),
+                                        child: Text(coopTargetName(context, target, _form.type)),
                                       ),
                                       if (!_hasPreset)
                                         Semantics(
                                           button: true,
-                                          label: '移除 ${target.name}',
+                                          label: stringsOf(context).coopRemoveName(coopTargetName(context, target, _form.type)),
                                           child: CupertinoButton(
                                             key: Key(
                                               'coop-remove-target-${target.toId}',
@@ -654,7 +673,7 @@ class _CoopInvitePageState extends ConsumerState<CoopInvitePage> {
                           children: <Widget>[
                             Expanded(
                               child: Text(
-                                '附近商家 · 含未入驻商家可电话联系',
+                                stringsOf(context).coopNearbyContactHint,
                                 style: textTheme.labelLarge?.copyWith(
                                   color: CyPalette.of(context).textSecondary,
                                 ),
@@ -709,7 +728,7 @@ class _CoopInvitePageState extends ConsumerState<CoopInvitePage> {
                                   height: 18,
                                   child: CupertinoActivityIndicator(),
                                 )
-                              : Text('发送邀约(${_form.targets.length})'),
+                              : Text(stringsOf(context).coopSendCount(_form.targets.length)),
                         ),
                       ),
                     ],

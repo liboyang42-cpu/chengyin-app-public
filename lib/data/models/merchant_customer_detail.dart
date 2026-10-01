@@ -60,6 +60,7 @@ class MerchantCustomerSummary {
   const MerchantCustomerSummary({
     required this.customerMemberId,
     required this.displayName,
+    this.hasNameFallback = false,
     required this.avatar,
     required this.arrivedCount,
     required this.pendingCount,
@@ -70,6 +71,7 @@ class MerchantCustomerSummary {
 
   final int customerMemberId;
   final String displayName;
+  final bool hasNameFallback;
   final String? avatar;
   final int arrivedCount;
   final int pendingCount;
@@ -94,6 +96,7 @@ class MerchantCustomerSummary {
         'summary.customerMemberId',
       ),
       displayName: name.isEmpty ? '未留姓名' : name,
+      hasNameFallback: name.isEmpty,
       avatar: avatar.isEmpty ? null : avatar,
       arrivedCount: _nonNegativeInt(
         json['arrivedCount'],

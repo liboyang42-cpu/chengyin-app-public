@@ -1,3 +1,4 @@
+import '../../l10n/strings.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -32,10 +33,10 @@ class ClubLoginGate extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return StatusView(
       message: message,
-      sub: '这一步需要登录，登录完会自动回到这一页。',
+      sub: stringsOf(context).clubMainLoginHint,
       icon: CupertinoIcons.lock,
       large: true,
-      retryLabel: '去登录',
+      retryLabel: stringsOf(context).clubMainSignIn,
       onRetry: () async {
         if (!await requireLogin(context, ref)) return;
         onSignedIn();

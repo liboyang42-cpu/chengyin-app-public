@@ -1,3 +1,5 @@
+import '../../l10n/strings.dart';
+import 'merchant_finance_detail_strings.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -47,7 +49,7 @@ class MerchantRedemptionDetailPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return CupertinoPageScaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      navigationBar: const CupertinoNavigationBar(middle: Text('核销详情')),
+      navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).merchantFinanceDetailRedemptionTitle)),
       child: Material(
         color: Colors.transparent,
         child: SafeArea(bottom: false, child: _body(context, ref)),
@@ -60,13 +62,13 @@ class MerchantRedemptionDetailPage extends ConsumerWidget {
     //   只有一个动作 —— 退回去重进。
     if (recordType.isEmpty || recordId.isEmpty) {
       return StatusView(
-        message: '缺少核销记录标识',
-        sub: '请返回核销记录列表重新进入',
+        message: stringsOf(context).merchantFinanceDetailRecordIdMissing,
+        sub: stringsOf(context).merchantFinanceDetailRecordIdHint,
         icon: CupertinoIcons.doc_text_search,
         large: true,
         scrollable: true,
         onRetry: () => Navigator.of(context).maybePop(),
-        retryLabel: '返回上一页',
+        retryLabel: stringsOf(context).merchantFinanceDetailBack,
       );
     }
 
@@ -108,11 +110,11 @@ class MerchantRedemptionDetailPage extends ConsumerWidget {
               // 手里还有上次的数据时,刷新/失败都**不掀桌子** ——
               // 真源 loadState=refreshing / stale-error 就是这个意思:
               // 先说清"这块现在能不能信",再让老数据继续可读。
-              if (async.isLoading) const _Notice('正在更新核销详情', '现有详情仍可查看'),
+              if (async.isLoading) _Notice(stringsOf(context).merchantFinanceDetailRecordRefreshing, stringsOf(context).merchantFinanceDetailOldDetails),
               if (async.hasError)
                 _Notice(
-                  '核销详情没有更新',
-                  _plainMessage(async.error!),
+                  stringsOf(context).merchantFinanceDetailRecordStale,
+                  _plainMessage(context, async.error!),
                   onRetry: reload,
                 ),
               _HeroCard(detail: detail),
@@ -126,21 +128,21 @@ class MerchantRedemptionDetailPage extends ConsumerWidget {
 
   /// 没有数据时的**终态**:越权/缺记录不叫"加载失败",也不给点了没用的重试。
   Widget _failure(BuildContext context, Object error, VoidCallback onRetry) {
-    final String message = _plainMessage(error);
+    final String message = _plainMessage(context, error);
     if (_isMissingRecord(message)) {
       return StatusView(
-        message: '核销记录不可见',
-        sub: '这条记录不属于当前商家,或已被移除',
+        message: stringsOf(context).merchantFinanceDetailRecordUnavailable,
+        sub: stringsOf(context).merchantFinanceDetailRecordUnavailableHint,
         icon: CupertinoIcons.lock,
         large: true,
         scrollable: true,
         onRetry: () => Navigator.of(context).maybePop(),
-        retryLabel: '返回核销列表',
+        retryLabel: stringsOf(context).merchantFinanceDetailRecordList,
       );
     }
     // 传输层失败说「网络不稳定」;网关 5xx 并到 main 上 #235 落盘的共用话术。
     return StatusView(
-      message: '核销详情没加载出来',
+      message: stringsOf(context).merchantFinanceDetailRecordError,
       sub: message,
       icon: CupertinoIcons.cloud,
       large: true,
@@ -161,13 +163,7 @@ class _HeroCard extends StatelessWidget {
     final TextTheme t = Theme.of(context).textTheme;
     final bool finance = detail.canReadFinance;
     final String? amount = detail.amountText;
-    final String stateText = finance
-        ? financeRedemptionStateText(
-            displayState: detail.displayState,
-            noCashReason: detail.noCashReason,
-            settlementRoute: detail.settlementRoute,
-          )
-        : financeFulfillmentStateText(detail.fulfillmentState);
+    final String stateText = merchantFinanceRedemptionState(context, detail);
 
     return Container(
       padding: const EdgeInsets.all(CyTokens.space4),
@@ -181,7 +177,7 @@ class _HeroCard extends StatelessWidget {
         children: <Widget>[
           Text(
             // 有钱可读才说"我的收入" —— 没投影时说这句等于承诺了一个看不到的数。
-            finance ? '${detail.titleText} · 我的收入' : detail.titleText,
+            finance ? stringsOf(context).merchantFinanceDetailIncome(merchantFinanceRedemptionTitle(context, detail)) : merchantFinanceRedemptionTitle(context, detail),
             style: t.bodyMedium?.copyWith(color: p.textSecondary),
           ),
           // ★ 后端不给金额就**不画金额行**,只画"—/待定"的占位并压成次要色
@@ -189,7 +185,7 @@ class _HeroCard extends StatelessWidget {
           if (finance) ...<Widget>[
             const SizedBox(height: CyTokens.space1),
             Text(
-              amount ?? detail.amountFallback,
+              amount ?? (detail.displayState == 'NO_CASH_SETTLEMENT' ? '—' : stringsOf(context).merchantFinanceDetailAmountPending),
               style: t.headlineMedium?.copyWith(
                 fontWeight: FontWeight.w700,
                 color: amount == null ? p.textPlaceholder : p.textPrimary,
@@ -217,17 +213,17 @@ class _HeroCard extends StatelessWidget {
             ),
           ],
           const SizedBox(height: CyTokens.space3),
-          _Kv('核销门店', detail.storeName ?? '门店信息待补充'),
+          _Kv(stringsOf(context).merchantFinanceDetailStore, detail.storeName ?? stringsOf(context).merchantFinanceDetailStoreMissing),
           if (detail.accrualRuleText != null)
-            _Kv('计提规则', detail.accrualRuleText!),
+            _Kv(stringsOf(context).merchantFinanceDetailAccrual, detail.accrualRuleText!),
           if (detail.occurredAtMinute != null)
-            _Kv('核销时间', detail.occurredAtMinute!),
-          if (detail.refundText != null) _Kv('退款状态', detail.refundText!),
+            _Kv(stringsOf(context).merchantFinanceDetailOccurredAt, detail.occurredAtMinute!),
+          if (detail.refundText != null) _Kv(stringsOf(context).merchantFinanceDetailRefundState, merchantFinanceLocalText(context, detail.refundText!)),
           // 走协作订单的钱落在个人账户 —— 这一行是**入口**,不是一个事实陈述。
           if (finance && detail.settlementRoute == 'COOP_ORDER')
             _KvLink(
-              '结算去向',
-              '个人账户 · 去我的资产',
+              stringsOf(context).merchantFinanceDetailDestination,
+              stringsOf(context).merchantFinanceDetailAssets,
               onTap: () => context.push('/assets'),
             ),
         ],
@@ -264,7 +260,7 @@ class _Timeline extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         const SizedBox(height: CyTokens.space4),
-        const CySectionTitle('结算进度'),
+        CySectionTitle(stringsOf(context).merchantFinanceDetailProgress),
         Container(
           padding: const EdgeInsets.all(CyTokens.space4),
           decoration: BoxDecoration(
@@ -404,7 +400,7 @@ class _Notice extends StatelessWidget {
               onPressed: onRetry,
               padding: const EdgeInsets.symmetric(horizontal: CyTokens.space2),
               minimumSize: Size.zero,
-              child: Text('重试', style: t.bodySmall?.copyWith(color: p.brand)),
+              child: Text(stringsOf(context).merchantFinanceDetailRetry, style: t.bodySmall?.copyWith(color: p.brand)),
             ),
         ],
       ),
@@ -414,7 +410,7 @@ class _Notice extends StatelessWidget {
 
 /// 异常原文只进日志,不上屏 —— Dio 的传输层异常自带一整段英文(502 那句尤长)。
 /// 业务异常(`MerchantApiException.toString() == message`)照后端原文,那句是写给人看的。
-String _plainMessage(Object error) {
+String _plainMessage(BuildContext context, Object error) {
   if (error is DioException) {
     debugPrint('[merchant-redemption] 核销详情加载失败: $error');
     // HTTP 非 200 但后端仍回了业务 msg(越权那类走的就是这条),原文照贴 ——
@@ -425,7 +421,7 @@ String _plainMessage(Object error) {
       if (msg.isNotEmpty) return msg;
     }
     // 有响应 = 服务端的问题,并到共用口径 #235;纯传输层失败才说「网络不稳定」。
-    return _isNetworkFailure(error) ? '网络不稳定，请检查连接后重试' : '网络异常，请稍后重试';
+    return _isNetworkFailure(error) ? stringsOf(context).merchantFinanceDetailNetworkUnstable : stringsOf(context).merchantFinanceDetailNetworkError;
   }
   return error.toString().replaceFirst('Exception: ', '');
 }

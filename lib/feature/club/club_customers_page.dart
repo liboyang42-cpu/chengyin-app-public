@@ -1,3 +1,6 @@
+import 'club_api_messages.dart';
+import 'club_customer_labels.dart';
+import '../../l10n/strings.dart';
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
@@ -5,7 +8,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/network/dio_client.dart';
 import '../../core/theme/cy_palette.dart';
 import '../../core/theme/cy_tokens.dart';
 import '../../core/widgets/cy_search_field.dart';
@@ -30,11 +32,11 @@ class ClubCustomersPage extends ConsumerStatefulWidget {
 }
 
 class _ClubCustomersPageState extends ConsumerState<ClubCustomersPage> {
-  static const List<CyTab> _filters = <CyTab>[
-    CyTab(key: 'all', label: '全部'),
-    CyTab(key: 'repeat', label: '回头客'),
-    CyTab(key: 'new', label: '新客'),
-    CyTab(key: 'remark', label: '有备注'),
+  List<CyTab> get _filters => <CyTab>[
+    CyTab(key: 'all', label: stringsOf(context).clubCustomersAll),
+    CyTab(key: 'repeat', label: stringsOf(context).clubCustomersRepeat),
+    CyTab(key: 'new', label: stringsOf(context).clubCustomersNew),
+    CyTab(key: 'remark', label: stringsOf(context).clubCustomersWithRemark),
   ];
 
   String _filter = 'all';
@@ -94,7 +96,7 @@ class _ClubCustomersPageState extends ConsumerState<ClubCustomersPage> {
     );
     return CupertinoPageScaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      navigationBar: const CupertinoNavigationBar(middle: Text('客户')),
+      navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).clubCustomersTitle)),
       child: Material(
         color: Colors.transparent,
         child: SafeArea(
@@ -102,42 +104,42 @@ class _ClubCustomersPageState extends ConsumerState<ClubCustomersPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              const CyPageTitle('客户'),
+              CyPageTitle(stringsOf(context).clubCustomersTitle),
               Expanded(
                 child: switch (gate.decision) {
                   ClubAccessDecision.deny => StatusView(
-                    message: '当前岗位没有客户查看权限',
-                    sub: gate.reason,
+                    message: stringsOf(context).clubCustomersNoPermission,
+                    sub: localizedClubAccessReason(context, gate),
                     icon: CupertinoIcons.lock,
                     large: true,
                     onRetry: _goBack,
-                    retryLabel: '返回俱乐部',
+                    retryLabel: stringsOf(context).clubCustomersBack,
                   ),
                   ClubAccessDecision.checking => const CySkeleton(),
                   _ => customers.when(
-                    loading: () => const CySkeleton(label: '正在加载客户名单'),
+                    loading: () => CySkeleton(label: stringsOf(context).clubCustomersLoading),
                     error: (Object error, StackTrace _) {
                       final failure = classifyClubCrmFailure(error);
                       if (failure.auth) {
                         return StatusView(
-                          message: '当前岗位没有客户查看权限',
-                          sub: friendlyOrBackendMessage(
+                          message: stringsOf(context).clubCustomersNoPermission,
+                          sub: clubApiErrorMessage(context,
                             error,
-                            fallback: '登录状态已变化，请重新进入',
+                            fallback: stringsOf(context).clubCustomersSessionChanged,
                           ),
                           icon: CupertinoIcons.lock,
                           large: true,
                           onRetry: _goBack,
-                          retryLabel: '返回俱乐部',
+                          retryLabel: stringsOf(context).clubCustomersBack,
                         );
                       }
                       return StatusView(
-                        message: '客户名单加载失败',
+                        message: stringsOf(context).clubCustomersLoadFailed,
                         sub: failure.network
-                            ? '检查网络后重新加载客户名单'
-                            : friendlyOrBackendMessage(
+                            ? stringsOf(context).clubCustomersNetworkRetry
+                            : clubApiErrorMessage(context,
                                 error,
-                                fallback: '客户名单没能加载，请稍后重试',
+                                fallback: stringsOf(context).clubCustomersRetryLater,
                               ),
                         icon: CupertinoIcons.cloud,
                         large: true,
@@ -169,7 +171,7 @@ class _ClubCustomersPageState extends ConsumerState<ClubCustomersPage> {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: CyTokens.pageX),
           child: Text(
-            list.countText,
+            stringsOf(context).clubCustomersCount(list.total, list.monthNew),
             style: Theme.of(
               context,
             ).textTheme.bodySmall?.copyWith(color: palette.textSecondary),
@@ -193,7 +195,7 @@ class _ClubCustomersPageState extends ConsumerState<ClubCustomersPage> {
           padding: const EdgeInsets.symmetric(horizontal: CyTokens.pageX),
           child: CySearchField(
             value: _keywordInput,
-            placeholder: '搜索',
+            placeholder: stringsOf(context).clubCustomersSearch,
             onChanged: _onKeywordChanged,
             onSubmitted: _onKeywordSubmitted,
           ),
@@ -201,9 +203,9 @@ class _ClubCustomersPageState extends ConsumerState<ClubCustomersPage> {
         const SizedBox(height: CyTokens.space2),
         Expanded(
           child: list.items.isEmpty
-              ? const StatusView(
-                  message: '还没有客户',
-                  sub: '有人买过本俱乐部的票之后，这里会按人汇总他的到店与退款。',
+              ? StatusView(
+                  message: stringsOf(context).clubCustomersEmpty,
+                  sub: stringsOf(context).clubCustomersEmptyBody,
                   icon: CupertinoIcons.person_2,
                   large: true,
                 )
@@ -240,22 +242,22 @@ class _CustomerRow extends StatelessWidget {
     return CupertinoListTile(
       key: Key('club-customer-${item.memberId}'),
       onTap: () => context.push('/club/$clubId/customers/${item.memberId}'),
-      leading: CyAvatar(url: item.avatar, fallback: item.displayName, size: 44),
+      leading: CyAvatar(url: item.avatar, fallback: clubCustomerItemName(context, item), size: 44),
       title: Row(
         children: <Widget>[
           Flexible(
-            child: Text(item.displayName, overflow: TextOverflow.ellipsis),
+            child: Text(clubCustomerItemName(context, item), overflow: TextOverflow.ellipsis),
           ),
           if (item.hasRemark) ...<Widget>[
             const SizedBox(width: CyTokens.space2),
-            CyTag(label: '备注'),
+            CyTag(label: stringsOf(context).clubCustomersRemark),
           ],
         ],
       ),
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text(item.metaText),
+          Text(clubCustomerItemMeta(context, item)),
           if (item.subText.isNotEmpty)
             Text(
               item.subText,

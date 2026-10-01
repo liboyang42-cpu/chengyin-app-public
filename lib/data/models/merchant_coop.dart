@@ -4,6 +4,7 @@ class RecruitingRoute {
   const RecruitingRoute({
     required this.id,
     required this.name,
+    this.hasNameFallback = false,
     this.imgUrl,
     this.productType,
     this.signUpEndDate,
@@ -11,6 +12,7 @@ class RecruitingRoute {
 
   final int id;
   final String name;
+  final bool hasNameFallback;
   final String? imgUrl;
 
   /// 产品类型。用于区分 ①经典定向 / ②漫游 / ③探店日。
@@ -31,6 +33,7 @@ class RecruitingRoute {
     return RecruitingRoute(
       id: (json['id'] as num?)?.toInt() ?? 0,
       name: (json['name'] as String?) ?? '未命名路线',
+      hasNameFallback: json['name'] == null,
       imgUrl: json['imgUrl'] as String?,
       productType: json['productType'] as String?,
       signUpEndDate: json['merchantSignUpEndDate'] as String?,
@@ -47,6 +50,7 @@ class MerchantInvite {
   const MerchantInvite({
     required this.id,
     required this.title,
+    this.hasTitleFallback = false,
     this.eventTitle,
     this.state,
     this.city,
@@ -60,6 +64,7 @@ class MerchantInvite {
 
   final int id;
   final String title;
+  final bool hasTitleFallback;
   final String? eventTitle;
 
   /// 兼容口径:后端部分旧路径给字符串状态。
@@ -146,6 +151,7 @@ class MerchantInvite {
       title: (json['title'] as String?) ??
           (json['partyName'] as String?) ??
           '官方活动',
+      hasTitleFallback: json['title'] == null && json['partyName'] == null,
       eventTitle: json['eventTitle'] as String?,
       state: json['state'] as String?,
       city: json['city'] as String?,

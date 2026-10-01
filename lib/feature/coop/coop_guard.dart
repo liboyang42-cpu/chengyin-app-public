@@ -1,3 +1,6 @@
+import '../../data/models/coop_failure.dart';
+import '../../l10n/error_presentation.dart';
+import '../../l10n/strings.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -23,7 +26,26 @@ bool isCoopUnauthorized(Object err) =>
 
 /// 读接口失败的副文案:后端给了中文原话就用它(业务拒绝、权限态都走这条路);
 /// 只有 dio 自己的英文栈(带 MDN 链接那种)才换成一句人话。
-String coopErrorSub(Object err, {String fallback = '网络不稳定,请稍后重试'}) {
+String coopErrorSub(Object err, {String fallback = '网络不稳定,请稍后重试', BuildContext? context}) {
+  if (context != null) {
+    if (err is CoopFailure) {
+      final strings = stringsOf(context);
+      if (!err.isLocalFallback) return err.message;
+      return switch (err.kind) {
+        CoopFailureKind.operation => strings.operationFailed,
+        CoopFailureKind.refundUnknown => strings.coopFailureRefundUnknown,
+        CoopFailureKind.refundRetry => strings.coopFailureRefundRetry,
+        CoopFailureKind.templateId => strings.coopFailureTemplateId,
+        CoopFailureKind.conversation => strings.coopFailureConversation,
+        CoopFailureKind.missingSettlementId => strings.coopFailureMissingSettlementId,
+        CoopFailureKind.settlementUnavailable => strings.coopFailureSettlementUnavailable,
+        CoopFailureKind.invalidSettlementSource => strings.coopFailureInvalidSettlementSource,
+      };
+    }
+    return presentError(err, stringsOf(context),
+      originalApiMessage: legacyApiMessage(err),
+    ).noticeText;
+  }
   if (err is! DioException) {
     return err.toString().replaceFirst('Exception: ', '');
   }
@@ -77,9 +99,9 @@ Widget coopLoginStatus(
   return StatusView(
     icon: CupertinoIcons.lock,
     message: message,
-    sub: '这一步需要登录,登录完会自动回到这一页。',
+    sub: stringsOf(context).coopLoginReturn,
     large: true,
-    retryLabel: '去登录',
+    retryLabel: stringsOf(context).coopSignIn,
     onRetry: () async {
       if (!await requireLogin(context, ref)) return;
       refetch?.call();

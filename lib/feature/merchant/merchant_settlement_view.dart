@@ -1,4 +1,6 @@
 import 'package:flutter/cupertino.dart';
+import '../../l10n/strings.dart';
+import 'merchant_operations_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -68,11 +70,11 @@ class MerchantSettlementView extends ConsumerWidget {
             data: (MerchantSettlementOverview o) => _Hero(overview: o),
           ),
           const SizedBox(height: CyTokens.space5),
-          const _SectionTitle('收入明细'),
+          _SectionTitle(stringsOf(context).merchantOperationsIncomeDetails),
           const SizedBox(height: CyTokens.space2),
           const _EntriesBlock(),
           const SizedBox(height: CyTokens.space5),
-          const _SectionTitle('对公打款批次'),
+          _SectionTitle(stringsOf(context).merchantOperationsBusinessPaymentBatches),
           const SizedBox(height: CyTokens.space2),
           const _BatchesBlock(),
         ],
@@ -96,11 +98,11 @@ class _Hero extends StatelessWidget {
 
   /// ★ 标签随正负变(小程序 `netLabel`):负数是**净调整**不是净入账 ——
   ///   写成「净入账 -120」商家会以为自己收到了一笔负钱。
-  String get _netLabel {
+  String _netLabel(BuildContext context) {
     final double? v = double.tryParse(
       overview.personalArrivedThisMonthNet ?? '',
     );
-    return (v != null && v < 0) ? '本月个人账户净调整' : '本月个人账户净入账';
+    return (v != null && v < 0) ? stringsOf(context).merchantOperationsPersonalAccountNetAdjustmentThisMonth : stringsOf(context).merchantOperationsPersonalAccountNetIncomeThisMonth;
   }
 
   @override
@@ -117,7 +119,7 @@ class _Hero extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Text(
-            _netLabel,
+            _netLabel(context),
             style: textTheme.labelMedium?.copyWith(color: p.textSecondary),
           ),
           const SizedBox(height: CyTokens.space1),
@@ -135,14 +137,14 @@ class _Hero extends StatelessWidget {
           if (overview.hasPendingAdjustment) ...<Widget>[
             const SizedBox(height: CyTokens.space2),
             _Chip(
-              text: '${overview.adjustmentPendingCount} 笔调整待处理',
+              text: stringsOf(context).merchantOperationsAdjustmentCount(overview.adjustmentPendingCount.toString()),
               tone: FinanceTone.warning,
             ),
           ],
           const SizedBox(height: CyTokens.space3),
-          _Kv('个人账户毛额', _money(overview.personalArrivedThisMonthGross)),
-          _Kv('已执行调整', _money(overview.personalExecutedAdjustmentsThisMonth)),
-          _Kv('待对公结算', _money(overview.publicPayablePending)),
+          _Kv(stringsOf(context).merchantOperationsPersonalAccountGrossAmount, _money(overview.personalArrivedThisMonthGross)),
+          _Kv(stringsOf(context).merchantOperationsAdjustmentsApplied, _money(overview.personalExecutedAdjustmentsThisMonth)),
+          _Kv(stringsOf(context).merchantOperationsAwaitingBusinessSettlement, _money(overview.publicPayablePending)),
         ],
       ),
     );
@@ -231,11 +233,11 @@ class _EntriesBlock extends ConsumerWidget {
       ),
       data: (MerchantFinancePage<MerchantSettlementEntry> page) =>
           page.rows.isEmpty
-          ? const StatusView(
+          ? StatusView(
               icon: CupertinoIcons.tray,
-              message: '还没有已成立的收入明细',
+              message: stringsOf(context).merchantOperationsNoConfirmedIncomeDetailsYet,
               // 说清去哪找 —— 待结算的还在核销记录里。
-              sub: '待主题结算的履约会留在核销记录中',
+              sub: stringsOf(context).merchantOperationsFulfillmentsAwaitingThemeSettlementRemainInRedemptionRecords,
             )
           : Column(
               children: page.rows
@@ -270,7 +272,7 @@ class _EntryRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Text(
-                  entry.source ?? entry.entryKind ?? '收入',
+                  entry.source ?? entry.entryKind ?? stringsOf(context).merchantOperationsIncome,
                   style: textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 2),
@@ -279,13 +281,13 @@ class _EntryRow extends StatelessWidget {
                     // ★ 日期取服务端下发的前 10 位,**不在前端做时区换算**
                     //   (小程序注释原话)。换算一次就和后端对不上账了。
                     Text(
-                      _day(entry.occurredAt),
+                      _day(context, entry.occurredAt),
                       style: textTheme.labelSmall?.copyWith(
                         color: p.textTertiary,
                       ),
                     ),
                     const SizedBox(width: CyTokens.space2),
-                    _Chip(text: state, tone: financeTone(entry.displayState)),
+                    _Chip(text: merchantOperationModelText(context, state), tone: financeTone(entry.displayState)),
                   ],
                 ),
               ],
@@ -307,9 +309,9 @@ class _EntryRow extends StatelessWidget {
 }
 
 /// 服务端时间串的前 10 位。拿不到就说「未标注日期」,不猜今天。
-String _day(String? raw) {
+String _day(BuildContext context, String? raw) {
   final String s = (raw ?? '').trim();
-  if (s.length < 10) return '未标注日期';
+  if (s.length < 10) return stringsOf(context).merchantOperationsDateNotProvided;
   return s.substring(0, 10);
 }
 
@@ -330,10 +332,10 @@ class _BatchesBlock extends ConsumerWidget {
         onRetry: () => ref.invalidate(transferBatchesProvider),
       ),
       data: (MerchantFinancePage<PublicTransferBatch> page) => page.rows.isEmpty
-          ? const StatusView(
+          ? StatusView(
               icon: Icons.account_balance_outlined,
-              message: '还没有对公打款批次',
-              sub: '按自然月归集,当月有需要打款的收入时才会生成',
+              message: stringsOf(context).merchantOperationsNoBusinessPaymentBatchesYet,
+              sub: stringsOf(context).merchantOperationsGroupedByCalendarMonthABatchIsCreatedOnlyWhenIncomeNeedsToBePaid,
             )
           : Column(
               children: page.rows
@@ -371,10 +373,10 @@ class _BatchRow extends StatelessWidget {
       key: Key('batch-row-${batch.batchId}'),
       button: id != null,
       label: <String?>[
-        batch.periodYm ?? '未标注月份',
-        state,
-        invoice,
-        amount.isEmpty ? '金额未知' : '金额 $amount 元',
+        batch.periodYm ?? stringsOf(context).merchantOperationsMonthNotProvided,
+        merchantOperationModelText(context, state),
+        invoice == null ? null : merchantOperationModelText(context, invoice),
+        amount.isEmpty ? stringsOf(context).merchantOperationsAmountUnknown : stringsOf(context).merchantOperationsAmountSemantics(amount),
       ].whereType<String>().join('，'),
       onTap: action,
       excludeSemantics: true,
@@ -394,7 +396,7 @@ class _BatchRow extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
                       Text(
-                        batch.periodYm ?? '未标注月份',
+                        batch.periodYm ?? stringsOf(context).merchantOperationsMonthNotProvided,
                         style: textTheme.bodyMedium,
                       ),
                       const SizedBox(height: 2),
@@ -403,7 +405,7 @@ class _BatchRow extends StatelessWidget {
                         runSpacing: 2,
                         children: <Widget>[
                           _Chip(
-                            text: state,
+                            text: merchantOperationModelText(context, state),
                             tone: batchTone(
                               displayState: batch.displayState,
                               paymentState: batch.paymentState,
@@ -413,7 +415,7 @@ class _BatchRow extends StatelessWidget {
                           //   那会让商家去催一张可能已经开了的票。
                           if (invoice != null)
                             Text(
-                              invoice,
+                              merchantOperationModelText(context, invoice),
                               style: textTheme.labelSmall?.copyWith(
                                 color: p.textTertiary,
                               ),

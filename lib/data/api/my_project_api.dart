@@ -66,7 +66,9 @@ class MyProjectApi {
     );
     final body = resp.data ?? <String, dynamic>{};
     if ((body['code'] as num?)?.toInt() != 200) {
-      throw Exception((body['msg'] as String?) ?? '加载失败');
+      throw MyProjectApiException((body['msg'] as String?) ?? '加载失败',
+        code: (body['code'] as num?)?.toInt(),
+        localCode: body['msg'] == null ? 'load' : null);
     }
     final data = (body['data'] as Map<String, dynamic>?) ?? <String, dynamic>{};
     final rows = ((data['rows'] as List<dynamic>?) ?? const <dynamic>[])
@@ -92,14 +94,14 @@ class MyProjectApi {
   ///   **不猜一个端点去试**。
   Future<void> remove(MyProject p) async {
     final ep = ProjectEndpoints.forBizType(p.bizType);
-    if (ep == null) throw Exception('这种类型暂不支持删除');
+    if (ep == null) throw const MyProjectApiException('这种类型暂不支持删除', localCode: 'removeUnsupported');
     await _post(ep.delete, <String, dynamic>{'id': p.id.toString()});
   }
 
   /// 上架 / 下架。
   Future<void> toggleStatus(MyProject p) async {
     final ep = ProjectEndpoints.forBizType(p.bizType);
-    if (ep == null) throw Exception('这种类型暂不支持上下架');
+    if (ep == null) throw const MyProjectApiException('这种类型暂不支持上下架', localCode: 'statusUnsupported');
     await _post(ep.toggleStatus, <String, dynamic>{
       'id': p.id.toString(),
       if (p.bizType == 'topic') 'expectedUserStatus': p.isOnline ? '1' : '0',
@@ -113,7 +115,9 @@ class MyProjectApi {
     );
     final body = resp.data ?? <String, dynamic>{};
     if ((body['code'] as num?)?.toInt() != 200) {
-      throw Exception((body['msg'] as String?) ?? '操作失败');
+      throw MyProjectApiException((body['msg'] as String?) ?? '操作失败',
+        code: (body['code'] as num?)?.toInt(),
+        localCode: body['msg'] == null ? 'action' : null);
     }
   }
 
@@ -187,7 +191,9 @@ class MyProjectApi {
     );
     final Map<String, dynamic> body = resp.data ?? <String, dynamic>{};
     if ((body['code'] as num?)?.toInt() != 200) {
-      throw Exception((body['msg'] as String?) ?? '加载失败');
+      throw MyProjectApiException((body['msg'] as String?) ?? '加载失败',
+        code: (body['code'] as num?)?.toInt(),
+        localCode: body['msg'] == null ? 'load' : null);
     }
     return (body['data'] as Map<String, dynamic>?) ?? <String, dynamic>{};
   }
@@ -199,14 +205,18 @@ class MyProjectApi {
     final resp = await _client.dio.post<Map<String, dynamic>>(path, data: body);
     final Map<String, dynamic> res = resp.data ?? <String, dynamic>{};
     if ((res['code'] as num?)?.toInt() != 200) {
-      throw Exception((res['msg'] as String?) ?? '加载失败');
+      throw MyProjectApiException((res['msg'] as String?) ?? '加载失败',
+        code: (res['code'] as num?)?.toInt(),
+        localCode: res['msg'] == null ? 'load' : null);
     }
     return (res['data'] as Map<String, dynamic>?) ?? <String, dynamic>{};
   }
 
   List<Map<String, dynamic>> _rowsOf(Map<String, dynamic> res) {
     if ((res['code'] as num?)?.toInt() != 200) {
-      throw Exception((res['msg'] as String?) ?? '加载失败');
+      throw MyProjectApiException((res['msg'] as String?) ?? '加载失败',
+        code: (res['code'] as num?)?.toInt(),
+        localCode: res['msg'] == null ? 'load' : null);
     }
     final Object? data = res['data'];
     final List<dynamic> rows = data is List
@@ -215,4 +225,14 @@ class MyProjectApi {
               const <dynamic>[];
     return rows.whereType<Map<String, dynamic>>().toList();
   }
+}
+
+/// Optional localCode marks only client-generated copy; server text remains exact.
+class MyProjectApiException implements Exception {
+  const MyProjectApiException(this.message, {this.code, this.localCode});
+  final String message;
+  final int? code;
+  final String? localCode;
+  @override
+  String toString() => 'Exception: $message';
 }

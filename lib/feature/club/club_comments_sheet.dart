@@ -1,3 +1,5 @@
+import 'club_api_messages.dart';
+import '../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -102,7 +104,7 @@ class _CommentsSheetState extends ConsumerState<_CommentsSheet> {
       // 评论数长在动态卡上,发完要让外面那层也刷新。
       widget.onChanged?.call();
     } catch (e) {
-      _toast(e.toString().replaceFirst('Exception: ', ''));
+      _toast(clubApiErrorMessage(context, e));
     } finally {
       if (mounted) setState(() => _sending = false);
     }
@@ -122,20 +124,20 @@ class _CommentsSheetState extends ConsumerState<_CommentsSheet> {
     try {
       final bool ok = await cyConfirm(
         context,
-        title: '删除这条评论?',
-        content: '删除后其他成员就看不到了。',
-        confirmText: '删除',
+        title: stringsOf(context).clubCommentsDeleteTitle,
+        content: stringsOf(context).clubCommentsDeleteBody,
+        confirmText: stringsOf(context).clubCommentsDelete,
         danger: true,
       );
       if (!ok) return;
-      final String msg = await ref
+      final String msg = await clubApiAction(context, () => ref
           .read(clubApiProvider)
-          .deleteComment(comment.id);
+          .deleteComment(comment.id));
       ref.invalidate(commentsProvider(widget.postId));
       widget.onChanged?.call();
       _toast(msg);
     } catch (e) {
-      _toast(e.toString().replaceFirst('Exception: ', ''));
+      _toast(clubApiErrorMessage(context, e));
     }
   }
 
@@ -143,13 +145,13 @@ class _CommentsSheetState extends ConsumerState<_CommentsSheet> {
     try {
       final String? reason = await showReportSheet(
         context,
-        targetLabel: '这条评论',
+        targetLabel: stringsOf(context).clubCommentsTarget,
       );
       if (reason == null) return;
       // ⚠️ 举报只入审核队列,**不立即删** —— 提示按后端原话,别说「已删除」。
-      _toast(await ref.read(clubApiProvider).reportComment(comment.id));
+      _toast(await clubApiAction(context, () => ref.read(clubApiProvider).reportComment(comment.id)));
     } catch (e) {
-      _toast(e.toString().replaceFirst('Exception: ', ''));
+      _toast(clubApiErrorMessage(context, e));
     }
   }
 
@@ -176,7 +178,7 @@ class _CommentsSheetState extends ConsumerState<_CommentsSheet> {
                 children: <Widget>[
                   Expanded(
                     child: Text(
-                      '评论',
+                      stringsOf(context).clubCommentsTitle,
                       style: textTheme.titleLarge?.copyWith(
                         color: palette.textPrimary,
                         fontWeight: FontWeight.w700,
@@ -184,7 +186,7 @@ class _CommentsSheetState extends ConsumerState<_CommentsSheet> {
                     ),
                   ),
                   Semantics(
-                    label: '关闭评论',
+                    label: stringsOf(context).clubCommentsClose,
                     button: true,
                     child: CupertinoButton(
                       key: const Key('club-comments-close'),
@@ -208,16 +210,16 @@ class _CommentsSheetState extends ConsumerState<_CommentsSheet> {
                     const Center(child: CupertinoActivityIndicator()),
                 error: (Object e, _) => StatusView(
                   icon: CupertinoIcons.exclamationmark_circle,
-                  message: '评论加载不出来',
-                  sub: e.toString().replaceFirst('Exception: ', ''),
+                  message: stringsOf(context).clubCommentsLoadFailed,
+                  sub: clubApiErrorMessage(context, e),
                   onRetry: () =>
                       ref.invalidate(commentsProvider(widget.postId)),
                 ),
                 data: (List<ClubComment> list) => list.isEmpty
-                    ? const StatusView(
+                    ? StatusView(
                         icon: CupertinoIcons.chat_bubble_2,
-                        message: '还没有评论',
-                        sub: '还没有评论，来抢沙发',
+                        message: stringsOf(context).clubCommentsEmpty,
+                        sub: stringsOf(context).clubCommentsEmptyBody,
                       )
                     : ListView.builder(
                         controller: widget.scrollController,
@@ -268,7 +270,7 @@ class _CommentsSheetState extends ConsumerState<_CommentsSheet> {
                         controller: _input,
                         minLines: 1,
                         maxLines: 4,
-                        placeholder: '写评论…',
+                        placeholder: stringsOf(context).clubCommentsPlaceholder,
                         clearButtonMode: OverlayVisibilityMode.editing,
                         textInputAction: TextInputAction.send,
                         onSubmitted: (_) => _send(),
@@ -284,7 +286,7 @@ class _CommentsSheetState extends ConsumerState<_CommentsSheet> {
                     ),
                     const SizedBox(width: CyTokens.space2),
                     Semantics(
-                      label: '发送评论',
+                      label: stringsOf(context).clubCommentsSend,
                       button: true,
                       enabled: !_sending,
                       child: CupertinoButton(
@@ -347,7 +349,7 @@ class _CommentRow extends StatelessWidget {
               children: <Widget>[
                 Row(
                   children: <Widget>[
-                    Text(comment.displayName, style: textTheme.titleSmall),
+                    Flexible(child: Text(comment.avatarName ?? stringsOf(context).clubCommentsUserFallback, style: textTheme.titleSmall)),
                     const Spacer(),
                     if ((comment.createTime ?? '').isNotEmpty)
                       Text(
@@ -372,7 +374,7 @@ class _CommentRow extends StatelessWidget {
                           context,
                         ),
                         onPressed: onDelete,
-                        child: const Text('删除'),
+                        child: Text(stringsOf(context).clubCommentsDelete),
                       ),
                     CupertinoButton(
                       key: Key('club-comment-report-${comment.id}'),
@@ -380,7 +382,7 @@ class _CommentRow extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       foregroundColor: palette.textSecondary,
                       onPressed: onReport,
-                      child: const Text('举报'),
+                      child: Text(stringsOf(context).clubCommentsReport),
                     ),
                   ],
                 ),

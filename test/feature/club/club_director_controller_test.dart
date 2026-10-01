@@ -5,6 +5,11 @@
 //   ③ 核对用原 requestId 回读(绝不重发),重试才用同 requestId 重放。
 // 下面每条断言都对着「接错了会悄悄重复扣一次 / 丢一次动作」的场景写。
 
+import 'dart:async';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:chengyin_app/feature/auth/auth_controller.dart';
+import 'package:chengyin_app/data/models/user.dart';
+import '../../support/fixed_auth.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -15,11 +20,29 @@ import 'package:chengyin_app/feature/club/club_director_controller.dart';
 
 const int _activityId = 41;
 
+class _ChangingAuth extends AuthController {
+  @override
+  AuthState build() => signedInAuthState();
+  void switchTo(int? id, {bool loading = false}) => state = AuthState(
+    initialized: true, loading: loading,
+    user: id == null ? null : User(id: id, nickname: 'user', avatar: '', role: 'player'),
+  );
+}
+
+class _LegacyStore extends ClubDirectorPendingStore {
+  _LegacyStore() : super.memory(ownerId: 1);
+  @override
+  Future<bool> hasUnownedLegacy(int activityId) async => true;
+}
+
+
 class _FakeDirectorGateway implements ClubDirectorGateway {
   _FakeDirectorGateway(this.projection);
 
   ClubDirectorProjection projection;
   Object? loadError;
+  Completer<ClubDirectorProjection>? delayedLoad;
+  Completer<GameSessionReceipt>? delayedSubmit;
 
   /// submitClubCommand 依次弹出:GameSessionReceipt 直接返回,其余抛出。
   final List<Object> submitQueue = <Object>[];
@@ -36,6 +59,7 @@ class _FakeDirectorGateway implements ClubDirectorGateway {
     required int activityId,
   }) async {
     loadCalls += 1;
+    if (delayedLoad != null) return delayedLoad!.future;
     if (loadError != null) throw loadError!;
     return projection;
   }
@@ -45,6 +69,7 @@ class _FakeDirectorGateway implements ClubDirectorGateway {
     GameSessionCommand command,
   ) async {
     submitted.add(command);
+    if (delayedSubmit != null) return delayedSubmit!.future;
     if (submitQueue.isNotEmpty) {
       final Object next = submitQueue.removeAt(0);
       if (next is GameSessionReceipt) return next;
@@ -149,6 +174,7 @@ _harness({
   // 不写 List<Override> 的显式类型:Riverpod 3 把它导出在另一处,靠推断。
   final ProviderContainer container = ProviderContainer(
     overrides: [
+      signedInAuthOverride(),
       clubDirectorApiProvider.overrideWithValue(gateway),
       clubDirectorPendingStoreProvider.overrideWith(
         (ref) => store ?? ClubDirectorPendingStore.memory(),
@@ -180,6 +206,115 @@ Future<ClubDirectorController> _readyHarness(
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  test('pending storage is owner namespaced and legacy data is not adopted', () async {
+    FlutterSecureStorage.setMockInitialValues({
+      'club_director_pending_v1_41': 'legacy-unowned-private-payload',
+    });
+    const storage = FlutterSecureStorage();
+    final first = ClubDirectorPendingStore(storage, ownerId: 1);
+    final second = ClubDirectorPendingStore(storage, ownerId: 2);
+    final pending = ClubDirectorPendingWrite.fromCommand(GameSessionCommand(
+      activityId: 41, requestId: 'owner-one-123', expectedRevision: 3,
+      action: 'FINISH', payload: const {},
+    ));
+    await first.write(pending);
+    expect((await first.read(41))?.requestId, pending.requestId);
+    expect(await second.read(41), isNull);
+    expect(await second.hasUnownedLegacy(41), isTrue);
+    await second.clear(41);
+    expect((await first.read(41))?.requestId, pending.requestId);
+    expect(await storage.read(key: 'club_director_pending_v1_41'), 'legacy-unowned-private-payload');
+  });
+
+  test('account transition clears projection and rejects late read completion', () async {
+    final gateway = _FakeDirectorGateway(_projection())
+      ..delayedLoad = Completer<ClubDirectorProjection>();
+    final container = ProviderContainer(overrides: [
+      authControllerProvider.overrideWith(_ChangingAuth.new),
+      clubDirectorApiProvider.overrideWithValue(gateway),
+      clubDirectorPendingStoreProvider.overrideWith((ref) => ClubDirectorPendingStore.memory()),
+    ]);
+    addTearDown(container.dispose);
+    final listener = container.listen(clubDirectorProvider(_activityId), (_, __) {});
+    addTearDown(listener.close);
+    final controller = container.read(clubDirectorProvider(_activityId).notifier);
+    final loading = controller.load();
+    await Future<void>.delayed(Duration.zero);
+    (container.read(authControllerProvider.notifier) as _ChangingAuth).switchTo(2);
+    await container.pump();
+    gateway.delayedLoad!.complete(_projection());
+    await loading;
+    expect(_state(container).projection, isNull);
+    expect(_state(container).writeLocked, isFalse);
+    (container.read(authControllerProvider.notifier) as _ChangingAuth).switchTo(null);
+    await container.pump();
+    await controller.load();
+    expect(gateway.loadCalls, 1);
+  });
+
+  test('late command receipt never clears persisted pending or changes new account', () async {
+    final gateway = _FakeDirectorGateway(_projection());
+    final store = ClubDirectorPendingStore.memory(ownerId: 1);
+    final container = ProviderContainer(overrides: [
+      authControllerProvider.overrideWith(_ChangingAuth.new),
+      clubDirectorApiProvider.overrideWithValue(gateway),
+      clubDirectorPendingStoreProvider.overrideWithValue(store),
+    ]);
+    addTearDown(container.dispose);
+    final listener = container.listen(clubDirectorProvider(_activityId), (_, __) {});
+    addTearDown(listener.close);
+    final controller = container.read(clubDirectorProvider(_activityId).notifier);
+    await controller.load();
+    gateway.delayedSubmit = Completer<GameSessionReceipt>();
+    final writing = controller.finish();
+    await Future<void>.delayed(Duration.zero);
+    final command = gateway.submitted.single;
+    (container.read(authControllerProvider.notifier) as _ChangingAuth).switchTo(2);
+    await container.pump();
+    gateway.delayedSubmit!.complete(_applied(command.requestId, command.action));
+    await writing;
+    expect(_state(container).projection, isNull);
+    expect(_state(container).refreshTick, 0);
+    expect((await store.read(_activityId))?.requestId, command.requestId);
+  });
+
+  test('legacy unowned pending blocks new commands without replay or deletion', () async {
+    final h = _harness(projection: _projection(), store: _LegacyStore());
+    await h.controller.load();
+    expect(_state(h.container).writeLocked, isTrue);
+    expect(_state(h.container).canRetryUnknownWrite, isFalse);
+    expect(await h.controller.finish(), ClubDirectorWriteResult.blocked);
+    expect(await h.controller.reconcileOutcome(), isNull);
+    expect(h.gateway.submitted, isEmpty);
+    expect(h.gateway.receiptReads, isEmpty);
+  });
+
+  test('local message provenance clears when a raw server message replaces it', () {
+    const local = ClubDirectorState(activityId: 41,
+      writeMessage: '正在提交…', localWriteMessage: ClubDirectorLocalMessage.submitting);
+    expect(local.copyWith(refreshTick: 1).localWriteMessage, ClubDirectorLocalMessage.submitting);
+    final raw = local.copyWith(writeMessage: '正在提交…');
+    expect(raw.writeMessage, local.writeMessage);
+    expect(raw.localWriteMessage, isNull);
+    expect(local.copyWith(writeMessage: '').localWriteMessage, isNull);
+  });
+
+  test('controller separates local fallback from identical backend explanation', () async {
+    final h = _harness(projection: _projection());
+    h.gateway.loadError = _networkDown();
+    await h.controller.load();
+    expect(_state(h.container).localErrorMessage, ClubDirectorLocalMessage.networkUnavailable);
+    h.gateway.loadError = const GameSessionContractException('网络不可用，请稍后重试');
+    await h.controller.load();
+    expect(_state(h.container).errorText, '网络不可用，请稍后重试');
+    expect(_state(h.container).localErrorMessage, isNull);
+    h.gateway.loadError = const GameSessionContractException('活动导演数据与当前活动不匹配',
+      reasonCode: 'PROJECTION_MISMATCH', isLocal: true);
+    await h.controller.load();
+    expect(_state(h.container).localErrorMessage, ClubDirectorLocalMessage.projectionMismatch);
+  });
+
   group('三态主链:PREPARE / START / FINISH', () {
     test('PREPARE:无局空壳(revision 0)进准备 → APPLIED → confirmed,主页面回读', () async {
       // `club: null` + NOT_PREPARED + PREPARE 是合法开局入口(适配器闸)。
@@ -800,6 +935,7 @@ void main() {
         );
       final ProviderContainer container = ProviderContainer(
         overrides: [
+      signedInAuthOverride(),
           clubDirectorApiProvider.overrideWithValue(gateway),
           clubDirectorPendingStoreProvider.overrideWith(
             (ref) => ClubDirectorPendingStore.memory(),

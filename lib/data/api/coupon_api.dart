@@ -13,6 +13,23 @@ class CouponUnavailableException implements Exception {
   String toString() => message;
 }
 
+/// Provenance for merchant-side messages created locally, not by the server.
+enum CouponLocalFailureKind { load, publish, stop }
+
+class CouponLocalFailure implements Exception {
+  const CouponLocalFailure(this.kind, this.message);
+  final CouponLocalFailureKind kind;
+  final String message;
+  @override
+  String toString() => 'Exception: $message';
+}
+
+class CouponPublishReceipt {
+  const CouponPublishReceipt({required this.message, this.hasLocalMessage = false});
+  final String message;
+  final bool hasLocalMessage;
+}
+
 /// 优惠券接口(对齐后端 ApiCouponController)。
 class CouponApi {
   CouponApi(this._client);
@@ -57,7 +74,10 @@ class CouponApi {
     );
     final body = resp.data ?? <String, dynamic>{};
     if ((body['code'] as num?)?.toInt() != 200) {
-      throw Exception((body['msg'] ?? '加载失败').toString());
+      if (body['msg'] == null) {
+        throw const CouponLocalFailure(CouponLocalFailureKind.load, '加载失败');
+      }
+      throw Exception(body['msg'].toString());
     }
     final rows = (body['data'] as List<dynamic>?) ?? <dynamic>[];
     return rows.whereType<Map<String, dynamic>>().toList();
@@ -80,6 +100,21 @@ class CouponApi {
     required int couponType,
     String? description,
   }) async {
+    return (await publishWithReceipt(
+      name: name, startTime: startTime, endTime: endTime,
+      publishCount: publishCount, couponType: couponType, description: description,
+    )).message;
+  }
+
+  /// Additive receipt API keeps local fallback provenance for localized views.
+  Future<CouponPublishReceipt> publishWithReceipt({
+    required String name,
+    required DateTime startTime,
+    required DateTime endTime,
+    required int publishCount,
+    required int couponType,
+    String? description,
+  }) async {
     final resp = await _client.dio.post<Map<String, dynamic>>(
       '/api/coupon/publish',
       data: <String, dynamic>{
@@ -94,9 +129,15 @@ class CouponApi {
     );
     final body = resp.data ?? <String, dynamic>{};
     if ((body['code'] as num?)?.toInt() != 200) {
-      throw Exception((body['msg'] ?? '发布失败').toString());
+      if (body['msg'] == null) {
+        throw const CouponLocalFailure(CouponLocalFailureKind.publish, '发布失败');
+      }
+      throw Exception(body['msg'].toString());
     }
-    return (body['msg'] as String?) ?? '已发布';
+    return CouponPublishReceipt(
+      message: (body['msg'] as String?) ?? '已发布',
+      hasLocalMessage: body['msg'] == null,
+    );
   }
 
   /// 停发自己的券(商家侧):`POST /api/coupon/stop`(表单 couponId)。
@@ -114,7 +155,10 @@ class CouponApi {
     );
     final body = resp.data ?? <String, dynamic>{};
     if ((body['code'] as num?)?.toInt() != 200) {
-      throw Exception((body['msg'] ?? '停发失败，请稍后重试').toString());
+      if (body['msg'] == null) {
+        throw const CouponLocalFailure(CouponLocalFailureKind.stop, '停发失败，请稍后重试');
+      }
+      throw Exception(body['msg'].toString());
     }
   }
 
@@ -194,7 +238,10 @@ class CouponApi {
     );
     final body = resp.data ?? <String, dynamic>{};
     if ((body['code'] as num?)?.toInt() != 200) {
-      throw Exception((body['msg'] ?? '停发失败，请稍后重试').toString());
+      if (body['msg'] == null) {
+        throw const CouponLocalFailure(CouponLocalFailureKind.stop, '停发失败，请稍后重试');
+      }
+      throw Exception(body['msg'].toString());
     }
   }
 }

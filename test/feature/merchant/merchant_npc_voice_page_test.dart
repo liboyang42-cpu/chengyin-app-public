@@ -11,6 +11,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:chengyin_app/l10n/app_localizations_zh.dart';
 
 import 'package:chengyin_app/core/providers.dart';
 import 'package:chengyin_app/data/api/merchant_npc_api.dart';
@@ -106,13 +107,14 @@ void main() {
     final String src = File(
       'lib/feature/merchant/merchant_npc_voice_page.dart',
     ).readAsStringSync();
+    expect(src, contains('merchantVoiceCheckStatus'));
     for (final String line in <String>[
       '声音正在生成，可以先返回继续装修店铺。',
       '角色的声音已准备好。',
       '声音生成失败，请重新选择清晰的录音。',
       '查询生成状态',
     ]) {
-      expect(src.contains(line), isTrue, reason: '小程序原句缺了「$line」');
+      expect(<String>[AppLocalizationsZh().merchantVoiceGenerating, AppLocalizationsZh().merchantVoiceReady, AppLocalizationsZh().merchantVoiceFailed, AppLocalizationsZh().merchantVoiceCheckStatus].any((text) => text.contains(line)), isTrue, reason: '小程序原句缺了「$line」');
     }
   });
 }

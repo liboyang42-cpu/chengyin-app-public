@@ -1,3 +1,4 @@
+import '../../support/fixed_auth.dart';
 // 活动详情(topic-detail)的负控门:六个状态的主键去向、权限面(canManageSessions /
 // setting.canManage)、四张半屏的接口参数、结束主题的「失败不关框」。
 //
@@ -12,6 +13,7 @@
 //   - 名单三个统计数是全量口径,四个 chip 就是服务端 filter 的取值。
 
 import 'package:flutter/cupertino.dart';
+import 'package:chengyin_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -32,10 +34,13 @@ import 'package:chengyin_app/data/models/club_topic_ops.dart';
 import 'package:chengyin_app/feature/club/club_director_controller.dart';
 import 'package:chengyin_app/feature/club/club_topic_detail_page.dart';
 
-Widget _app(Widget home, List<dynamic> overrides) {
+Widget _app(Widget home, List<dynamic> overrides, {Locale locale = const Locale('zh')}) {
   return ProviderScope(
-    overrides: overrides.cast(),
+    overrides: <dynamic>[signedInAuthOverride(role: 'club'), ...overrides].cast(),
     child: MaterialApp(
+      locale: locale,
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
       theme: ThemeData(useMaterial3: true),
       debugShowCheckedModeBanner: false,
       home: home,
@@ -489,6 +494,7 @@ Future<void> _pumpPage(
   WidgetTester tester, {
   required _FakeClubTopicOpsApi fake,
   _FakeClubDirectorGateway? director,
+  Locale locale = const Locale('zh'),
 }) async {
   await tester.binding.setSurfaceSize(const Size(390, 1100));
   await tester.pumpWidget(
@@ -508,6 +514,7 @@ Future<void> _pumpPage(
           (ref) => ClubDirectorPendingStore.memory(),
         ),
       ],
+      locale: locale,
     ),
   );
   await tester.pumpAndSettle();
@@ -549,6 +556,7 @@ Future<GoRouter> _pumpRouted(
   await tester.pumpWidget(
     ProviderScope(
       overrides: <dynamic>[
+            signedInAuthOverride(role: 'club'),
         clubTopicOpsApiProvider.overrideWithValue(fake),
         clubDirectorApiProvider.overrideWithValue(_FakeClubDirectorGateway()),
         clubDirectorPendingStoreProvider.overrideWith(
@@ -586,6 +594,19 @@ bool _primaryEnabled(WidgetTester tester) =>
     null;
 
 void main() {
+  testWidgets('English activity details preserve raw title and reviewing state', (tester) async {
+    final fake = _FakeClubTopicOpsApi()
+      ..overviewValue = ClubTopicOverview.tryFromJson(
+        _overviewJson(name: '原始活动名', status: 'reviewing'),
+      )!;
+    await _pumpPage(tester, fake: fake, locale: const Locale('en'));
+    expect(find.text('Activity details'), findsOneWidget);
+    expect(find.text('原始活动名'), findsOneWidget);
+    expect(find.text('Under review'), findsOneWidget);
+    expect(find.text('Start activity'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   group('topic-detail:结构与状态表', () {
     testWidgets('进行中:状态胶囊/四圆钮/核销三格/主题卡/场次一次读齐', (WidgetTester tester) async {
       final fake = _FakeClubTopicOpsApi()
@@ -1400,6 +1421,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: <dynamic>[
+            signedInAuthOverride(role: 'club'),
             clubTopicOpsApiProvider.overrideWithValue(fake),
             // main 的详情页多了导演台宿主态,不挡这两个 provider 会一直重试。
             clubDirectorApiProvider.overrideWithValue(

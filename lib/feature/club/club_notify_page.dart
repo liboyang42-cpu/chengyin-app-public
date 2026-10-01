@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers.dart';
+import '../../l10n/strings.dart';
 import '../../core/theme/cy_palette.dart';
 import '../../core/theme/cy_tokens.dart';
 import '../../core/widgets/cy_native_button.dart';
@@ -34,7 +35,6 @@ class ClubNotifyPage extends ConsumerStatefulWidget {
 class _AudienceOption {
   const _AudienceOption({
     required this.value,
-    required this.label,
     required this.eventOnly,
     this.disabled = false,
     this.hint = '',
@@ -42,7 +42,6 @@ class _AudienceOption {
   });
 
   final String value;
-  final String label;
   final bool eventOnly;
   final bool disabled;
   final String hint;
@@ -54,7 +53,6 @@ class _AudienceOption {
     String? countText,
   }) => _AudienceOption(
     value: value,
-    label: label,
     eventOnly: eventOnly,
     disabled: disabled ?? this.disabled,
     hint: hint ?? this.hint,
@@ -66,21 +64,31 @@ enum _PreviewState { idle, loading, ready, empty, error }
 
 class _ClubNotifyPageState extends ConsumerState<ClubNotifyPage> {
   static const List<_AudienceOption> _baseAudiences = <_AudienceOption>[
-    _AudienceOption(value: 'ALL_MEMBERS', label: '全部成员', eventOnly: false),
-    _AudienceOption(value: 'ADMINS', label: '管理员', eventOnly: false),
+    _AudienceOption(value: 'ALL_MEMBERS', eventOnly: false),
+    _AudienceOption(value: 'ADMINS', eventOnly: false),
     _AudienceOption(
       value: 'REGISTERED',
-      label: '本场已报名',
+
       eventOnly: true,
     ),
-    _AudienceOption(value: 'WAITLIST', label: '本场候补', eventOnly: true),
-    _AudienceOption(value: 'NO_SHOW', label: '本场未到场', eventOnly: true),
+    _AudienceOption(value: 'WAITLIST', eventOnly: true),
+    _AudienceOption(value: 'NO_SHOW', eventOnly: true),
     _AudienceOption(
       value: 'INACTIVE',
-      label: '近 90 天未活跃',
+
       eventOnly: false,
     ),
   ];
+
+  String _audienceLabel(String value) => switch (value) {
+    'ALL_MEMBERS' => stringsOf(context).notificationAllMembers,
+    'ADMINS' => stringsOf(context).notificationAdmins,
+    'REGISTERED' => stringsOf(context).notificationRegistered,
+    'WAITLIST' => stringsOf(context).notificationWaitlist,
+    'NO_SHOW' => stringsOf(context).notificationNoShow,
+    'INACTIVE' => stringsOf(context).notificationInactive,
+    _ => value,
+  };
 
   final TextEditingController _titleCtrl = TextEditingController();
   final TextEditingController _contentCtrl = TextEditingController();
@@ -95,6 +103,7 @@ class _ClubNotifyPageState extends ConsumerState<ClubNotifyPage> {
   String _previewError = '';
   bool _sending = false;
   bool _retrying = false;
+  bool _refreshingCampaign = false;
   NotificationCampaign? _campaign;
   String _draftRequestId = '';
 
@@ -133,12 +142,14 @@ class _ClubNotifyPageState extends ConsumerState<ClubNotifyPage> {
         allowed: (ClubOpsAccess a) =>
             a.has(kClubNotifySend) ||
             (_activityId != null && a.has(kClubEventOperate)),
-        deniedMessage: '当前角色没有成员通知权限',
+        deniedMessage: stringsOf(context).notificationDeniedRole,
       );
       if (denied != null) {
         setState(() {
           _state = ClubOpsLoadState.noPermission;
-          _error = denied;
+          _error = !access.active || access.clubId != widget.clubId
+              ? stringsOf(context).notificationNotMember
+              : denied;
         });
         return;
       }
@@ -150,8 +161,8 @@ class _ClubNotifyPageState extends ConsumerState<ClubNotifyPage> {
                   : !canNotifyAllMembers,
               hint: item.eventOnly
                   ? (_activityId == null
-                        ? '从具体活动进入后才可选'
-                        : (canOperateEvent ? '' : '当前角色没有本场通知权限'))
+                        ? stringsOf(context).notificationNeedsEvent
+                        : (canOperateEvent ? '' : stringsOf(context).notificationDeniedEvent))
                   : '',
             ),
           )
@@ -171,7 +182,7 @@ class _ClubNotifyPageState extends ConsumerState<ClubNotifyPage> {
       setState(() {
         _loginRequired = clubLoginRequired(error);
         _state = clubOpsFailureState(error);
-        _error = clubOpsErrorMessage(error, '通知权限暂时不可用');
+        _error = clubOpsErrorMessage(error, stringsOf(context).notificationAccessUnavailable);
       });
     }
   }
@@ -189,7 +200,7 @@ class _ClubNotifyPageState extends ConsumerState<ClubNotifyPage> {
                 countText:
                     counts.counts[item.value] == null
                     ? ''
-                    : '${counts.counts[item.value]} 人',
+                    : stringsOf(context).notificationAudienceCount(counts.counts[item.value]!),
               ),
             )
             .toList();
@@ -222,11 +233,11 @@ class _ClubNotifyPageState extends ConsumerState<ClubNotifyPage> {
     final String title = _titleCtrl.text.trim();
     final String content = _contentCtrl.text.trim();
     if (title.isEmpty || title.length > 80) {
-      CyNativeNotice.show(context, '标题需为 1–80 字', isError: true);
+      CyNativeNotice.show(context, stringsOf(context).notificationTitleValidation, isError: true);
       return false;
     }
     if (content.isEmpty || content.length > 1000) {
-      CyNativeNotice.show(context, '内容需为 1–1000 字', isError: true);
+      CyNativeNotice.show(context, stringsOf(context).notificationContentValidation, isError: true);
       return false;
     }
     return true;
@@ -257,7 +268,7 @@ class _ClubNotifyPageState extends ConsumerState<ClubNotifyPage> {
       if (preview == null) {
         setState(() {
           _previewState = _PreviewState.error;
-          _previewError = '受众预览不可用';
+          _previewError = stringsOf(context).notificationPreviewUnavailable;
         });
         return;
       }
@@ -271,7 +282,7 @@ class _ClubNotifyPageState extends ConsumerState<ClubNotifyPage> {
       if (!mounted) return;
       setState(() {
         _previewState = _PreviewState.error;
-        _previewError = clubOpsErrorMessage(error, '受众预览不可用');
+        _previewError = clubOpsErrorMessage(error, stringsOf(context).notificationPreviewUnavailable);
       });
     }
   }
@@ -302,20 +313,24 @@ class _ClubNotifyPageState extends ConsumerState<ClubNotifyPage> {
           );
       if (!mounted) return;
       if (campaign == null) {
-        CyNativeNotice.show(context, '通知发送失败', isError: true);
+        CyNativeNotice.show(context, stringsOf(context).notificationSendFailed, isError: true);
         return;
       }
       setState(() => _campaign = campaign);
       CyNativeNotice.show(
         context,
-        campaign.failedCount > 0 ? '部分发送失败' : '站内通知已发送',
+        campaign.failedCount > 0
+            ? stringsOf(context).notificationPartiallyFailed
+            : campaign.successCount < campaign.totalCount
+            ? stringsOf(context).notificationSubmitted
+            : stringsOf(context).notificationSent,
         isError: campaign.failedCount > 0,
       );
     } catch (error) {
       if (!mounted) return;
       CyNativeNotice.show(
         context,
-        clubOpsErrorMessage(error, '网络异常，请稍后重试'),
+        clubOpsErrorMessage(error, stringsOf(context).networkError),
         isError: true,
       );
     } finally {
@@ -323,9 +338,32 @@ class _ClubNotifyPageState extends ConsumerState<ClubNotifyPage> {
     }
   }
 
+  Future<void> _refreshCampaign() async {
+    final campaign = _campaign;
+    if (campaign == null || _refreshingCampaign || _retrying || _sending) return;
+    setState(() => _refreshingCampaign = true);
+    try {
+      final refreshed = await ref.read(clubOpsApiProvider)
+          .notificationStatus(campaignId: campaign.id);
+      if (!mounted || _campaign?.id != campaign.id) return;
+      if (refreshed == null || refreshed.id != campaign.id) {
+        CyNativeNotice.show(context, stringsOf(context).notificationStatusUnavailable, isError: true);
+        return;
+      }
+      setState(() => _campaign = refreshed);
+    } catch (error) {
+      if (!mounted) return;
+      CyNativeNotice.show(context,
+        clubOpsErrorMessage(error, stringsOf(context).notificationStatusUnavailable), isError: true);
+    } finally {
+      if (mounted) setState(() => _refreshingCampaign = false);
+    }
+  }
+
   Future<void> _retryFailed() async {
     final NotificationCampaign? campaign = _campaign;
-    if (campaign == null || _retrying || campaign.failedCount <= 0) return;
+    if (campaign == null || _retrying || _refreshingCampaign ||
+        campaign.failedCount <= 0) return;
     setState(() => _retrying = true);
     try {
       final NotificationCampaign? retried = await ref
@@ -333,20 +371,20 @@ class _ClubNotifyPageState extends ConsumerState<ClubNotifyPage> {
           .notificationRetry(campaignId: campaign.id);
       if (!mounted) return;
       if (retried == null) {
-        CyNativeNotice.show(context, '重试失败', isError: true);
+        CyNativeNotice.show(context, stringsOf(context).notificationRetryFailed, isError: true);
         return;
       }
       setState(() => _campaign = retried);
       CyNativeNotice.show(
         context,
-        retried.failedCount > 0 ? '仍有失败项' : '失败项已重试',
+        retried.failedCount > 0 ? stringsOf(context).notificationFailuresRemain : stringsOf(context).notificationRetried,
         isError: retried.failedCount > 0,
       );
     } catch (error) {
       if (!mounted) return;
       CyNativeNotice.show(
         context,
-        clubOpsErrorMessage(error, '网络异常，请稍后重试'),
+        clubOpsErrorMessage(error, stringsOf(context).networkError),
         isError: true,
       );
     } finally {
@@ -366,13 +404,13 @@ class _ClubNotifyPageState extends ConsumerState<ClubNotifyPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              const CyPageTitle('群发通知'),
+              CyPageTitle(stringsOf(context).notificationTitle),
               Expanded(child: _body()),
               if (_state == ClubOpsLoadState.ready)
                 CyFooterBar(
                   primary: CyNativeButton(
                     key: const Key('notify-send'),
-                    label: _sending ? '正在投递…' : '发送站内通知',
+                    label: _sending ? stringsOf(context).notificationSending : stringsOf(context).notificationSend,
                     width: double.infinity,
                     onPressed: (_sending || _previewState != _PreviewState.ready)
                         ? null
@@ -391,7 +429,7 @@ class _ClubNotifyPageState extends ConsumerState<ClubNotifyPage> {
     // 而真因只是没登录 —— 登录后原地重取,人留在这一页。
     if (_loginRequired) {
       return ClubLoginGate(
-        message: '登录后查看群发通知',
+        message: stringsOf(context).notificationLogin,
         onSignedIn: _loadAccess,
       );
     }
@@ -400,16 +438,16 @@ class _ClubNotifyPageState extends ConsumerState<ClubNotifyPage> {
         return const CySkeleton(type: CySkeletonType.card, count: 4);
       case ClubOpsLoadState.noPermission:
         return StatusView(
-          message: '你没有发通知的权限',
+          message: stringsOf(context).notificationNoPermission,
           sub: _error.isEmpty
-              ? '发俱乐部通知需要「通知成员」权限,可以请主理人给你委派。'
+              ? stringsOf(context).notificationPermissionHint
               : _error,
           icon: CupertinoIcons.lock,
           large: true,
         );
       case ClubOpsLoadState.networkError:
         return StatusView(
-          message: '网络连接失败',
+          message: stringsOf(context).notificationNetworkFailed,
           sub: _error,
           icon: CupertinoIcons.exclamationmark_triangle,
           large: true,
@@ -417,7 +455,7 @@ class _ClubNotifyPageState extends ConsumerState<ClubNotifyPage> {
         );
       case ClubOpsLoadState.error:
         return StatusView(
-          message: '通知工具暂时不可用',
+          message: stringsOf(context).notificationUnavailable,
           sub: _error,
           icon: CupertinoIcons.exclamationmark_triangle,
           large: true,
@@ -434,18 +472,18 @@ class _ClubNotifyPageState extends ConsumerState<ClubNotifyPage> {
       padding: const EdgeInsets.only(bottom: CyTokens.space6),
       children: <Widget>[
         ClubOpsSection(
-          title: '选择受众',
+          title: stringsOf(context).notificationChooseAudience,
           children: <Widget>[
             ClubOpsCard(
               children: _audiences
                   .map(
                     (_AudienceOption item) => ClubOpsRow(
                       key: Key('notify-audience-${item.value}'),
-                      title: item.label,
+                      title: _audienceLabel(item.value),
                       meta: item.hint.isEmpty ? null : item.hint,
                       value: item.countText.isEmpty ? null : item.countText,
                       trailing: Text(
-                        _audienceType == item.value ? '已选' : '选择',
+                        _audienceType == item.value ? stringsOf(context).notificationSelected : stringsOf(context).notificationSelect,
                         style: TextStyle(
                           fontSize: CyTokens.typeLabel,
                           color: _audienceType == item.value
@@ -462,7 +500,7 @@ class _ClubNotifyPageState extends ConsumerState<ClubNotifyPage> {
           ],
         ),
         ClubOpsSection(
-          title: '内容',
+          title: stringsOf(context).notificationContent,
           children: <Widget>[
             ClubOpsCard(
               children: <Widget>[
@@ -477,21 +515,21 @@ class _ClubNotifyPageState extends ConsumerState<ClubNotifyPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
                       CyField(
-                        label: '标题',
+                        label: stringsOf(context).notificationDraftTitle,
                         child: _OpsTextField(
                           key: const Key('notify-title'),
                           controller: _titleCtrl,
-                          placeholder: '例如：周六集合提醒',
+                          placeholder: stringsOf(context).notificationTitleHint,
                           maxLength: 80,
                           onChanged: (_) => _resetDraft(),
                         ),
                       ),
                       CyField(
-                        label: '内容',
+                        label: stringsOf(context).notificationContent,
                         child: _OpsTextField(
                           key: const Key('notify-content'),
                           controller: _contentCtrl,
-                          placeholder: '写清集合时间、地点与需要准备的物品',
+                          placeholder: stringsOf(context).notificationContentHint,
                           maxLength: 1000,
                           maxLines: 5,
                           onChanged: (_) => _resetDraft(),
@@ -512,7 +550,7 @@ class _ClubNotifyPageState extends ConsumerState<ClubNotifyPage> {
                                 ),
                               ),
                               ClubOpsRowLink(
-                                label: '重试',
+                                label: stringsOf(context).retry,
                                 onTap: _preview,
                                 enabled:
                                     _previewState != _PreviewState.loading &&
@@ -524,7 +562,7 @@ class _ClubNotifyPageState extends ConsumerState<ClubNotifyPage> {
                       if (_previewState == _PreviewState.empty)
                         _previewCard(
                           child: Text(
-                            '0 人 · 当前分群没有可发送成员，不会创建空任务。',
+                            stringsOf(context).notificationEmptyAudience,
                             style: TextStyle(
                               fontSize: CyTokens.typeLabel,
                               color: palette.textSecondary,
@@ -534,7 +572,7 @@ class _ClubNotifyPageState extends ConsumerState<ClubNotifyPage> {
                       if (_previewState == _PreviewState.ready)
                         _previewCard(
                           child: Text(
-                            '$_recipientCount 人 · 不会下发手机号；发送后可按失败项重试。',
+                            stringsOf(context).notificationPreviewSummary(_recipientCount),
                             style: TextStyle(
                               fontSize: CyTokens.typeLabel,
                               color: palette.textSecondary,
@@ -550,35 +588,45 @@ class _ClubNotifyPageState extends ConsumerState<ClubNotifyPage> {
         ),
         if (_campaign != null)
           ClubOpsSection(
-            title: '投递状态',
+            title: stringsOf(context).notificationDeliveryStatus,
             children: <Widget>[
               ClubOpsCard(
                 children: <Widget>[
                   ClubOpsRow(
-                    title: '总人数',
+                    title: stringsOf(context).notificationTotal,
                     value: '${_campaign!.totalCount}',
                     valueColor: palette.textPrimary,
                   ),
                   ClubOpsRow(
-                    title: '已送达站内',
+                    title: stringsOf(context).notificationDelivered,
                     value: '${_campaign!.successCount}',
                     valueColor: CyTokens.statusSuccess,
                   ),
                   ClubOpsRow(
-                    title: '失败',
-                    meta: _campaign!.failedCount > 0 ? '重试' : null,
+                    title: stringsOf(context).notificationFailed,
+                    meta: _campaign!.failedCount > 0 ? stringsOf(context).retry : null,
                     value: '${_campaign!.failedCount}',
                     valueColor: CyTokens.statusDanger,
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(CyTokens.space3),
+                    child: CyNativeButton(
+                      key: const Key('notify-refresh'),
+                      label: _refreshingCampaign ? stringsOf(context).notificationRefreshing : stringsOf(context).notificationRefresh,
+                      role: CyNativeButtonRole.secondary,
+                      onPressed: _refreshingCampaign || _retrying || _sending
+                          ? null : _refreshCampaign,
+                    ),
                   ),
                   if (_campaign!.failedCount > 0)
                     Padding(
                       padding: const EdgeInsets.all(CyTokens.space3),
                       child: CyNativeButton(
                         key: const Key('notify-retry'),
-                        label: _retrying ? '正在重试…' : '只重试失败项',
+                        label: _retrying ? stringsOf(context).notificationRetrying : stringsOf(context).notificationRetryFailedOnly,
                         role: CyNativeButtonRole.secondary,
                         width: double.infinity,
-                        onPressed: _retrying ? null : _retryFailed,
+                        onPressed: _retrying || _refreshingCampaign ? null : _retryFailed,
                       ),
                     ),
                 ],
@@ -593,7 +641,7 @@ class _ClubNotifyPageState extends ConsumerState<ClubNotifyPage> {
             0,
           ),
           child: Text(
-            '不会下发手机号；发送后可按失败项重试。分群为空时不会创建空任务。',
+            stringsOf(context).notificationPrivacyHint,
             style: TextStyle(
               fontSize: CyTokens.typeCaption,
               height: 1.5,
@@ -611,7 +659,7 @@ class _ClubNotifyPageState extends ConsumerState<ClubNotifyPage> {
       padding: const EdgeInsets.only(top: CyTokens.space1),
       child: CyNativeButton(
         key: const Key('notify-preview'),
-        label: busy ? '正在预览…' : '预览受众',
+        label: busy ? stringsOf(context).notificationPreviewing : stringsOf(context).notificationPreview,
         role: CyNativeButtonRole.secondary,
         width: double.infinity,
         onPressed: (busy || _sending) ? null : _preview,

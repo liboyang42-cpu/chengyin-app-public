@@ -1,3 +1,7 @@
+import 'coop_strings.dart';
+import '../../l10n/strings.dart';
+import '../auth/auth_controller.dart';
+import '../../core/network/request_session_scope.dart';
 import '../../core/theme/cy_palette.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -28,8 +32,8 @@ class CoopCandidatesPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    const String title = '承接候选';
-    const String needLogin = '登录后查看承接候选';
+    final String title = stringsOf(context).coopCandidates;
+    final String needLogin = stringsOf(context).coopLoginCandidates;
     final Widget? gate = coopLoginGate(
       context,
       ref,
@@ -40,7 +44,7 @@ class CoopCandidatesPage extends ConsumerWidget {
     final async = ref.watch(coopCandidatesProvider(topicId));
     return CupertinoPageScaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      navigationBar: const CupertinoNavigationBar(middle: Text(title)),
+      navigationBar: CupertinoNavigationBar(middle: Text(title)),
       child: Material(
         color: Colors.transparent,
         child: SafeArea(
@@ -57,17 +61,17 @@ class CoopCandidatesPage extends ConsumerWidget {
                       ref.invalidate(coopCandidatesProvider(topicId)),
                 );
               }
-              final msg = coopErrorSub(e);
+              final msg = coopErrorSub(e, context: context);
               // ★ 「仅主题发布者可查看候选池」是权限态 —— 重试多少次都不会变,不给重试。
               if (msg.contains('仅主题发布者')) {
-                return const StatusView(
-                  message: '只有主题发布者能看候选池',
-                  sub: '你不是这个主题的发布者',
+                return StatusView(
+                  message: stringsOf(context).coopOnlyPublisher,
+                  sub: stringsOf(context).coopNotPublisher,
                   large: true,
                 );
               }
               return StatusView(
-                message: '候选池没能加载出来',
+                message: stringsOf(context).coopCandidatesLoadFailed,
                 sub: msg,
                 large: true,
                 onRetry: () => ref.invalidate(coopCandidatesProvider(topicId)),
@@ -75,9 +79,9 @@ class CoopCandidatesPage extends ConsumerWidget {
             },
             data: (CoopCandidates c) {
               if (c.isEmpty) {
-                return const StatusView(
-                  message: '还没有承接候选',
-                  sub: '俱乐部申请承接或商家报名后,会出现在这里',
+                return StatusView(
+                  message: stringsOf(context).coopNoCandidates,
+                  sub: stringsOf(context).coopNoCandidatesHint,
                   large: true,
                 );
               }
@@ -88,7 +92,7 @@ class CoopCandidatesPage extends ConsumerWidget {
                   padding: const EdgeInsets.all(CyTokens.pageX),
                   children: <Widget>[
                     if (c.clubApplies.isNotEmpty) ...<Widget>[
-                      const CySectionTitle('俱乐部申请'),
+                      CySectionTitle(stringsOf(context).coopClubApplications),
                       const SizedBox(height: CyTokens.space2),
                       ...c.clubApplies.map(
                         (ClubApply a) => _ApplyTile(apply: a, topicId: topicId),
@@ -96,7 +100,7 @@ class CoopCandidatesPage extends ConsumerWidget {
                       const SizedBox(height: CyTokens.space4),
                     ],
                     if (c.registrations.isNotEmpty) ...<Widget>[
-                      const CySectionTitle('已报名候选'),
+                      CySectionTitle(stringsOf(context).coopRegisteredCandidates),
                       const SizedBox(height: CyTokens.space2),
                       ...c.registrations.map(
                         (CandidateRegistration r) =>
@@ -128,15 +132,30 @@ class _RegistrationTile extends ConsumerStatefulWidget {
 }
 
 class _RegistrationTileState extends ConsumerState<_RegistrationTile> {
+  @override
+  void initState() {
+    super.initState();
+    _requestScope = ref.read(authControllerProvider.notifier).requestScope(
+      ref.read(authControllerProvider).user?.id ?? 0,
+    );
+  }
+
+  late final RequestSessionScope _requestScope;
+
   bool _busy = false;
   bool _confirmed = false;
 
-  Future<void> _confirm() async {
+  Future<void> _confirm() => RequestSessionScope.run(
+    _requestScope,
+    () => _confirmScoped(),
+  );
+
+  Future<void> _confirmScoped() async {
     final bool ok = await cyConfirm(
       context,
-      title: '确认「${widget.reg.name}」为本次候选?',
-      content: '确认只是占住这个位置,不等于成交——接下来还要向对方发出带条款的合作邀约,对方接受才算合作达成。',
-      confirmText: '确认候选',
+      title: stringsOf(context).coopConfirmCandidateName(widget.reg.name),
+      content: stringsOf(context).coopCandidateConfirmHint,
+      confirmText: stringsOf(context).coopConfirmCandidate,
     );
     if (!ok || !mounted) return;
     setState(() => _busy = true);
@@ -147,9 +166,9 @@ class _RegistrationTileState extends ConsumerState<_RegistrationTile> {
       setState(() => _confirmed = true);
       await cyConfirm(
         context,
-        title: '已选定该候选',
-        content: '请向该商家发出带条款的合作邀约,对方接受后才成合作单。',
-        confirmText: '知道了',
+        title: stringsOf(context).coopCandidateSelected,
+        content: stringsOf(context).coopCandidateSendTerms,
+        confirmText: stringsOf(context).coopGotIt,
         showCancel: false,
       );
       if (!mounted) return;
@@ -158,7 +177,7 @@ class _RegistrationTileState extends ConsumerState<_RegistrationTile> {
       if (!mounted) return;
       CyNativeNotice.show(
         context,
-        e.toString().replaceFirst('Exception: ', ''),
+        coopErrorSub(e, context: context),
         isError: true,
       );
     } finally {
@@ -171,10 +190,10 @@ class _RegistrationTileState extends ConsumerState<_RegistrationTile> {
     return CyCell(
       title: widget.reg.name,
       trailing: _confirmed
-          ? const Text('已确认')
+          ? Text(stringsOf(context).coopConfirmed)
           : CyNativeButton(
               width: 120,
-              label: '确认候选',
+              label: stringsOf(context).coopConfirmCandidate,
               role: CyNativeButtonRole.secondary,
               loading: _busy,
               onPressed: _busy ? null : _confirm,
@@ -193,14 +212,29 @@ class _ApplyTile extends ConsumerStatefulWidget {
 }
 
 class _ApplyTileState extends ConsumerState<_ApplyTile> {
+  @override
+  void initState() {
+    super.initState();
+    _requestScope = ref.read(authControllerProvider.notifier).requestScope(
+      ref.read(authControllerProvider).user?.id ?? 0,
+    );
+  }
+
+  late final RequestSessionScope _requestScope;
+
   bool _busy = false;
 
-  Future<void> _decline() async {
+  Future<void> _decline() => RequestSessionScope.run(
+    _requestScope,
+    () => _declineScoped(),
+  );
+
+  Future<void> _declineScoped() async {
     final bool ok = await cyConfirm(
       context,
-      title: '婉拒「${widget.apply.clubName}」的申请?',
-      content: '婉拒后对方可以再次申请。',
-      confirmText: '婉拒',
+      title: stringsOf(context).coopDeclineApplicationName(widget.apply.clubName),
+      content: stringsOf(context).coopDeclineReapply,
+      confirmText: stringsOf(context).coopDecline,
       danger: true,
     );
     if (!ok || !mounted) return;
@@ -209,12 +243,12 @@ class _ApplyTileState extends ConsumerState<_ApplyTile> {
       await ref.read(coopApiProvider).declineApply(widget.apply.id);
       ref.invalidate(coopCandidatesProvider(widget.topicId));
       if (!mounted) return;
-      CyNativeNotice.show(context, '已婉拒');
+      CyNativeNotice.show(context, stringsOf(context).coopDeclined);
     } catch (e) {
       if (!mounted) return;
       CyNativeNotice.show(
         context,
-        e.toString().replaceFirst('Exception: ', ''),
+        coopErrorSub(e, context: context),
         isError: true,
       );
     } finally {
@@ -242,7 +276,7 @@ class _ApplyTileState extends ConsumerState<_ApplyTile> {
               CyAvatar(url: a.clubLogo, fallback: a.clubName.characters.first),
               const SizedBox(width: CyTokens.space2),
               Expanded(child: Text(a.clubName, style: textTheme.titleSmall)),
-              CyTag(label: a.statusText),
+              CyTag(label: coopCandidateStatus(context, a.status)),
             ],
           ),
           // 留言为空时整行不渲染,不留一个空的引号框。
@@ -262,7 +296,7 @@ class _ApplyTileState extends ConsumerState<_ApplyTile> {
             SizedBox(
               width: double.infinity,
               child: CyNativeButton(
-                label: '婉拒',
+                label: stringsOf(context).coopDecline,
                 role: CyNativeButtonRole.destructive,
                 loading: _busy,
                 onPressed: _busy ? null : _decline,
@@ -270,7 +304,7 @@ class _ApplyTileState extends ConsumerState<_ApplyTile> {
             )
           else
             Text(
-              a.status == 3 ? '已转为邀约,去「邀约」里继续' : '这条申请已处理',
+              a.status == 3 ? stringsOf(context).coopContinueInvite : stringsOf(context).coopApplicationHandled,
               style: textTheme.bodySmall?.copyWith(
                 color: CyPalette.of(context).textTertiary,
               ),

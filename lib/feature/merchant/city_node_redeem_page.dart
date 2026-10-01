@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../core/providers.dart';
+import '../../l10n/strings.dart';
 import '../../core/theme/cy_palette.dart';
 import '../../core/theme/cy_tokens.dart';
 import '../../core/widgets/cy_native_button.dart';
@@ -83,9 +84,9 @@ class _CityNodeRedeemPageState extends ConsumerState<CityNodeRedeemPage> {
   Future<void> _manual() async {
     final String? code = await showCySystemTextInputAlert(
       context: context,
-      title: '手动输入核销码',
-      placeholder: '玩家出示的那串字符',
-      confirmText: '核销',
+      title: stringsOf(context).merchantRedemptionManualTitle,
+      placeholder: stringsOf(context).merchantRedemptionPlayerCodeHint,
+      confirmText: stringsOf(context).merchantRedemptionRedeem,
       keyboardKind: CySystemKeyboardKind.ascii,
     );
     if (code == null || code.isEmpty || !mounted) return;
@@ -100,7 +101,7 @@ class _CityNodeRedeemPageState extends ConsumerState<CityNodeRedeemPage> {
     return CupertinoPageScaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       navigationBar: CupertinoNavigationBar(
-        middle: const Text('据点核销'),
+        middle: Text(stringsOf(context).merchantRedemptionCityTitle),
         trailing: CupertinoButton(
           key: const Key('citynode-manual'),
           onPressed: _manual,
@@ -108,7 +109,7 @@ class _CityNodeRedeemPageState extends ConsumerState<CityNodeRedeemPage> {
           padding: EdgeInsets.zero,
           child: Semantics(
             button: true,
-            label: '手动输入',
+            label: stringsOf(context).merchantRedemptionManual,
             child: const Icon(CupertinoIcons.keyboard),
           ),
         ),
@@ -120,7 +121,7 @@ class _CityNodeRedeemPageState extends ConsumerState<CityNodeRedeemPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              const CyPageTitle('扫玩家的据点码'),
+              CyPageTitle(stringsOf(context).merchantRedemptionCityScanTitle),
               Expanded(
                 child: Stack(
                   children: <Widget>[
@@ -198,7 +199,7 @@ class CityNodeRedeemResult extends StatelessWidget {
                 child: CyNativeButton(
                   key: const Key('citynode-next'),
                   onPressed: onNext,
-                  label: '继续扫描',
+                  label: stringsOf(context).merchantRedemptionNext,
                   width: double.infinity,
                 ),
               ),

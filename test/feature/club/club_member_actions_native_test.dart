@@ -1,6 +1,7 @@
 import 'package:chengyin_app/core/widgets/cy_confirm.dart';
 import 'package:chengyin_app/data/models/club.dart';
 import 'package:chengyin_app/feature/club/club_member_actions.dart';
+import 'package:chengyin_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -35,10 +36,19 @@ Future<void> _pumpAction(
   bool viewerIsCreator = true,
   bool canGovernMembers = false,
   CyNativeConfirmPresenter? confirmPresenter,
+  Locale locale = const Locale('zh'),
+  double textScale = 1,
 }) async {
   await tester.pumpWidget(
     ProviderScope(
       child: MaterialApp(
+        locale: locale,
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(textScale)),
+          child: child!,
+        ),
         home: Scaffold(
           body: ClubMemberActions(
             clubId: 3,
@@ -91,6 +101,26 @@ Future<void> _pumpActionRouted(
 }
 
 void main() {
+  testWidgets('English member actions wrap at large text and retain confirmation', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(320, 700));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final confirm = _ConfirmPresenter();
+    await _pumpAction(
+      tester, member: _member(role: 1), canGovernMembers: true,
+      confirmPresenter: confirm, locale: const Locale('en'), textScale: 1.8,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Remove admin role'), findsOneWidget);
+    expect(find.text('Temporary ban'), findsOneWidget);
+    expect(find.text('Remove'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.byKey(const Key('member-role-7')));
+    await tester.pumpAndSettle();
+    expect(confirm.request?.title, 'Remove administrator role');
+    expect(confirm.request?.content, contains('no longer be able'));
+    expect(tester.takeException(), isNull);
+  });
+
   test('成员行不得把两个源入口折叠成 ellipsis 菜单', () {
     final String code = codeOf('lib/feature/club/club_member_actions.dart');
     expect(code.contains('CupertinoIcons.ellipsis'), isFalse);

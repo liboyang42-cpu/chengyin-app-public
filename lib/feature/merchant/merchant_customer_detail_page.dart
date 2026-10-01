@@ -1,3 +1,5 @@
+import 'merchant_customer_detail_strings.dart';
+import '../../l10n/strings.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
@@ -85,7 +87,7 @@ class _MerchantCustomerDetailPageState
     if (widget.customerMemberId <= 0) {
       setState(() {
         _pageState = _CustomerDetailPageState.error;
-        _errorMessage = '客户ID无效';
+        _errorMessage = stringsOf(context).merchantCustomerDetailInvalidId;
       });
       return;
     }
@@ -112,13 +114,13 @@ class _MerchantCustomerDetailPageState
         _pageState = error.isPermissionDenied
             ? _CustomerDetailPageState.noPermission
             : _CustomerDetailPageState.error;
-        _errorMessage = error.message;
+        _errorMessage = merchantCustomerApiError(context, error);
       });
     } on Object {
       if (!mounted || token != _requestToken) return;
       setState(() {
         _pageState = _CustomerDetailPageState.error;
-        _errorMessage = '网络连接失败，请稍后重试';
+        _errorMessage = stringsOf(context).merchantCustomerDetailNetwork;
       });
     }
   }
@@ -151,11 +153,11 @@ class _MerchantCustomerDetailPageState
     if (!_access.canSegmentCrm || _tagSubmitting) return;
     final String name = _tagController.text.trim();
     if (name.isEmpty) {
-      setState(() => _tagError = '请填写标签名称');
+      setState(() => _tagError = stringsOf(context).merchantCustomerDetailTagRequired);
       return;
     }
     if (name.length > 16) {
-      setState(() => _tagError = '标签最多16字');
+      setState(() => _tagError = stringsOf(context).merchantCustomerDetailTagLength);
       return;
     }
     final String fingerprint = '$name|#2E6D5A';
@@ -183,12 +185,12 @@ class _MerchantCustomerDetailPageState
         _tagSubmitting = false;
         _tagError = '';
       });
-      await _refreshAfterMutation(receipt.message);
+      await _refreshAfterMutation(merchantCustomerApiReceipt(context, receipt));
     } on Object catch (error) {
       if (!mounted) return;
       setState(() {
         _tagSubmitting = false;
-        _tagError = _message(error, '客户标签保存失败');
+        _tagError = _message(context, error, stringsOf(context).merchantCustomerDetailTagError);
       });
     }
   }
@@ -197,11 +199,11 @@ class _MerchantCustomerDetailPageState
     if (!_access.canSegmentCrm || _noteSubmitting) return;
     final String content = _noteController.text.trim();
     if (content.isEmpty) {
-      setState(() => _noteError = '请填写跟进备注');
+      setState(() => _noteError = stringsOf(context).merchantCustomerDetailNoteRequired);
       return;
     }
     if (content.length > 500) {
-      setState(() => _noteError = '跟进备注最多500字');
+      setState(() => _noteError = stringsOf(context).merchantCustomerDetailNoteLength);
       return;
     }
     final String fingerprint = '${_correctsNoteId ?? ''}|$content';
@@ -229,12 +231,12 @@ class _MerchantCustomerDetailPageState
         _noteSubmitting = false;
         _noteError = '';
       });
-      await _refreshAfterMutation(receipt.message);
+      await _refreshAfterMutation(merchantCustomerApiReceipt(context, receipt));
     } on Object catch (error) {
       if (!mounted) return;
       setState(() {
         _noteSubmitting = false;
-        _noteError = _message(error, '跟进备注保存失败');
+        _noteError = _message(context, error, stringsOf(context).merchantCustomerDetailNoteError);
       });
     }
   }
@@ -251,7 +253,7 @@ class _MerchantCustomerDetailPageState
       setState(() => _detail = detail);
     } on Object {
       if (!mounted || token != _requestToken) return;
-      CyNativeNotice.show(context, '操作已成功，但详情刷新失败', isError: true);
+      CyNativeNotice.show(context, stringsOf(context).merchantCustomerDetailRefreshError, isError: true);
     }
   }
 
@@ -284,9 +286,9 @@ class _MerchantCustomerDetailPageState
     }
     final bool confirmed = await cyConfirm(
       context,
-      title: '隐藏跟进记录',
-      content: '原文会保留在审计记录中，客户时间线不再显示。',
-      confirmText: '隐藏',
+      title: stringsOf(context).merchantCustomerDetailHideTitle,
+      content: stringsOf(context).merchantCrmPolicyHideAudit,
+      confirmText: stringsOf(context).merchantCustomerDetailHide,
       danger: true,
     );
     if (!confirmed || !mounted) return;
@@ -309,11 +311,11 @@ class _MerchantCustomerDetailPageState
       if (!mounted) return;
       _hideRequestIds.remove(noteId);
       setState(() => _hidingNoteId = null);
-      await _refreshAfterMutation(receipt.message);
+      await _refreshAfterMutation(merchantCustomerApiReceipt(context, receipt));
     } on Object catch (error) {
       if (!mounted) return;
       setState(() => _hidingNoteId = null);
-      CyNativeNotice.show(context, _message(error, '隐藏跟进失败'), isError: true);
+      CyNativeNotice.show(context, _message(context, error, stringsOf(context).merchantCustomerDetailHideError), isError: true);
     }
   }
 
@@ -321,9 +323,9 @@ class _MerchantCustomerDetailPageState
     if (!_access.canSegmentCrm || _removingTagId != null) return;
     final bool confirmed = await cyConfirm(
       context,
-      title: '移除标签',
-      content: '只会移除当前客户与该标签的关系。',
-      confirmText: '移除',
+      title: stringsOf(context).merchantCustomerDetailRemoveTitle,
+      content: stringsOf(context).merchantCrmPolicyRemoveRelation,
+      confirmText: stringsOf(context).merchantCustomerDetailRemove,
       danger: true,
     );
     if (!confirmed || !mounted) return;
@@ -346,11 +348,11 @@ class _MerchantCustomerDetailPageState
       if (!mounted) return;
       _removeTagRequestIds.remove(tagId);
       setState(() => _removingTagId = null);
-      await _refreshAfterMutation(receipt.message);
+      await _refreshAfterMutation(merchantCustomerApiReceipt(context, receipt));
     } on Object catch (error) {
       if (!mounted) return;
       setState(() => _removingTagId = null);
-      CyNativeNotice.show(context, _message(error, '标签移除失败'), isError: true);
+      CyNativeNotice.show(context, _message(context, error, stringsOf(context).merchantCustomerDetailRemoveError), isError: true);
     }
   }
 
@@ -360,7 +362,7 @@ class _MerchantCustomerDetailPageState
       backgroundColor: CupertinoColors.systemGroupedBackground.resolveFrom(
         context,
       ),
-      navigationBar: const CupertinoNavigationBar(middle: Text('客户详情')),
+      navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).merchantCustomerDetailTitle)),
       child: SafeArea(bottom: false, child: _body()),
     );
   }
@@ -371,16 +373,16 @@ class _MerchantCustomerDetailPageState
         return const CySkeleton(type: CySkeletonType.card, count: 4);
       case _CustomerDetailPageState.noPermission:
         return StatusView(
-          message: '当前岗位没有客户查看权限',
-          sub: '请联系店主调整经营团队权限',
+          message: stringsOf(context).merchantCustomerDetailDenied,
+          sub: stringsOf(context).merchantCustomerDetailDeniedHint,
           icon: CupertinoIcons.lock_fill,
           large: true,
         );
       case _CustomerDetailPageState.error:
         return StatusView(
-          message: '客户详情加载失败',
+          message: stringsOf(context).merchantCustomerDetailLoadError,
           sub: _errorMessage,
-          retryLabel: '重新加载',
+          retryLabel: stringsOf(context).merchantCustomerDetailReload,
           onRetry: _loadAccessAndDetail,
           large: true,
         );
@@ -466,7 +468,7 @@ class _ReadyCustomerDetail extends StatelessWidget {
               children: <Widget>[
                 CyAvatar(
                   url: summary.avatar,
-                  fallback: summary.displayName == '未留姓名'
+                  fallback: summary.hasNameFallback
                       ? null
                       : summary.displayName,
                   size: 48,
@@ -477,7 +479,7 @@ class _ReadyCustomerDetail extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
                       Text(
-                        summary.displayName,
+                        summary.hasNameFallback ? stringsOf(context).merchantCrmUnnamed : summary.displayName,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -488,7 +490,7 @@ class _ReadyCustomerDetail extends StatelessWidget {
                       ),
                       const SizedBox(height: CyTokens.space1),
                       Text(
-                        '最近互动 ${summary.lastInteractionTimeText.isEmpty ? '时间待确认' : summary.lastInteractionTimeText}',
+                        stringsOf(context).merchantCustomerDetailLastInteraction(summary.lastInteractionTimeText.isEmpty ? stringsOf(context).merchantCustomerDetailTimeUnknown : summary.lastInteractionTimeText),
                         style: TextStyle(
                           color: CyPalette.of(context).textSecondary,
                           fontSize: CyTokens.typeCaption,
@@ -499,7 +501,7 @@ class _ReadyCustomerDetail extends StatelessWidget {
                 ),
                 const SizedBox(width: CyTokens.space2),
                 Text(
-                  summary.paidAmountText,
+                  summary.paidAmount == null ? stringsOf(context).merchantCustomerDetailAmountDenied : summary.paidAmountText,
                   style: TextStyle(
                     color: CyPalette.of(context).textPrimary,
                     fontSize: CyTokens.typeBody,
@@ -517,28 +519,28 @@ class _ReadyCustomerDetail extends StatelessWidget {
             padding: EdgeInsets.zero,
             child: Row(
               children: <Widget>[
-                _Stat(value: summary.arrivedCount, label: '到店'),
+                _Stat(value: summary.arrivedCount, label: stringsOf(context).merchantCustomerDetailArrived),
                 _Divider(),
-                _Stat(value: summary.pendingCount, label: '待核销'),
+                _Stat(value: summary.pendingCount, label: stringsOf(context).merchantCustomerDetailPending),
                 _Divider(),
-                _Stat(value: summary.refundedCount, label: '退款'),
+                _Stat(value: summary.refundedCount, label: stringsOf(context).merchantCustomerDetailRefunded),
               ],
             ),
           ),
           const SizedBox(height: CyTokens.space5),
-          const _SectionHeader(title: '客户标签', hint: '系统事实与店内标记分开'),
-          const _GroupLabel('系统标签 · 自动更新'),
+          _SectionHeader(title: stringsOf(context).merchantCustomerDetailTags, hint: stringsOf(context).merchantCustomerDetailTagHint),
+          _GroupLabel(stringsOf(context).merchantCustomerDetailSystemTags),
           _TagGroup(
-            emptyText: '暂未形成系统标签',
+            emptyText: stringsOf(context).merchantCustomerDetailSystemEmpty,
             children: <Widget>[
               for (final MerchantCustomerSystemTag tag in detail.systemTags)
                 _TagChip(label: tag.label),
             ],
           ),
           const SizedBox(height: CyTokens.space4),
-          const _GroupLabel('店内标签 · 团队可见'),
+          _GroupLabel(stringsOf(context).merchantCustomerDetailStoreTags),
           _TagGroup(
-            emptyText: '还没有店内标签',
+            emptyText: stringsOf(context).merchantCustomerDetailStoreEmpty,
             children: <Widget>[
               for (final MerchantCustomerTag tag in detail.merchantTags)
                 _TagChip(
@@ -560,7 +562,7 @@ class _ReadyCustomerDetail extends StatelessWidget {
                   child: CupertinoTextField(
                     key: const Key('merchant-customer-tag-input'),
                     controller: tagController,
-                    placeholder: '例如：高频复购',
+                    placeholder: stringsOf(context).merchantCustomerDetailTagExample,
                     textInputAction: TextInputAction.done,
                     inputFormatters: <TextInputFormatter>[
                       LengthLimitingTextInputFormatter(16),
@@ -579,7 +581,7 @@ class _ReadyCustomerDetail extends StatelessWidget {
                 ),
                 const SizedBox(width: CyTokens.space2),
                 CyNativeButton(
-                  label: '添加',
+                  label: stringsOf(context).merchantCustomerDetailAdd,
                   onPressed: onSubmitTag,
                   loading: tagSubmitting,
                   role: CyNativeButtonRole.secondary,
@@ -591,21 +593,21 @@ class _ReadyCustomerDetail extends StatelessWidget {
           if (canEdit) ...<Widget>[
             const SizedBox(height: CyTokens.space5),
             _SectionHeader(
-              title: correctsNoteId == null ? '记录跟进' : '追加更正',
+              title: correctsNoteId == null ? stringsOf(context).merchantCustomerDetailFollowUp : stringsOf(context).merchantCustomerDetailCorrection,
               trailing: correctsNoteId == null
                   ? null
                   : CupertinoButton(
                       minimumSize: const Size(44, 44),
                       padding: EdgeInsets.zero,
                       onPressed: onCancelCorrection,
-                      child: const Text('取消更正'),
+                      child: Text(stringsOf(context).merchantCustomerDetailCancelCorrection),
                     ),
             ),
             if (correctsNoteId != null)
               Padding(
                 padding: const EdgeInsets.only(bottom: CyTokens.space2),
                 child: Text(
-                  '正在更正备注 #$correctsNoteId；系统会追加新记录，不改原文。',
+                  stringsOf(context).merchantCrmPolicyCorrection(correctsNoteId!),
                   style: TextStyle(
                     color: CupertinoColors.systemOrange.resolveFrom(context),
                     fontSize: CyTokens.typeCaption,
@@ -615,7 +617,7 @@ class _ReadyCustomerDetail extends StatelessWidget {
             CupertinoTextField(
               key: const Key('merchant-customer-note-input'),
               controller: noteController,
-              placeholder: '记录偏好、承诺事项或下次联系计划',
+              placeholder: stringsOf(context).merchantCustomerDetailNoteHint,
               minLines: 4,
               maxLines: 6,
               textInputAction: TextInputAction.newline,
@@ -633,16 +635,16 @@ class _ReadyCustomerDetail extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: CyNativeButton(
-                label: '保存跟进',
+                label: stringsOf(context).merchantCustomerDetailSaveNote,
                 onPressed: onSubmitNote,
                 loading: noteSubmitting,
               ),
             ),
           ],
           const SizedBox(height: CyTokens.space5),
-          const _SectionHeader(title: '互动时间线'),
+          _SectionHeader(title: stringsOf(context).merchantCustomerDetailTimeline),
           if (detail.timeline.isEmpty)
-            const _EmptyLine('还没有互动记录')
+            _EmptyLine(stringsOf(context).merchantCustomerDetailTimelineEmpty)
           else
             _Surface(
               padding: EdgeInsets.zero,
@@ -871,7 +873,7 @@ class _TagChip extends StatelessWidget {
             Semantics(
               button: true,
               enabled: onRemove != null && !removing,
-              label: '移除标签 $label',
+              label: stringsOf(context).merchantCustomerDetailRemoveSemantics(label),
               child: CupertinoButton(
                 key: removeKey,
                 minimumSize: const Size(44, 44),
@@ -968,7 +970,15 @@ class _TimelineRow extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    item.typeText,
+                    switch(item.type) {
+'NOTE' => stringsOf(context).merchantCustomerDetailNoteType,
+'NOTE_CORRECTION' => stringsOf(context).merchantCustomerDetailCorrectionType,
+'ARRIVED' => stringsOf(context).merchantCustomerDetailArrivedType,
+'REFUNDED' => stringsOf(context).merchantCustomerDetailRefundedType,
+'REGISTERED' => stringsOf(context).merchantCustomerDetailRegisteredType,
+'CAMPAIGN' => stringsOf(context).merchantCustomerDetailCampaignType,
+_ => item.typeText,
+},
                     style: TextStyle(
                       color: CyPalette.of(context).textSecondary,
                       fontSize: CyTokens.typeCaption,
@@ -989,7 +999,7 @@ class _TimelineRow extends StatelessWidget {
               ],
               const SizedBox(height: CyTokens.space1),
               Text(
-                item.occurredAtText.isEmpty ? '时间待确认' : item.occurredAtText,
+                item.occurredAtText.isEmpty ? stringsOf(context).merchantCustomerDetailTimeUnknown : item.occurredAtText,
                 style: TextStyle(
                   color: CyPalette.of(context).textSecondary,
                   fontSize: CyTokens.typeCaption,
@@ -1008,7 +1018,7 @@ class _TimelineRow extends StatelessWidget {
                       onPressed: hiding
                           ? null
                           : () => onCorrectNote(item.noteId!),
-                      child: const Text('追加更正'),
+                      child: Text(stringsOf(context).merchantCustomerDetailCorrection),
                     ),
                     const SizedBox(width: CyTokens.space2),
                     CupertinoButton(
@@ -1019,7 +1029,7 @@ class _TimelineRow extends StatelessWidget {
                       ),
                       onPressed: hiding ? null : () => onHideNote(item),
                       child: Text(
-                        hiding ? '处理中…' : '隐藏',
+                        hiding ? stringsOf(context).merchantCustomerDetailProcessing : stringsOf(context).merchantCustomerDetailHide,
                         style: TextStyle(
                           color: CupertinoColors.systemRed.resolveFrom(context),
                         ),
@@ -1036,10 +1046,10 @@ class _TimelineRow extends StatelessWidget {
   );
 }
 
-String _message(Object error, String fallback) {
+String _message(BuildContext context, Object error, String fallback) {
   if (error is MerchantCustomerDetailApiException &&
       error.message.trim().isNotEmpty) {
-    return error.message;
+    return merchantCustomerApiError(context, error);
   }
   final String text = error.toString().replaceFirst('Exception: ', '').trim();
   return text.isEmpty ? fallback : text;

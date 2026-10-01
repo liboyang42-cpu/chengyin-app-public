@@ -17,6 +17,7 @@ import 'package:chengyin_app/data/api/club_api.dart';
 import 'package:chengyin_app/data/api/publisher_identity_api.dart';
 import 'package:chengyin_app/feature/auth/auth_controller.dart';
 import 'package:chengyin_app/feature/club/club_apply_page.dart';
+import 'package:chengyin_app/l10n/app_localizations.dart';
 
 import '../../support/fake_publisher_identity.dart';
 
@@ -44,9 +45,12 @@ class _FakeAuthController extends AuthController {
   Future<void> refreshRole() async {}
 }
 
-Widget _app(List<dynamic> overrides, Widget home) => ProviderScope(
+Widget _app(List<dynamic> overrides, Widget home, {Locale locale = const Locale('zh')}) => ProviderScope(
   overrides: overrides.cast(),
   child: MaterialApp(
+    locale: locale,
+    supportedLocales: AppLocalizations.supportedLocales,
+    localizationsDelegates: AppLocalizations.localizationsDelegates,
     debugShowCheckedModeBanner: false,
     home: home,
   ),
@@ -85,6 +89,41 @@ CupertinoButton _submitWidget(WidgetTester tester) =>
     tester.widget<CupertinoButton>(_submitBtn());
 
 void main() {
+  testWidgets('English organizer wizard preserves canonical experience and identity payload', (tester) async {
+    final identity = FakePublisherIdentityApi(registered: true);
+    final club = _FakeClubApi();
+    await tester.pumpWidget(_app([
+      clubApiProvider.overrideWithValue(club),
+      publisherIdentityApiProvider.overrideWithValue(identity),
+      authControllerProvider.overrideWith(() => _FakeAuthController(
+        AuthState(user: null, initialized: true),
+      )),
+    ], const ClubApplyPage(), locale: const Locale('en')));
+    await tester.pumpAndSettle();
+    expect(find.text('Organizer identity'), findsOneWidget);
+    await tester.enterText(find.byKey(const ValueKey<String>('club-apply-leader-name')), '原始称呼');
+    await tester.enterText(find.byKey(const ValueKey<String>('club-apply-phone')), 'raw_wechat_id');
+    await tester.pump();
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('No experience'));
+    await tester.pump();
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Become a club organizer'));
+    await tester.pumpAndSettle();
+    expect(club.becomeLeaderPayload?['experience'], '没有经验');
+    expect(club.becomeLeaderPayload?['hasExperience'], 0);
+    expect(club.becomeLeaderPayload?['leaderName'], '原始称呼');
+    expect(club.becomeLeaderPayload?['phone'], 'raw_wechat_id');
+    expect(club.becomeLeaderPayload?.containsKey('idCard'), isFalse);
+    expect(identity.registerCalls, isEmpty);
+    expect(find.text('You are now an organizer'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('进第 4 屏查一次状态;已登记的人收起字段、只回显状态', (
     WidgetTester tester,
   ) async {

@@ -48,7 +48,7 @@ void main() {
       expect(container.read(authControllerProvider).user!.role, role);
       expect(accessReads, 1);
       expect(find.byType(MerchantHomePage), findsOneWidget);
-      expect(find.text('去申请入驻'), findsOneWidget);
+      expect(find.text('Apply as a merchant'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   }

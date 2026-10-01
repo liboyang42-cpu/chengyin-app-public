@@ -1,3 +1,4 @@
+import '../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
@@ -35,9 +36,9 @@ class _ClubJoinRequestsPageState extends ConsumerState<ClubJoinRequestsPage> {
     final memberId = request.memberId;
     final bool confirmed = await cyConfirm(
       context,
-      title: approve ? '通过入会申请' : '拒绝入会申请',
-      content: approve ? '通过后，对方将成为正式成员并可进入群聊。' : '拒绝后，对方不会获得成员权限，可以再次申请。',
-      confirmText: approve ? '通过' : '拒绝',
+      title: approve ? stringsOf(context).clubJoinApproveTitle : stringsOf(context).clubJoinRejectTitle,
+      content: approve ? stringsOf(context).clubJoinApproveBody : stringsOf(context).clubJoinRejectBody,
+      confirmText: approve ? stringsOf(context).clubJoinApprove : stringsOf(context).clubJoinReject,
       danger: !approve,
     );
     if (!confirmed || !mounted) return;
@@ -54,7 +55,7 @@ class _ClubJoinRequestsPageState extends ConsumerState<ClubJoinRequestsPage> {
       if (!mounted) return;
       ref.invalidate(clubJoinRequestsProvider(widget.clubId));
       ref.invalidate(clubDetailProvider(widget.clubId));
-      CyNativeNotice.show(context, approve ? '已通过' : '已拒绝');
+      CyNativeNotice.show(context, approve ? stringsOf(context).clubJoinApproved : stringsOf(context).clubJoinRejected);
     } catch (e) {
       if (!mounted) return;
       CyNativeNotice.show(context, e.toString(), isError: true);
@@ -76,22 +77,22 @@ class _ClubJoinRequestsPageState extends ConsumerState<ClubJoinRequestsPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              const CyPageTitle('入会申请'),
+              CyPageTitle(stringsOf(context).clubJoinRequestsTitle),
               Expanded(
                 child: requests.when(
                   loading: () => const CySkeleton(),
                   error: (Object err, StackTrace st) => StatusView(
-                    message: '入会申请暂时不可用',
-                    sub: '检查网络后重试',
+                    message: stringsOf(context).clubJoinUnavailable,
+                    sub: stringsOf(context).clubPanelRetryNetwork,
                     icon: CupertinoIcons.exclamationmark_triangle,
                     onRetry: () =>
                         ref.invalidate(clubJoinRequestsProvider(widget.clubId)),
                   ),
                   data: (List<JoinRequest> list) {
                     if (list.isEmpty) {
-                      return const StatusView(
-                        message: '还没有入会申请',
-                        sub: '需要审批的加入申请会出现在这里。',
+                      return StatusView(
+                        message: stringsOf(context).clubJoinEmpty,
+                        sub: stringsOf(context).clubJoinEmptyBody,
                         icon: CupertinoIcons.person_badge_plus,
                         large: true,
                       );
@@ -144,7 +145,7 @@ class _RequestRow extends StatelessWidget {
               url: request.avatar,
               fallback: (request.nickname?.isNotEmpty ?? false)
                   ? request.nickname!
-                  : '玩',
+                  : stringsOf(context).clubJoinAvatarFallback,
               size: 44,
             ),
             const SizedBox(width: CyTokens.space3),
@@ -155,14 +156,16 @@ class _RequestRow extends StatelessWidget {
                   Text(
                     (request.nickname?.isNotEmpty ?? false)
                         ? request.nickname!
-                        : '用户${request.memberId}',
+                        : stringsOf(context).clubJoinUser(request.memberId),
                     style: textTheme.bodyMedium,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: CyTokens.space1),
                   Text(
-                    request.requestTimeText,
+                    (request.joinTime?.isEmpty ?? true)
+                        ? stringsOf(context).clubJoinTimeUnknown
+                        : request.requestTimeText,
                     style: textTheme.labelSmall?.copyWith(
                       color: AppColors.textSecondary,
                     ),
@@ -180,9 +183,9 @@ class _RequestRow extends StatelessWidget {
                   horizontal: CyTokens.space1,
                 ),
                 minimumSize: const Size(44, 44),
-                child: const Text(
-                  '拒绝',
-                  style: TextStyle(color: AppColors.danger),
+                child: Text(
+                  stringsOf(context).clubJoinReject,
+                  style: const TextStyle(color: AppColors.danger),
                 ),
               ),
             ),
@@ -202,7 +205,7 @@ class _RequestRow extends StatelessWidget {
                     : CyTokens.actionPrimaryFg,
                 child: busy
                     ? const CupertinoActivityIndicator()
-                    : const Text('通过'),
+                    : Text(stringsOf(context).clubJoinApprove),
               ),
             ),
           ],

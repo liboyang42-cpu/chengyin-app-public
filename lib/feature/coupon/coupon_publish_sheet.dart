@@ -1,3 +1,6 @@
+import '../../data/api/coupon_api.dart';
+import 'merchant_coupon_strings.dart';
+import '../../l10n/strings.dart';
 // 发布优惠券(商家侧)—— 对应小程序 utils/coupon-form.js + subpackageMember/couponInfo。
 //
 // App 此前**发不了券**:只有「我发布的券」列表(看),没有创建入口,
@@ -127,10 +130,10 @@ class _SheetState extends ConsumerState<_Sheet> {
     }
     final bool discard = await cyConfirm(
       context,
-      title: '放弃编辑？',
-      content: '已填写的优惠券内容不会保存。',
-      confirmText: '放弃',
-      cancelText: '继续编辑',
+      title: stringsOf(context).merchantCouponDiscardTitle,
+      content: stringsOf(context).merchantCouponDiscardBody,
+      confirmText: stringsOf(context).merchantCouponDiscard,
+      cancelText: stringsOf(context).merchantCouponKeepEditing,
     );
     if (discard && mounted) Navigator.of(context).pop();
   }
@@ -143,7 +146,7 @@ class _SheetState extends ConsumerState<_Sheet> {
       initialDateTime: (start ? _start : _end) ?? now,
       minimumDate: now.subtract(const Duration(days: 1)),
       maximumDate: now.add(const Duration(days: 365 * 2)),
-      title: start ? '选择开始日期' : '选择结束日期',
+      title: start ? stringsOf(context).merchantCouponStartDate : stringsOf(context).merchantCouponEndDate,
     );
     if (d == null || !mounted) return;
     setState(() => start ? _start = d : _end = d);
@@ -153,9 +156,9 @@ class _SheetState extends ConsumerState<_Sheet> {
     if (_busy || _blocker != null) return;
     setState(() => _busy = true);
     try {
-      final String msg = await ref
+      final CouponPublishReceipt receipt = await ref
           .read(couponApiProvider)
-          .publish(
+          .publishWithReceipt(
             name: _name.text.trim(),
             startTime: _start!,
             endTime: _end!,
@@ -165,7 +168,8 @@ class _SheetState extends ConsumerState<_Sheet> {
           );
       if (!mounted) return;
       Navigator.of(context).pop(true);
-      CyNativeNotice.show(context, msg);
+      CyNativeNotice.show(context, receipt.hasLocalMessage
+          ? stringsOf(context).merchantCouponPublished : receipt.message);
     } catch (e) {
       if (!mounted) return;
       setState(() => _busy = false);
@@ -178,11 +182,12 @@ class _SheetState extends ConsumerState<_Sheet> {
   /// Exception(msg) 是 coupon_api 透传的后端原话,剥掉壳直接给用户;
   /// DioException(断网/超时/非 2xx)按真源 `getRequestErrorMessage(err,'网络错误,请重试')`
   /// 收敛 —— 不把 `DioException [bad response] …` 糊到 toast 上。
-  static String _submitErrorText(Object e) {
+  String _submitErrorText(Object e) {
+    if (e is CouponLocalFailure) return couponLocalFailureText(context, e);
     if (e is DioException) {
       final data = e.response?.data;
       final msg = data is Map ? data['msg'] : null;
-      return (msg is String && msg.trim().isNotEmpty) ? msg.trim() : '网络错误，请重试';
+      return (msg is String && msg.trim().isNotEmpty) ? msg.trim() : stringsOf(context).merchantCouponNetworkError;
     }
     return e.toString().replaceFirst('Exception: ', '');
   }
@@ -209,7 +214,7 @@ class _SheetState extends ConsumerState<_Sheet> {
     return CupertinoPageScaffold(
       backgroundColor: palette.bgPage,
       resizeToAvoidBottomInset: true,
-      navigationBar: const CupertinoNavigationBar(middle: Text('优惠券设置')),
+      navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).merchantCouponSettings)),
       child: SafeArea(
         top: false,
         child: ListView(
@@ -221,13 +226,13 @@ class _SheetState extends ConsumerState<_Sheet> {
             CyTokens.space4 + MediaQuery.viewInsetsOf(context).bottom,
           ),
           children: <Widget>[
-            _FieldLabel(text: '优惠券名称', required: true),
+            _FieldLabel(text: stringsOf(context).merchantCouponName, required: true),
             const SizedBox(height: CyTokens.space2),
             CupertinoTextField(
               controller: _name,
               key: const Key('coupon-name'),
               onChanged: (_) => setState(() {}),
-              placeholder: '请输入优惠券名称',
+              placeholder: stringsOf(context).merchantCouponEnterName,
               placeholderStyle: placeholderStyle,
               style: inputStyle,
               padding: const EdgeInsets.all(CyTokens.space3),
@@ -239,14 +244,14 @@ class _SheetState extends ConsumerState<_Sheet> {
               clearButtonMode: OverlayVisibilityMode.editing,
             ),
             const SizedBox(height: CyTokens.space4),
-            _FieldLabel(text: '优惠券日期', required: true),
+            _FieldLabel(text: stringsOf(context).merchantCouponDates, required: true),
             const SizedBox(height: CyTokens.space2),
             Row(
               children: <Widget>[
                 Expanded(
                   child: _DateBtn(
                     keyName: 'coupon-start',
-                    label: '开始',
+                    label: stringsOf(context).merchantCouponStart,
                     value: _start,
                     onTap: () => _pick(true),
                   ),
@@ -265,7 +270,7 @@ class _SheetState extends ConsumerState<_Sheet> {
                 Expanded(
                   child: _DateBtn(
                     keyName: 'coupon-end',
-                    label: '结束',
+                    label: stringsOf(context).merchantCouponEnd,
                     value: _end,
                     onTap: () => _pick(false),
                   ),
@@ -273,7 +278,7 @@ class _SheetState extends ConsumerState<_Sheet> {
               ],
             ),
             const SizedBox(height: CyTokens.space4),
-            _FieldLabel(text: '投放数', required: true),
+            _FieldLabel(text: stringsOf(context).merchantCouponQuantity, required: true),
             const SizedBox(height: CyTokens.space2),
             CupertinoTextField(
               controller: _count,
@@ -283,7 +288,7 @@ class _SheetState extends ConsumerState<_Sheet> {
                 FilteringTextInputFormatter.digitsOnly,
               ],
               onChanged: (_) => setState(() {}),
-              placeholder: '请输入投放数量',
+              placeholder: stringsOf(context).merchantCouponEnterQuantity,
               placeholderStyle: placeholderStyle,
               style: inputStyle,
               padding: const EdgeInsets.all(CyTokens.space3),
@@ -291,21 +296,21 @@ class _SheetState extends ConsumerState<_Sheet> {
               textInputAction: TextInputAction.next,
             ),
             const SizedBox(height: CyTokens.space4),
-            _FieldLabel(text: '优惠券类型', required: true),
+            _FieldLabel(text: stringsOf(context).merchantCouponCouponType, required: true),
             const SizedBox(height: CyTokens.space2),
             _CouponTypePicker(
               value: _type,
               onChanged: (int value) => setState(() => _type = value),
             ),
             const SizedBox(height: CyTokens.space4),
-            const _FieldLabel(text: '优惠券说明'),
+            _FieldLabel(text: stringsOf(context).merchantCouponDescription),
             const SizedBox(height: CyTokens.space2),
             CupertinoTextField(
               controller: _desc,
               key: const Key('coupon-desc'),
               minLines: 2,
               maxLines: 5,
-              placeholder: '请输入优惠券说明',
+              placeholder: stringsOf(context).merchantCouponEnterDescription,
               placeholderStyle: placeholderStyle,
               style: inputStyle,
               padding: const EdgeInsets.all(CyTokens.space3),
@@ -326,7 +331,7 @@ class _SheetState extends ConsumerState<_Sheet> {
                     color: palette.actionSecondaryBg,
                     foregroundColor: palette.textPrimary,
                     onPressed: _busy ? null : _cancel,
-                    child: const Text('取消'),
+                    child: Text(stringsOf(context).merchantCouponCancel),
                   ),
                 ),
                 const SizedBox(width: CyTokens.space2),
@@ -350,7 +355,7 @@ class _SheetState extends ConsumerState<_Sheet> {
                     // ★ 按钮上直接写缺什么 —— 灰按钮不说话等于把人堵在原地。
                     child: _busy
                         ? const CupertinoActivityIndicator()
-                        : Text(_blocker ?? '发布优惠券'),
+                        : Text(_blocker == null ? stringsOf(context).merchantCouponPublish : merchantCouponLocalText(context, _blocker!)),
                   ),
                 ),
               ],
@@ -404,19 +409,19 @@ class _CouponTypePicker extends StatelessWidget {
       context: context,
       semanticsDismissible: true,
       builder: (BuildContext context) => CupertinoActionSheet(
-        title: const Text('类型'),
+        title: Text(stringsOf(context).merchantCouponType),
         actions: <Widget>[
           for (int i = 0; i < kCouponTypePicker.length; i++)
             CupertinoActionSheetAction(
               key: Key('coupon-type-option-$i'),
               isDefaultAction: i == value,
               onPressed: () => Navigator.of(context).pop(i),
-              child: Text(kCouponTypePicker[i]),
+              child: Text(merchantCouponLocalText(context, kCouponTypePicker[i])),
             ),
         ],
         cancelButton: CupertinoActionSheetAction(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('取消'),
+          child: Text(stringsOf(context).merchantCouponCancel),
         ),
       ),
     );
@@ -443,7 +448,7 @@ class _CouponTypePicker extends StatelessWidget {
           onPressed: () => _show(context),
           child: Row(
             children: <Widget>[
-              Expanded(child: Text(kCouponTypePicker[value])),
+              Expanded(child: Text(merchantCouponLocalText(context, kCouponTypePicker[value]))),
               const Icon(CupertinoIcons.chevron_down, size: 16),
             ],
           ),
@@ -489,7 +494,7 @@ class _DateBtn extends StatelessWidget {
               child: Text(
                 // 没选就说「未选」,不显示今天 —— 默认日期会被当成已经选好了。
                 value == null
-                    ? '$label:未选'
+                    ? stringsOf(context).merchantCouponDateUnselected(label)
                     : '$label:${value!.month}/${value!.day}',
                 overflow: TextOverflow.ellipsis,
               ),

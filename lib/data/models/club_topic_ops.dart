@@ -673,6 +673,8 @@ class RecruitOverview {
 class TopicCustomerRow {
   const TopicCustomerRow({
     required this.key,
+    this.nameMissing = false,
+    this.timeMissing = false,
     required this.displayName,
     required this.timeText,
     required this.phoneText,
@@ -681,6 +683,8 @@ class TopicCustomerRow {
   });
 
   final String key;
+  final bool nameMissing;
+  final bool timeMissing;
   final String displayName;
 
   /// 这一行属于哪一场(后端按场次分组,稿上是平铺 —— 时间落到每一行)。
@@ -699,6 +703,7 @@ class TopicCustomerRow {
     final String key = asStr(raw['key']);
     return TopicCustomerRow(
       key: key.isEmpty ? fallbackKey : key,
+      nameMissing: name.isEmpty,
       displayName: name.isEmpty ? '这位成员' : name,
       timeText: asStr(raw['timeText']),
       phoneText: asStr(raw['phoneText']),
@@ -750,6 +755,8 @@ class TopicCustomers {
           rows.add(
             TopicCustomerRow(
               key: row.key,
+              nameMissing: row.nameMissing,
+              timeMissing: row.timeText.isEmpty && timeText.isEmpty,
               displayName: row.displayName,
               timeText: row.timeText.isEmpty
                   ? (timeText.isEmpty ? '时间待定' : timeText)

@@ -303,6 +303,7 @@ class EditionOption {
   EditionOption({
     required this.id,
     required this.label,
+    this.hasGeneratedLabel = false,
     this.topicName = '',
     this.startDate,
     this.executingClubId,
@@ -312,6 +313,7 @@ class EditionOption {
 
   /// `主题名(YYYY-MM-DD)`。
   final String label;
+  final bool hasGeneratedLabel;
 
   final String topicName;
   final String? startDate;
@@ -336,6 +338,7 @@ class EditionOption {
         : '';
     final topicLabel = name.isNotEmpty ? name : '期次 #$id';
     return EditionOption(
+      hasGeneratedLabel: true,
       id: id,
       label: date.isNotEmpty ? '$topicLabel（$date）' : topicLabel,
       topicName: name,

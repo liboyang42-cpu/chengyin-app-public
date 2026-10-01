@@ -1,3 +1,5 @@
+import '../../l10n/strings.dart';
+import 'merchant_node_strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
@@ -12,7 +14,6 @@ import '../../core/widgets/status_view.dart';
 import '../../data/api/merchant_api.dart';
 import '../../data/models/node_template.dart';
 import '../club/club_image_picker.dart';
-import '../../core/widgets/upload_hints.dart';
 import '../../core/widgets/cy_net_image.dart';
 import '../../core/widgets/cy_native_button.dart';
 import '../../core/widgets/cy_widgets.dart';
@@ -147,7 +148,7 @@ class _NodeTemplateEditPageState extends ConsumerState<NodeTemplateEditPage> {
     // ★ 先本地拦一道:让商家在填的时候就知道缺什么,而不是提交完被打回。
     final String? why = d.validate();
     if (why != null) {
-      setState(() => _error = why);
+      setState(() => _error = merchantNodeLocalText(context, why));
       return;
     }
     setState(() {
@@ -173,7 +174,7 @@ class _NodeTemplateEditPageState extends ConsumerState<NodeTemplateEditPage> {
       if (!mounted) return;
       setState(() {
         _saving = false;
-        _error = '没能保存,请重试';
+        _error = stringsOf(context).merchantNodeSaveFailed;
       });
     }
   }
@@ -183,7 +184,7 @@ class _NodeTemplateEditPageState extends ConsumerState<NodeTemplateEditPage> {
     if (_loading) {
       return CupertinoPageScaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        navigationBar: const CupertinoNavigationBar(middle: Text('节点玩法')),
+        navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).merchantNodeExperience)),
         child: const Material(
           color: Colors.transparent,
           child: SafeArea(bottom: false, child: CySkeleton()),
@@ -197,7 +198,7 @@ class _NodeTemplateEditPageState extends ConsumerState<NodeTemplateEditPage> {
     return CupertinoPageScaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       navigationBar: CupertinoNavigationBar(
-        middle: Text(widget.templateId == null ? '创建节点玩法' : '编辑节点玩法'),
+        middle: Text(widget.templateId == null ? stringsOf(context).merchantNodeCreateExperience : stringsOf(context).merchantNodeEditExperience),
       ),
       child: Material(
         color: Colors.transparent,
@@ -207,17 +208,17 @@ class _NodeTemplateEditPageState extends ConsumerState<NodeTemplateEditPage> {
             padding: const EdgeInsets.all(CyTokens.space4),
             children: <Widget>[
               Text(
-                '完善以下内容,为路线打造可落地的现场互动方案',
+                stringsOf(context).merchantNodeExperienceIntro,
                 style: t.bodySmall?.copyWith(color: p.textSecondary),
               ),
               const SizedBox(height: CyTokens.space4),
-              _field('title', '玩法名称', hint: '给这个玩法起个名字'),
-              _field('description', '玩法说明', hint: '玩家到店后看到的介绍', maxLines: 3),
+              _field('title', stringsOf(context).merchantNodeExperienceName, hint: stringsOf(context).merchantNodeExperienceNameHint),
+              _field('description', stringsOf(context).merchantNodeExperienceDescription, hint: stringsOf(context).merchantNodeExperienceDescriptionHint, maxLines: 3),
               // ★ 封面。`NodeTemplateDraft.toJson` 里一直有 imgUrl,
               //   但编辑器**没有这个输入** —— 保存时永远发空,
               //   于是玩法在列表和详情里都没有图。小程序那页有「上传玩法封面」。
               const SizedBox(height: CyTokens.space3),
-              const CySectionTitle('玩法封面'),
+              CySectionTitle(stringsOf(context).merchantNodeExperienceCover),
               const SizedBox(height: CyTokens.space2),
               if ((_draft.imgUrl ?? '').isEmpty)
                 CyNativeButton(
@@ -228,7 +229,7 @@ class _NodeTemplateEditPageState extends ConsumerState<NodeTemplateEditPage> {
                     sfSymbol: 'photo',
                     fallback: CupertinoIcons.photo,
                   ),
-                  label: _uploading ? '上传中…' : uploadHint('上传玩法封面', kHint16x9),
+                  label: _uploading ? stringsOf(context).merchantNodeUploading : stringsOf(context).merchantNodeUploadCoverLandscape,
                   loading: _uploading,
                 )
               else
@@ -251,7 +252,7 @@ class _NodeTemplateEditPageState extends ConsumerState<NodeTemplateEditPage> {
                           key: const Key('template-cover-replace'),
                           onPressed: _uploading ? null : _pickCover,
                           padding: EdgeInsets.zero,
-                          child: const Text('换一张'),
+                          child: Text(stringsOf(context).merchantNodeChangeImage),
                         ),
                         CupertinoButton(
                           key: const Key('template-cover-remove'),
@@ -261,7 +262,7 @@ class _NodeTemplateEditPageState extends ConsumerState<NodeTemplateEditPage> {
                                   () => _draft = _draft.copyWith(imgUrl: ''),
                                 ),
                           padding: EdgeInsets.zero,
-                          child: const Text('移除'),
+                          child: Text(stringsOf(context).merchantNodeRemove),
                         ),
                       ],
                     ),
@@ -285,8 +286,8 @@ class _NodeTemplateEditPageState extends ConsumerState<NodeTemplateEditPage> {
                       Expanded(
                         child: Text(
                           _c['title']!.text.trim().isEmpty
-                              ? '先填玩法名称,AI 才能帮你写'
-                              : 'AI 帮我写',
+                              ? stringsOf(context).merchantNodeAiNeedsName
+                              : stringsOf(context).merchantNodeAiWrite,
                         ),
                       ),
                     ],
@@ -296,7 +297,7 @@ class _NodeTemplateEditPageState extends ConsumerState<NodeTemplateEditPage> {
               const SizedBox(height: CyTokens.space2),
 
               const SizedBox(height: CyTokens.space3),
-              Text('玩家怎么算完成', style: t.labelLarge),
+              Text(stringsOf(context).merchantNodeCompletionMethod, style: t.labelLarge),
               const SizedBox(height: CyTokens.space2),
               // ★ 五种方式各带一句说明 —— 只写名字的话,商家分不清
               //   「扫张贴码」和「拍照打卡」差在哪。
@@ -317,17 +318,17 @@ class _NodeTemplateEditPageState extends ConsumerState<NodeTemplateEditPage> {
               //   商家会填一堆根本不生效的字段。
               if (m == NodeValidationMethod.secretWord) ...<Widget>[
                 const SizedBox(height: CyTokens.space3),
-                _field('questionAnswer', '暗号答案', hint: '玩家要输入的那串字'),
+                _field('questionAnswer', stringsOf(context).merchantNodePassphrase, hint: stringsOf(context).merchantNodePassphraseHint),
               ],
               if (m == NodeValidationMethod.quiz) ...<Widget>[
                 const SizedBox(height: CyTokens.space3),
-                _field('questionName', '题目'),
-                _field('a', '选项 A'),
-                _field('b', '选项 B'),
-                _field('c', '选项 C(可空)'),
-                _field('d', '选项 D(可空)'),
+                _field('questionName', stringsOf(context).merchantNodeQuestion),
+                _field('a', stringsOf(context).merchantNodeOptionA),
+                _field('b', stringsOf(context).merchantNodeOptionB),
+                _field('c', stringsOf(context).merchantNodeOptionC),
+                _field('d', stringsOf(context).merchantNodeOptionD),
                 const SizedBox(height: CyTokens.space2),
-                Text('正确答案', style: t.labelLarge),
+                Text(stringsOf(context).merchantNodeCorrectAnswer, style: t.labelLarge),
                 const SizedBox(height: CyTokens.space1),
                 // 用 CyTabs 的 chip 变体,不用 Material 的 ChoiceChip ——
                 // 后者与全站分段控件不是一套(门禁 no_material_segmented 禁它)。
@@ -347,14 +348,13 @@ class _NodeTemplateEditPageState extends ConsumerState<NodeTemplateEditPage> {
                 const SizedBox(height: CyTokens.space1),
                 // ★ 说清"指到空选项等于没答案" —— 那是最容易犯又最难发现的错。
                 Text(
-                  '正确答案要指到一个**填了内容**的选项;指到空的等于没答案,'
-                  '玩家怎么选都不对。',
+                  stringsOf(context).merchantNodeCorrectAnswerHint,
                   style: t.bodySmall?.copyWith(color: p.textSecondary),
                 ),
               ],
 
               const SizedBox(height: CyTokens.space3),
-              _field('feedback', '完成后的反馈', hint: '玩家完成时看到的一句话', maxLines: 2),
+              _field('feedback', stringsOf(context).merchantNodeFeedback, hint: stringsOf(context).merchantNodeFeedbackHint, maxLines: 2),
 
               if (_error != null) ...<Widget>[
                 const SizedBox(height: CyTokens.space3),
@@ -372,20 +372,20 @@ class _NodeTemplateEditPageState extends ConsumerState<NodeTemplateEditPage> {
                 Padding(
                   padding: const EdgeInsets.only(bottom: CyTokens.space2),
                   child: Text(
-                    _blocker!,
+                    merchantNodeLocalText(context, _blocker!),
                     style: t.bodySmall?.copyWith(color: CyPalette.of(context).statusWarning),
                   ),
                 ),
               CyNativeButton(
                 onPressed: (_saving || _blocker != null) ? null : _save,
-                label: '保存',
+                label: stringsOf(context).merchantNodeSave,
                 width: double.infinity,
                 loading: _saving,
               ),
               const SizedBox(height: CyTokens.space3),
               // 这条接口免人工审,说清楚,免得商家一直等审核。
               Text(
-                '保存后即刻生效(只过内容安全检查,不需要人工审核)。',
+                stringsOf(context).merchantNodeImmediateEffect,
                 style: t.bodySmall?.copyWith(color: p.textSecondary),
               ),
             ],
@@ -496,7 +496,7 @@ class _NodeTemplateEditPageState extends ConsumerState<NodeTemplateEditPage> {
     return Semantics(
       selected: selected,
       button: true,
-      label: value.label,
+      label: merchantNodeLocalText(context, value.label),
       child: CupertinoButton(
         key: Key('node-method-${value.wire}'),
         minimumSize: const Size.fromHeight(56),
@@ -511,9 +511,9 @@ class _NodeTemplateEditPageState extends ConsumerState<NodeTemplateEditPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  Text(value.label, style: textTheme.bodyLarge),
+                  Text(merchantNodeLocalText(context, value.label), style: textTheme.bodyLarge),
                   Text(
-                    value.hint,
+                    merchantNodeLocalText(context, value.hint),
                     style: textTheme.bodySmall?.copyWith(
                       color: palette.textSecondary,
                     ),

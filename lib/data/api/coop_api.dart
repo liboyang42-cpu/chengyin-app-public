@@ -1,3 +1,4 @@
+import '../models/coop_failure.dart';
 import '../../core/network/request_session_scope.dart';
 import '../../core/network/dio_client.dart';
 import '../models/coop_pool.dart';
@@ -214,24 +215,25 @@ class CoopApi {
     try {
       final resp = await _client.dio.post<Map<String, dynamic>>(
         '/api/coop/deposit/refund/retry',
-        options: RequestSessionScope.options(),
+      options: RequestSessionScope.options(),
         data: <String, dynamic>{'inviteId': inviteId},
       );
       res = resp.data ?? const <String, dynamic>{};
     } catch (_) {
       // 真源的 fail / successStatusAbnormal 两个分支都是这一句。
-      throw Exception('退款结果暂无法确认，请先核对，勿重复提交');
+      throw CoopFailure.local(CoopFailureKind.refundUnknown, '退款结果暂无法确认，请先核对，勿重复提交');
     }
-    final String msg = (res['msg'] as String?)?.trim() ?? '';
-    final int? code = (res['code'] as num?)?.toInt();
-    final Object? refundState =
-        (res['data'] as Map<String, dynamic>?)?['refundState'];
-    if (code == 200 && refundState is String && msg.isNotEmpty) return msg;
+    final String msg = res['msg'] is String ? res['msg'] as String : '';
+    final int? code = res['code'] is num ? (res['code'] as num).toInt() : null;
+    final rawData = res['data'];
+    final Object? refundState = rawData is Map ? rawData['refundState'] : null;
+    if (code == 200 && refundState is String && msg.trim().isNotEmpty) return msg;
     if (code != 200) {
       // failureText(res, '退款重试失败'):后端原话优先,没有才用兜底。
-      throw Exception(msg.isNotEmpty ? msg : '退款重试失败');
+      throw msg.trim().isNotEmpty ? CoopFailure.server(msg)
+          : const CoopFailure.local(CoopFailureKind.refundRetry, '退款重试失败');
     }
-    throw Exception('退款结果暂无法确认，请先核对，勿重复提交');
+    throw CoopFailure.local(CoopFailureKind.refundUnknown, '退款结果暂无法确认，请先核对，勿重复提交');
   }
 
   // ---------------------------------------------- 常备权益模板
@@ -253,7 +255,7 @@ class CoopApi {
       template,
     );
     final Object? id = d['id'];
-    if (id is! num) throw Exception('模板没返回编号 —— 别当保存成功了');
+    if (id is! num) throw CoopFailure.local(CoopFailureKind.templateId, '模板没返回编号 —— 别当保存成功了');
     return id.toInt();
   }
 
@@ -426,7 +428,9 @@ class CoopApi {
     final resp = await _client.dio.post<Map<String, dynamic>>(path, data: body, options: RequestSessionScope.options());
     final Map<String, dynamic> res = resp.data ?? <String, dynamic>{};
     if ((res['code'] as num?)?.toInt() != 200) {
-      throw Exception((res['msg'] as String?) ?? '操作失败');
+      final message = res['msg'];
+      throw message is String ? CoopFailure.server(message)
+          : const CoopFailure.local(CoopFailureKind.operation, '操作失败');
     }
     return ((res['data'] as List<dynamic>?) ?? const <dynamic>[])
         .whereType<Map<String, dynamic>>()
@@ -444,7 +448,9 @@ class CoopApi {
     );
     final data = resp.data ?? <String, dynamic>{};
     if ((data['code'] as num?)?.toInt() != 200) {
-      throw Exception((data['msg'] as String?) ?? '操作失败');
+      final message = data['msg'];
+      throw message is String ? CoopFailure.server(message)
+          : const CoopFailure.local(CoopFailureKind.operation, '操作失败');
     }
     return (data['data'] as Map<String, dynamic>?) ?? <String, dynamic>{};
   }
@@ -466,7 +472,7 @@ class CoopApi {
     );
     final int? cid = (data['conversationId'] as num?)?.toInt();
     if (cid == null || cid <= 0) {
-      throw Exception('会话创建失败,请稍后再试');
+      throw CoopFailure.local(CoopFailureKind.conversation, '会话创建失败,请稍后再试');
     }
     return cid;
   }

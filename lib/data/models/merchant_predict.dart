@@ -12,6 +12,7 @@ class PredictRound {
     required this.nodeId,
     required this.playDay,
     required this.nodeName,
+    this.hasCustomNodeName = true,
     required this.question,
     required this.options,
     required this.betCount,
@@ -23,6 +24,7 @@ class PredictRound {
   final int nodeId;
   final String playDay;
   final String nodeName;
+  final bool hasCustomNodeName;
   final String question;
   final List<PredictOption> options;
   final int betCount;
@@ -70,6 +72,7 @@ PredictRound shapePredictRound(Map<String, dynamic> row) {
     rid: '$nodeId:$playDay',
     nodeId: nodeId,
     playDay: playDay,
+    hasCustomNodeName: _text(row['nodeName']).isNotEmpty,
     nodeName: _text(row['nodeName']).isEmpty ? '未命名点位' : _text(row['nodeName']),
     question: _text(row['question']),
     options: options,

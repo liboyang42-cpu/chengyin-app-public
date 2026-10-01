@@ -1,4 +1,5 @@
 import '../../core/network/request_session_scope.dart';
+import '../models/play_root_failure.dart';
 import 'package:dio/dio.dart';
 
 import '../../core/network/dio_client.dart';
@@ -25,7 +26,7 @@ class ClubLeadApi {
     );
     final body = resp.data ?? <String, dynamic>{};
     if ((body['code'] as num?)?.toInt() != 200) {
-      throw Exception((body['msg'] as String?) ?? '加载失败');
+      throw PlayRootFailure.response(PlayRootOperation.teamProgress, body['msg'] as String?, '加载失败');
     }
     return TeamProgress.fromJson(
       (body['data'] as Map<String, dynamic>?) ?? <String, dynamic>{},
@@ -95,7 +96,7 @@ class ClubLeadApi {
     );
     final body = resp.data ?? <String, dynamic>{};
     if ((body['code'] as num?)?.toInt() != 200) {
-      throw Exception((body['msg'] as String?) ?? '操作失败');
+      throw PlayRootFailure.response(PlayRootOperation.teamAction, body['msg'] as String?, '操作失败');
     }
   }
 }

@@ -1,3 +1,4 @@
+import '../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -37,7 +38,7 @@ class MerchantAiInsightPage extends ConsumerWidget {
     return CupertinoPageScaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       // 标题照小程序 `pages/merchant/marketing/ai-insight/index.wxml:7`(cy-nav-bar title)。
-      navigationBar: const CupertinoNavigationBar(middle: Text('店铺参谋')),
+      navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).merchantCouponAdvisor)),
       child: Material(
         color: Colors.transparent,
         child: SafeArea(
@@ -79,14 +80,14 @@ class MerchantAiInsightPage extends ConsumerWidget {
         (error.isClubLeaderConflict ||
             error.isPendingReview ||
             error.isNotMerchant)) {
-      return merchantErrorView(context, error, what: '店铺数据', onRetry: retry);
+      return merchantErrorView(context, error, what: stringsOf(context).merchantCouponStoreData, onRetry: retry);
     }
     return StatusView(
-      message: '店铺数据加载失败',
+      message: stringsOf(context).merchantCouponDataFailed,
       sub: error.toString().replaceFirst('Exception: ', ''),
       large: true,
       onRetry: retry,
-      retryLabel: '重新加载',
+      retryLabel: stringsOf(context).merchantCouponReload,
     );
   }
 }
@@ -129,7 +130,7 @@ class _InsightBody extends StatelessWidget {
               child: Semantics(
                 liveRegion: true,
                 child: Text(
-                  '正在更新经营数据…',
+                  stringsOf(context).merchantCouponUpdating,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     fontSize: CyTokens.typeCaption,
                     color: CyPalette.of(context).textSecondary,
@@ -144,7 +145,7 @@ class _InsightBody extends StatelessWidget {
                 bottom: CyTokens.space2,
               ),
               child: Text(
-                '生成于 ${insight.generatedAt}，次日更新',
+                stringsOf(context).merchantCouponGenerated(insight.generatedAt),
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   fontSize: CyTokens.typeCaption,
                   color: CyPalette.of(context).textSecondary,
@@ -154,45 +155,45 @@ class _InsightBody extends StatelessWidget {
           _MetricCard(
             tone: _MetricTone.a,
             icon: CupertinoIcons.qrcode_viewfinder,
-            name: '到店打卡',
+            name: stringsOf(context).merchantCouponCheckins,
             value: '${facts.checkin.total}',
-            denominator: '/ ${facts.window.isEmpty ? '近30天' : facts.window}',
-            badge: '核销率 ${facts.checkin.redeemRateText}',
+            denominator: '/ ${facts.window.isEmpty ? stringsOf(context).merchantCouponThirtyDays : facts.window}',
+            badge: stringsOf(context).merchantCouponRedeemMetric(facts.checkin.redeemRateText),
             filledSegments: facts.checkin.segmentFillCount,
           ),
           const SizedBox(height: CyTokens.space2_5),
           _MetricCard(
             tone: _MetricTone.b,
             icon: CupertinoIcons.heart,
-            name: '到店顾客',
+            name: stringsOf(context).merchantCouponCustomers,
             value: '${facts.crowd.members}',
-            denominator: '/ ${facts.window.isEmpty ? '近30天' : facts.window}',
-            badge: '复购率 ${facts.checkin.repeatRateText}',
+            denominator: '/ ${facts.window.isEmpty ? stringsOf(context).merchantCouponThirtyDays : facts.window}',
+            badge: stringsOf(context).merchantCouponRepeatMetric(facts.checkin.repeatRateText),
             filledSegments: facts.checkin.repeatSegmentFillCount,
           ),
           const SizedBox(height: CyTokens.space2_5),
           _MetricCard(
             tone: _MetricTone.a,
             icon: CupertinoIcons.flag,
-            name: '合作席位',
+            name: stringsOf(context).merchantCouponCoopPlaces,
             value: '${facts.supply.activeOffers}',
-            denominator: '/ 当前在架',
-            badge: '席位已用 ${facts.supply.quotaUsedRateText}',
+            denominator: stringsOf(context).merchantCouponListed,
+            badge: stringsOf(context).merchantCouponQuotaMetric(facts.supply.quotaUsedRateText),
             filledSegments: facts.supply.segmentFillCount,
           ),
           if (hours.isNotEmpty) ...<Widget>[
             _SectionHeader(
-              title: '到店时段',
+              title: stringsOf(context).merchantCouponVisitTimes,
               trailing: facts.checkin.avgWaitMinutes == null
                   ? null
-                  : '平均等待 ${facts.checkin.avgWaitMinutes}分钟',
+                  : stringsOf(context).merchantCouponWaitMetric(facts.checkin.avgWaitMinutes.toString()),
             ),
             _SurfaceCard(child: _HourChart(hours: hours)),
           ] else ...<Widget>[
             const SizedBox(height: CyTokens.space4),
-            const _InlineEmpty(
-              title: '还没有到店数据',
-              sub: '先去合作中心承接一个主题，玩家到店打卡后这里就有数据了',
+            _InlineEmpty(
+              title: stringsOf(context).merchantCouponNoVisits,
+              sub: stringsOf(context).merchantCouponNoVisitsBody,
             ),
             // 空态光说「还没有」是死路一条;给一条真能走的下一步
             // (小程序 `.empty-cta` → 合作中心)。
@@ -202,7 +203,7 @@ class _InsightBody extends StatelessWidget {
               height: CyTokens.btnH,
               child: CyNativeButton(
                 onPressed: () => onOpenSuggestion('/merchant/coop'),
-                label: '去合作中心看看',
+                label: stringsOf(context).merchantCouponOpenCoop,
                 width: double.infinity,
                 icon: const CyNativeButtonIcon(
                   sfSymbol: 'chevron.forward',
@@ -213,8 +214,8 @@ class _InsightBody extends StatelessWidget {
           ],
           if (facts.crowd.members > 0) ...<Widget>[
             _SectionHeader(
-              title: '客群构成',
-              trailing: '${facts.crowd.members} 位到店顾客',
+              title: stringsOf(context).merchantCouponAudienceMix,
+              trailing: stringsOf(context).merchantCouponVisitorCount(facts.crowd.members),
             ),
             _SurfaceCard(
               child: Column(
@@ -224,7 +225,7 @@ class _InsightBody extends StatelessWidget {
                     Row(
                       children: <Widget>[
                         Text(
-                          '性别',
+                          stringsOf(context).merchantCouponGender,
                           style: Theme.of(context).textTheme.bodySmall
                               ?.copyWith(
                                 fontSize: CyTokens.typeLabel,
@@ -233,7 +234,7 @@ class _InsightBody extends StatelessWidget {
                         ),
                         const SizedBox(width: CyTokens.space2),
                         Text(
-                          facts.crowd.sexText,
+                          stringsOf(context).merchantCouponGenderRates(merchantInsightPercent(facts.crowd.maleRate), merchantInsightPercent(facts.crowd.femaleRate)),
                           style: Theme.of(context).textTheme.bodySmall
                               ?.copyWith(
                                 fontSize: CyTokens.typeLabel,
@@ -257,7 +258,7 @@ class _InsightBody extends StatelessWidget {
             ),
           ],
           // 区块标题照原文(`index.wxml:137`:sec-title「经营解读」),不带 AI 前缀。
-          const _SectionHeader(title: '经营解读'),
+          _SectionHeader(title: stringsOf(context).merchantCouponInsights),
           if (ai != null)
             _SurfaceCard(
               child: Column(
@@ -267,7 +268,7 @@ class _InsightBody extends StatelessWidget {
                   //   拿 3 个玩家编出的经营结论不标,商家会当真。
                   if (facts.lowSample) ...<Widget>[
                     Text(
-                      '数据还少，以下解读仅供参考',
+                      stringsOf(context).merchantCouponLowSample,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         fontSize: CyTokens.typeCaption,
                         color: CyPalette.of(context).textSecondary,
@@ -286,7 +287,7 @@ class _InsightBody extends StatelessWidget {
                   if (ai.audiences.isNotEmpty) ...<Widget>[
                     const SizedBox(height: CyTokens.space3),
                     Text(
-                      '适合人群',
+                      stringsOf(context).merchantCouponAudiences,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         fontSize: CyTokens.typeCaption,
                         color: CyPalette.of(context).textSecondary,
@@ -320,9 +321,7 @@ class _InsightBody extends StatelessWidget {
 
                     // 句末「，上方经营数据不受影响」。
 
-                    '${insight.aiError.isEmpty ? '智能解读暂不可用' : insight.aiError}'
-
-                    '，上方经营数据不受影响',
+                    stringsOf(context).merchantCouponAiError(insight.aiError.isEmpty ? stringsOf(context).merchantCouponUnavailable : insight.aiError),
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       fontSize: CyTokens.typeLabel,
@@ -334,12 +333,12 @@ class _InsightBody extends StatelessWidget {
                   // (小程序 `ai-down-action`,aria-label「重新生成经营解读」)。
                   Semantics(
                     button: true,
-                    label: '重新生成经营解读',
+                    label: stringsOf(context).merchantCouponRegenerateSemantics,
                     child: CupertinoButton(
                       padding: EdgeInsets.zero,
                       minimumSize: const Size(44, 44),
                       onPressed: onRefresh,
-                      child: const Text('重新生成解读'),
+                      child: Text(stringsOf(context).merchantCouponRegenerate),
                     ),
                   ),
                 ],
@@ -348,7 +347,7 @@ class _InsightBody extends StatelessWidget {
           // ★ 推荐区是**后端下发的真实主体**(招商中主题 / 附近商家),不是 AI 编的
           //   —— 所以 AI 降级了它也照常出。
           if (insight.recommendedTopics.isNotEmpty) ...<Widget>[
-            const _SectionHeader(title: '为你推荐的主题'),
+            _SectionHeader(title: stringsOf(context).merchantCouponRecommendedThemes),
             ...insight.recommendedTopics.map(
               (MerchantInsightTopic topic) => Padding(
                 padding: const EdgeInsets.only(bottom: CyTokens.space2_5),
@@ -360,7 +359,7 @@ class _InsightBody extends StatelessWidget {
             ),
           ],
           if (insight.recommendedPartners.isNotEmpty) ...<Widget>[
-            const _SectionHeader(title: '推荐联动的商家'),
+            _SectionHeader(title: stringsOf(context).merchantCouponRecommendedPartners),
             ...insight.recommendedPartners.map(
               (MerchantInsightPartner partner) => Padding(
                 padding: const EdgeInsets.only(bottom: CyTokens.space2_5),
@@ -378,7 +377,7 @@ class _InsightBody extends StatelessWidget {
             ),
           ],
           if (ai != null && ai.suggestions.isNotEmpty) ...<Widget>[
-            const _SectionHeader(title: '建议活动'),
+            _SectionHeader(title: stringsOf(context).merchantCouponSuggestedActivities),
             ...ai.suggestions.map(
               (MerchantInsightSuggestion suggestion) => Padding(
                 padding: const EdgeInsets.only(bottom: CyTokens.space2_5),
@@ -650,7 +649,7 @@ class _HourChart extends StatelessWidget {
                     ),
                     const SizedBox(height: CyTokens.space1),
                     Text(
-                      '${item.hour}时',
+                      stringsOf(context).merchantCouponHour(item.hour),
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         fontSize: CyTokens.typeCaption,
                         color: CyPalette.of(context).textSecondary,
@@ -773,12 +772,12 @@ class _RecTopicCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: CyTokens.space2),
-                    const Wrap(
+                    Wrap(
                       spacing: CyTokens.space1_5,
                       runSpacing: CyTokens.space1,
                       children: <Widget>[
-                        _InsightChip(label: '自由探索'),
-                        _InsightChip(label: '招商中'),
+                        _InsightChip(label: stringsOf(context).merchantCouponExploration),
+                        _InsightChip(label: stringsOf(context).merchantCouponRecruiting),
                       ],
                     ),
                   ],
@@ -789,7 +788,7 @@ class _RecTopicCard extends StatelessWidget {
           const SizedBox(height: CyTokens.space2_5),
           Text(
             // 理由缺失时用小程序那句兜底,不留空(空一行比差一句更让人猜)。
-            topic.reason.isEmpty ? '平台招商中的自由探索主题' : topic.reason,
+            topic.reason.isEmpty ? stringsOf(context).merchantCouponTopicFallback : topic.reason,
             style: t.bodySmall?.copyWith(
               fontSize: CyTokens.typeLabel,
               color: p.textSecondary,
@@ -801,7 +800,7 @@ class _RecTopicCard extends StatelessWidget {
             height: CyTokens.btnH,
             child: CyNativeButton(
               onPressed: onOpen,
-              label: '去申请承接',
+              label: stringsOf(context).merchantCouponApply,
               width: double.infinity,
               icon: const CyNativeButtonIcon(
                 sfSymbol: 'chevron.forward',
@@ -867,8 +866,8 @@ class _RecPartnerCard extends StatelessWidget {
                       spacing: CyTokens.space1_5,
                       runSpacing: CyTokens.space1,
                       children: <Widget>[
-                        if (partner.isOpen) const _InsightChip(label: '营业中'),
-                        const _InsightChip(label: '可联动'),
+                        if (partner.isOpen) _InsightChip(label: stringsOf(context).merchantCouponOpen),
+                        _InsightChip(label: stringsOf(context).merchantCouponAvailable),
                       ],
                     ),
                     if (partner.cityRole.isNotEmpty) ...<Widget>[
@@ -934,7 +933,7 @@ class _RecPartnerCard extends StatelessWidget {
             height: CyTokens.btnH,
             child: CyNativeButton(
               onPressed: onOpen,
-              label: '发起接洽',
+              label: stringsOf(context).merchantCouponContact,
               width: double.infinity,
             ),
           ),
@@ -983,7 +982,7 @@ class _SuggestionCard extends StatelessWidget {
           if (suggestion.audience.isNotEmpty) ...<Widget>[
             const SizedBox(height: CyTokens.space1_5),
             Text(
-              '面向：${suggestion.audience}',
+              stringsOf(context).merchantCouponForAudience(suggestion.audience),
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 fontSize: CyTokens.typeLabel,
                 color: CyPalette.of(context).textPrimary,
@@ -1006,7 +1005,7 @@ class _SuggestionCard extends StatelessWidget {
             height: CyTokens.btnH,
             child: CyNativeButton(
               onPressed: route == null ? null : () => onOpen(route),
-              label: '一键去办',
+              label: stringsOf(context).merchantCouponOrganize,
               width: double.infinity,
               icon: const CyNativeButtonIcon(
                 sfSymbol: 'chevron.forward',

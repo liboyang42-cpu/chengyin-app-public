@@ -1,3 +1,4 @@
+import '../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -23,13 +24,6 @@ class MerchantDecorStoryPage extends ConsumerStatefulWidget {
 
 class _MerchantDecorStoryPageState
     extends ConsumerState<MerchantDecorStoryPage> {
-  static const String _placeholder =
-      '80-200 字讲讲你的店……\n\n'
-      '· 你的店和这条街有什么关系?\n'
-      '· 用户第一次来最应该注意什么?\n'
-      '· 店里有没有一个可以被发现的小细节?\n'
-      '· 你希望用户完成任务后记住哪句话?';
-
   _StoryLoadState _loadState = _StoryLoadState.loading;
   Map<String, dynamic> _profile = <String, dynamic>{};
   MerchantDecor _decor = const MerchantDecor();
@@ -87,7 +81,7 @@ class _MerchantDecorStoryPageState
         ),
       ]);
       if (!mounted) return;
-      CyNativeNotice.show(context, '已保存');
+      CyNativeNotice.show(context, stringsOf(context).merchantStoreSaved);
       _goBack();
     } catch (error) {
       if (mounted) {
@@ -115,7 +109,7 @@ class _MerchantDecorStoryPageState
   Widget build(BuildContext context) => CupertinoPageScaffold(
     backgroundColor: Theme.of(context).scaffoldBackgroundColor,
     navigationBar: CupertinoNavigationBar(
-      middle: const Text('品牌故事'),
+      middle: Text(stringsOf(context).merchantStoreStory),
       leading: CupertinoButton(
         key: const Key('merchant-story-back'),
         minimumSize: const Size(44, 44),
@@ -136,17 +130,17 @@ class _MerchantDecorStoryPageState
       count: 3,
     ),
     _StoryLoadState.error => StatusView(
-      message: '品牌故事加载失败',
-      sub: '网络或登录状态暂时不可用，请重试。',
+      message: stringsOf(context).merchantStoreStoryFailed,
+      sub: stringsOf(context).merchantStoreNetworkSession,
       onRetry: _load,
-      retryLabel: '重新载入',
+      retryLabel: stringsOf(context).merchantStoreReload,
       large: true,
     ),
     _StoryLoadState.empty => StatusView(
-      message: '暂时无法编辑品牌故事',
-      sub: '这个账号还没有店铺，先完成商家入驻拿到店铺，再回来写品牌故事。',
+      message: stringsOf(context).merchantStoreStoryUnavailable,
+      sub: stringsOf(context).merchantStoreStoryNoStore,
       onRetry: () => GoRouter.maybeOf(context)?.go('/merchant/apply'),
-      retryLabel: '去商家入驻',
+      retryLabel: stringsOf(context).merchantStoreApply,
       large: true,
     ),
     _StoryLoadState.ready => Column(
@@ -157,7 +151,7 @@ class _MerchantDecorStoryPageState
             child: CupertinoTextField(
               key: const Key('merchant-decor-story-body'),
               controller: _controller,
-              placeholder: _placeholder,
+              placeholder: stringsOf(context).merchantStoreStoryPrompt,
               maxLength: 300,
               minLines: 12,
               maxLines: null,
@@ -186,7 +180,7 @@ class _MerchantDecorStoryPageState
                 onPressed: _saving ? null : _save,
                 child: _saving
                     ? const CupertinoActivityIndicator()
-                    : const Text('保存品牌故事'),
+                    : Text(stringsOf(context).merchantStoreSaveStory),
               ),
             ),
           ),

@@ -1,3 +1,4 @@
+import '../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -115,10 +116,10 @@ class _MerchantPredictPageState extends ConsumerState<MerchantPredictPage> {
     // 这两件事点下去都撤不回来。
     final bool confirmed = await cyConfirm(
       context,
-      title: '公布答案「${picked.label}」?',
-      content: '押中的人会按你配的规则拿到奖励。这一轮只能公布一次,公布后不能改。',
-      confirmText: '公布并结算',
-      cancelText: '再想想',
+      title: stringsOf(context).merchantPairConfirmAnswer(picked.label),
+      content: stringsOf(context).merchantResidualPolicyPredict,
+      confirmText: stringsOf(context).merchantPairSettle,
+      cancelText: stringsOf(context).merchantPairThinkAgain,
       nativePresenter: widget.confirmPresenter,
     );
     if (!confirmed || !mounted || _submitting) return;
@@ -140,13 +141,13 @@ class _MerchantPredictPageState extends ConsumerState<MerchantPredictPage> {
       });
       CyNativeNotice.show(
         context,
-        winners > 0 ? '已公布 · $winners 人猜中' : '已公布 · 无人猜中',
+        winners > 0 ? stringsOf(context).merchantPairWinners(winners) : stringsOf(context).merchantPairNoneWon,
       );
     } on MerchantPredictApiException catch (error) {
       if (!mounted) return;
       // 失败要说人话并且留在原地 —— 这一轮还没结,人得能再试。
       setState(() => _submitting = false);
-      CyNativeNotice.show(context, error.message, isError: true);
+      CyNativeNotice.show(context, predictErrorCopy(context, error), isError: true);
     }
   }
 
@@ -167,7 +168,7 @@ class _MerchantPredictPageState extends ConsumerState<MerchantPredictPage> {
           onPressed: _goBack,
           child: const Icon(CupertinoIcons.back, size: 24),
         ),
-        middle: const Text('竞猜待答'),
+        middle: Text(stringsOf(context).merchantPairTitle),
       ),
       child: Material(
         color: Colors.transparent,
@@ -177,18 +178,18 @@ class _MerchantPredictPageState extends ConsumerState<MerchantPredictPage> {
             loading: () =>
                 const CySkeleton(type: CySkeletonType.list, count: 3),
             error: (Object error, StackTrace _) => StatusView(
-              message: '待答列表加载失败',
-              sub: friendlyOrBackendMessage(error, fallback: '待答列表没能加载，请稍后重试'),
+              message: stringsOf(context).merchantPairLoadFailed,
+              sub: predictErrorCopy(context, error),
               icon: Icons.cloud_off,
               scrollable: true,
-              retryLabel: '重新加载',
+              retryLabel: stringsOf(context).merchantPairReload,
               onRetry: () => ref.invalidate(predictInboxProvider),
             ),
             data: (PredictInboxState state) {
               switch (state) {
                 case PredictInboxDenied():
-                  return const StatusView(
-                    message: '当前岗位不能结算竞猜',
+                  return StatusView(
+                    message: stringsOf(context).merchantPairDenied,
                     sub: '结算会按规则发券,需要项目管理权限。请联系店主调整经营团队权限',
                     icon: Icons.lock_outline,
                     scrollable: true,
@@ -196,9 +197,9 @@ class _MerchantPredictPageState extends ConsumerState<MerchantPredictPage> {
                 case PredictInboxReady(:final List<PredictRound> rounds):
                   final List<PredictRound> visible = _visibleRounds(rounds);
                   if (visible.isEmpty) {
-                    return const StatusView(
-                      message: '没有等你给答案的竞猜',
-                      sub: '玩家押完之后,那一轮会出现在这里等你公布答案',
+                    return StatusView(
+                      message: stringsOf(context).merchantPairEmpty,
+                      sub: stringsOf(context).merchantPairEmptyHint,
                       icon: Icons.how_to_vote_outlined,
                       scrollable: true,
                     );
@@ -256,7 +257,7 @@ class _ReadyList extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.only(bottom: CyTokens.space3),
           child: Text(
-            '共 ${rounds.length} 轮等你给答案',
+            stringsOf(context).merchantPairRounds(rounds.length),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: CyPalette.of(context).textSecondary,
             ),
@@ -323,7 +324,7 @@ class _PredictCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     Text(
-                      round.nodeName,
+                      round.hasCustomNodeName ? round.nodeName : stringsOf(context).merchantPairUnnamedNode,
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w700,
                         color: palette.textPrimary,
@@ -331,7 +332,7 @@ class _PredictCard extends StatelessWidget {
                     ),
                     const SizedBox(height: CyTokens.space1),
                     Text(
-                      round.roundText,
+                      round.playDay.isEmpty ? stringsOf(context).merchantPairThisRound : stringsOf(context).merchantPairRoundDate(round.playDay),
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: palette.textSecondary,
                       ),
@@ -352,7 +353,7 @@ class _PredictCard extends StatelessWidget {
           ),
           const SizedBox(height: CyTokens.space2),
           Text(
-            round.betText,
+            round.betCount > 0 ? stringsOf(context).merchantPairBetCount(round.betCount) : stringsOf(context).merchantPairNoBets,
             style: Theme.of(
               context,
             ).textTheme.bodySmall?.copyWith(color: palette.textSecondary),
@@ -360,7 +361,7 @@ class _PredictCard extends StatelessWidget {
           if (open) ...<Widget>[
             const SizedBox(height: CyTokens.space3),
             Text(
-              '选出正确答案',
+              stringsOf(context).merchantPairChoose,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: palette.textSecondary,
               ),
@@ -380,7 +381,7 @@ class _PredictCard extends StatelessWidget {
               children: <Widget>[
                 Expanded(
                   child: _PredictActionButton(
-                    label: '先不给',
+                    label: stringsOf(context).merchantPairLater,
                     primary: false,
                     enabled: !submitting,
                     loading: false,
@@ -390,7 +391,7 @@ class _PredictCard extends StatelessWidget {
                 const SizedBox(width: CyTokens.space3),
                 Expanded(
                   child: _PredictActionButton(
-                    label: '就是这个',
+                    label: stringsOf(context).merchantPairSelected,
                     primary: true,
                     // ★ 没选选项就点不动 —— 而且**看得出来**点不动。
                     enabled: pickedKey.isNotEmpty && !submitting,
@@ -408,14 +409,14 @@ class _PredictCard extends StatelessWidget {
               child: Row(
                 children: <Widget>[
                   Text(
-                    round.optionText,
+                    stringsOf(context).merchantPairOptions(round.options.length),
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: palette.textSecondary,
                     ),
                   ),
                   const Spacer(),
                   Text(
-                    '给答案',
+                    stringsOf(context).merchantPairAnswer,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: palette.brand,
                     ),
@@ -455,7 +456,7 @@ class _DeadlineBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(CyTokens.radiusPill),
       ),
       child: Text(
-        round.deadlineText,
+        round.expired ? stringsOf(context).merchantPairDeadlineToday : stringsOf(context).merchantPairDaysLeft(round.daysLeft),
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
           fontSize: CyTokens.typeMicro,
           fontWeight: FontWeight.w600,
@@ -570,7 +571,7 @@ class _PredictActionButton extends StatelessWidget {
       button: true,
       enabled: active,
       label: label,
-      value: loading ? '正在处理' : null,
+      value: loading ? stringsOf(context).merchantPairProcessing : null,
       liveRegion: loading,
       child: ExcludeSemantics(
         child: CupertinoButton(
@@ -586,4 +587,16 @@ class _PredictActionButton extends StatelessWidget {
       ),
     );
   }
+}
+
+String predictErrorCopy(BuildContext context, Object error) {
+  if (error is MerchantPredictApiException && error.localCode != null) {
+    return switch (error.localCode) {
+      'incomplete' => stringsOf(context).merchantPairIncomplete,
+      'network' => stringsOf(context).merchantPairNetwork,
+      'http' => error.code == null ? stringsOf(context).merchantPairRequest : stringsOf(context).merchantPairHttp(error.code!),
+      _ => stringsOf(context).merchantPairRequest,
+    };
+  }
+  return friendlyOrBackendMessage(error, fallback: stringsOf(context).merchantPairLoadHint);
 }

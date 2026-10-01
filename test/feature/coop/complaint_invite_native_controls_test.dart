@@ -8,8 +8,8 @@ void main() {
 
     test('活动与类型从 Cupertino Sheet 选择', () {
       expect(code.contains('showCupertinoSheet<int>'), isTrue);
-      expect(code.contains("'投诉活动'"), isTrue);
-      expect(code.contains("'投诉类型'"), isTrue);
+      expect(code.contains('coopComplaintActivity'), isTrue);
+      expect(code.contains('coopComplaintType'), isTrue);
       expect(code.contains("'服务与履约'"), isTrue);
       expect(code.contains("'费用与退款'"), isTrue);
     });
@@ -44,9 +44,9 @@ void main() {
     });
 
     test('顺序保持小程序的主题 → 条款 → 邀请对象', () {
-      final int topic = code.indexOf('① 关联主题');
+      final int topic = code.indexOf('coopAssociatedTheme');
       final int terms = code.indexOf('② 合作条款');
-      final int targets = code.indexOf('③ 邀请对象');
+      final int targets = code.indexOf('coopRecipients');
       expect(topic, greaterThan(0));
       expect(terms, greaterThan(topic));
       expect(targets, greaterThan(terms));

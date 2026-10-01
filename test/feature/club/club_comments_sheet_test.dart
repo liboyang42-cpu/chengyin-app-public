@@ -6,6 +6,7 @@
 //    这里把它钉成行为断言,免得下一个人在 UI 层又编一句。)
 
 import 'package:flutter/cupertino.dart';
+import 'package:chengyin_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -40,12 +41,15 @@ class _FakeClubApi implements ClubApi {
   dynamic noSuchMethod(Invocation i) => super.noSuchMethod(i);
 }
 
-Future<void> _open(WidgetTester t, _FakeClubApi api) async {
+Future<void> _open(WidgetTester t, _FakeClubApi api, {Locale locale = const Locale('zh')}) async {
   await t.binding.setSurfaceSize(const Size(390, 900));
   await t.pumpWidget(
     ProviderScope(
       overrides: <dynamic>[clubApiProvider.overrideWithValue(api)].cast(),
       child: MaterialApp(
+        locale: locale,
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
         home: Scaffold(
           body: Builder(
             builder: (BuildContext c) => TextButton(
@@ -62,6 +66,22 @@ Future<void> _open(WidgetTester t, _FakeClubApi api) async {
 }
 
 void main() {
+  testWidgets('English comments preserve submitted content and author fallback', (t) async {
+    final sent = <String>[];
+    await _open(t, _FakeClubApi(
+      rows: [const ClubComment(id: 9, memberId: 999, content: '原始评论')],
+      onCreate: sent.add,
+    ), locale: const Locale('en'));
+    expect(find.text('Comments'), findsOneWidget);
+    expect(find.text('Chengyin user'), findsOneWidget);
+    expect(find.text('原始评论'), findsOneWidget);
+    await t.enterText(find.byType(CupertinoTextField), '我的原文');
+    await t.tap(find.byKey(const Key('club-comment-send')));
+    await t.pumpAndSettle();
+    expect(sent, ['我的原文']);
+    expect(t.takeException(), isNull);
+  });
+
   testWidgets('★ 空态说清楚,不是一片空白', (WidgetTester t) async {
     await _open(t, _FakeClubApi());
     expect(find.text('还没有评论'), findsOneWidget);

@@ -1,3 +1,6 @@
+import 'club_api_messages.dart';
+import 'club_customer_labels.dart';
+import '../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -73,13 +76,13 @@ class _ClubEditionReportPageState extends ConsumerState<ClubEditionReportPage> {
     final raw = _hourControllers[kind]?.text ?? '';
     final error = hoursInputError(raw);
     if (error != null) {
-      _toast(error, isError: true);
+      _toast(_editionValidationLabel(context, error), isError: true);
       return;
     }
     final topicId = _topicId;
     final clubId = widget.clubId;
     if (topicId == null || clubId == null) {
-      _toast(kPickEditionFirst, isError: true);
+      _toast(_editionValidationLabel(context, kPickEditionFirst), isError: true);
       return;
     }
     setState(() => _submittingKind = kind);
@@ -93,10 +96,10 @@ class _ClubEditionReportPageState extends ConsumerState<ClubEditionReportPage> {
             actualHours: double.parse(raw.trim()),
           );
       if (!mounted) return;
-      _toast('已自报，等待平台确认');
+      _toast(stringsOf(context).clubEditionHoursSubmitted);
     } catch (e) {
       if (!mounted) return;
-      _toast(e.toString(), isError: true);
+      _toast(clubApiErrorMessage(context, e), isError: true);
     } finally {
       if (mounted) setState(() => _submittingKind = '');
     }
@@ -105,13 +108,13 @@ class _ClubEditionReportPageState extends ConsumerState<ClubEditionReportPage> {
   Future<void> _submitEvidence() async {
     final error = evidenceHashError(_evidenceController.text);
     if (error != null) {
-      _toast(error, isError: true);
+      _toast(_editionValidationLabel(context, error), isError: true);
       return;
     }
     final topicId = _topicId;
     final clubId = widget.clubId;
     if (topicId == null || clubId == null) {
-      _toast(kPickEditionFirst, isError: true);
+      _toast(_editionValidationLabel(context, kPickEditionFirst), isError: true);
       return;
     }
     setState(() => _submittingKind = 'evidence');
@@ -125,10 +128,10 @@ class _ClubEditionReportPageState extends ConsumerState<ClubEditionReportPage> {
             evidenceHash: _evidenceController.text.trim().toLowerCase(),
           );
       if (!mounted) return;
-      _toast('证据已提交');
+      _toast(stringsOf(context).clubEditionEvidenceSubmitted);
     } catch (e) {
       if (!mounted) return;
-      _toast(e.toString(), isError: true);
+      _toast(clubApiErrorMessage(context, e), isError: true);
     } finally {
       if (mounted) setState(() => _submittingKind = '');
     }
@@ -176,12 +179,12 @@ class _ClubEditionReportPageState extends ConsumerState<ClubEditionReportPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              const CyPageTitle('探店日工时与证据'),
+              CyPageTitle(stringsOf(context).clubEditionTitle),
               Expanded(
                 child: clubId == null
-                    ? const StatusView(
-                        message: '缺少俱乐部信息',
-                        sub: '请从俱乐部管理入口进入本页',
+                    ? StatusView(
+                        message: stringsOf(context).clubEditionMissingClub,
+                        sub: stringsOf(context).clubEditionOpenFromClub,
                         icon: CupertinoIcons.exclamationmark_triangle,
                         large: true,
                       )
@@ -201,11 +204,11 @@ class _ClubEditionReportPageState extends ConsumerState<ClubEditionReportPage> {
       padding: const EdgeInsets.all(CyTokens.space4),
       children: <Widget>[
         Text(
-          '四类工时由俱乐部自报、平台后台逐条确认后才计入结算；自报本身不等于已确认。',
+          stringsOf(context).clubEditionConfirmationPolicy,
           style: textTheme.labelSmall?.copyWith(color: CyTokens.textTertiary),
         ),
         const SizedBox(height: CyTokens.space4),
-        const CySectionTitle('本次自报的期次'),
+        CySectionTitle(stringsOf(context).clubEditionSelectHeading),
         const SizedBox(height: CyTokens.space2),
         editions.when(
           // 期次区只是 ListView 里的一块,不能用 CySkeleton(card) —— 它自带
@@ -215,8 +218,8 @@ class _ClubEditionReportPageState extends ConsumerState<ClubEditionReportPage> {
             child: Center(child: CupertinoActivityIndicator()),
           ),
           error: (Object err, StackTrace st) => StatusView(
-            message: '期次加载失败',
-            sub: '检查网络后重试',
+            message: stringsOf(context).clubEditionLoadFailed,
+            sub: stringsOf(context).clubEditionNetworkRetry,
             icon: CupertinoIcons.exclamationmark_triangle,
             onRetry: () => ref.invalidate(clubEditionsProvider(clubId)),
           ),
@@ -230,7 +233,7 @@ class _ClubEditionReportPageState extends ConsumerState<ClubEditionReportPage> {
                   border: Border.all(color: CyTokens.borderSubtle),
                 ),
                 child: Text(
-                  '本俱乐部当前没有已开售的探店日期次。期次要在平台开售冻结之后才会出现在这里。',
+                  stringsOf(context).clubEditionEmpty,
                   style: textTheme.labelMedium?.copyWith(
                     color: AppColors.textSecondary,
                   ),
@@ -248,7 +251,7 @@ class _ClubEditionReportPageState extends ConsumerState<ClubEditionReportPage> {
                 // 真源 `pages/club/detail/index.wxml:501-524` 探店日期次面板的
                 // 「带票分享」—— 列表页在这,分享按钮此前没做。
                 const SizedBox(height: CyTokens.space4),
-                const CySectionTitle('带票分享'),
+                CySectionTitle(stringsOf(context).clubEditionShare),
                 const SizedBox(height: CyTokens.space2),
                 for (final EditionOption option in list)
                   Padding(
@@ -275,14 +278,14 @@ class _ClubEditionReportPageState extends ConsumerState<ClubEditionReportPage> {
                                   Text(
                                     option.topicName.isNotEmpty
                                         ? option.topicName
-                                        : '期次 #${option.id}',
+                                        : stringsOf(context).clubEditionNumber(option.id),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: textTheme.labelLarge,
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    '${option.dateText.isNotEmpty ? option.dateText : '时间待定'} · 执行俱乐部期次',
+                                    stringsOf(context).clubEditionDate(option.dateText.isNotEmpty ? option.dateText : stringsOf(context).clubEditionTimePending),
                                     style: textTheme.labelSmall?.copyWith(
                                       color: CyTokens.textTertiary,
                                     ),
@@ -298,7 +301,7 @@ class _ClubEditionReportPageState extends ConsumerState<ClubEditionReportPage> {
                               ),
                               onPressed: () =>
                                   _shareEditionWithTicket(clubId, option),
-                              child: const Text('带票分享'),
+                              child: Text(stringsOf(context).clubEditionShare),
                             ),
                           ],
                         ),
@@ -310,39 +313,39 @@ class _ClubEditionReportPageState extends ConsumerState<ClubEditionReportPage> {
           },
         ),
         const SizedBox(height: CyTokens.space6),
-        const CySectionTitle('实际工时自报'),
+        CySectionTitle(stringsOf(context).clubEditionActualHours),
         const SizedBox(height: CyTokens.space2),
         Text(
-          '自报只写上报值,平台后台逐条确认后才计入实际工时。',
+          stringsOf(context).clubEditionHoursPolicy,
           style: textTheme.labelSmall?.copyWith(color: CyTokens.textTertiary),
         ),
         const SizedBox(height: CyTokens.space3),
         for (final kind in _hourKinds)
           _HourRow(
             key: ValueKey<String>(kind.key),
-            label: kind.label,
+            label: _editionKindLabel(context, kind.key),
             controller: _hourControllers[kind.key]!,
             busy: _submittingKind == kind.key,
             onSubmit: () => _submitHours(kind.key),
           ),
         const SizedBox(height: CyTokens.space6),
-        const CySectionTitle('质量证据提交'),
+        CySectionTitle(stringsOf(context).clubEditionEvidenceHeading),
         const SizedBox(height: CyTokens.space2),
         CyField(
-          label: '质量维度',
+          label: stringsOf(context).clubEditionDimension,
           child: _CupertinoChoiceField<String>(
             key: const ValueKey<String>('dimension-picker'),
-            title: '选择质量维度',
-            placeholder: '选择质量维度',
+            title: stringsOf(context).clubEditionChooseDimension,
+            placeholder: stringsOf(context).clubEditionChooseDimension,
             options: <({String value, String label})>[
-              for (final d in _dimensions) (value: d.key, label: d.label),
+              for (final d in _dimensions) (value: d.key, label: _editionKindLabel(context, d.key)),
             ],
             value: _dimension,
             onChanged: (String value) => setState(() => _dimension = value),
           ),
         ),
         CyField(
-          label: '证据哈希',
+          label: stringsOf(context).clubEditionEvidenceHash,
           child: CupertinoTextField(
             key: const ValueKey<String>('edition-evidence-hash'),
             controller: _evidenceController,
@@ -365,7 +368,7 @@ class _ClubEditionReportPageState extends ConsumerState<ClubEditionReportPage> {
             placeholderStyle: Theme.of(
               context,
             ).textTheme.bodyMedium?.copyWith(color: CyTokens.textTertiary),
-            placeholder: '证据文件 SHA-256',
+            placeholder: stringsOf(context).clubEditionHashPlaceholder,
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
             decoration: _editionFieldDecoration(context),
           ),
@@ -375,11 +378,11 @@ class _ClubEditionReportPageState extends ConsumerState<ClubEditionReportPage> {
           onPressed: _submittingKind == 'evidence' ? null : _submitEvidence,
           child: _submittingKind == 'evidence'
               ? const CupertinoActivityIndicator()
-              : const Text('提交证据'),
+              : Text(stringsOf(context).clubEditionSubmitEvidence),
         ),
         const SizedBox(height: CyTokens.space2),
         Text(
-          '超过开售冻结的证据截止(活动结束 + 7 天)后不再收,届时该维按 0 结。',
+          stringsOf(context).clubEditionDeadlinePolicy,
           style: textTheme.labelSmall?.copyWith(color: CyTokens.textTertiary),
         ),
       ],
@@ -402,11 +405,11 @@ class _EditionPicker extends StatelessWidget {
   Widget build(BuildContext context) {
     return _CupertinoChoiceField<int>(
       key: const ValueKey<String>('edition-picker'),
-      title: '选择要报的期次',
-      placeholder: '选择要报的期次',
+      title: stringsOf(context).clubEditionChoose,
+      placeholder: stringsOf(context).clubEditionChoose,
       options: <({int value, String label})>[
         for (final EditionOption option in options)
-          (value: option.id, label: option.label),
+          (value: option.id, label: clubEditionOptionLabel(context, option)),
       ],
       value: selectedId,
       onChanged: onChanged,
@@ -443,7 +446,7 @@ class _CupertinoChoiceField<T> extends StatelessWidget {
       button: true,
       enabled: options.isNotEmpty,
       label: title,
-      value: selectedIndex < 0 ? '未选择' : label,
+      value: selectedIndex < 0 ? stringsOf(context).clubEditionUnselected : label,
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: AppColors.bgSurface,
@@ -499,7 +502,7 @@ class _CupertinoChoiceField<T> extends StatelessWidget {
         ],
         cancelButton: CupertinoActionSheetAction(
           onPressed: () => Navigator.of(sheetContext).pop(),
-          child: const Text('取消'),
+          child: Text(stringsOf(context).clubEditionCancel),
         ),
       ),
     );
@@ -541,7 +544,7 @@ class _HourRow extends StatelessWidget {
               inputFormatters: <TextInputFormatter>[
                 FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
               ],
-              placeholder: '小时',
+              placeholder: stringsOf(context).clubEditionHoursPlaceholder,
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
               decoration: _editionFieldDecoration(context),
             ),
@@ -553,7 +556,7 @@ class _HourRow extends StatelessWidget {
             onPressed: busy ? null : onSubmit,
             child: busy
                 ? const CupertinoActivityIndicator(radius: 7)
-                : const Text('自报'),
+                : Text(stringsOf(context).clubEditionReport),
           ),
         ],
       ),
@@ -569,3 +572,22 @@ BoxDecoration _editionFieldDecoration(BuildContext context) {
     borderRadius: BorderRadius.circular(CyTokens.radiusMd),
   );
 }
+
+String _editionKindLabel(BuildContext context, String key) => switch (key) {
+  'PREP' => stringsOf(context).clubEditionPrep,
+  'CONTENT' => stringsOf(context).clubEditionContent,
+  'ONSITE' => stringsOf(context).clubEditionOnsite,
+  'REVIEW' => stringsOf(context).clubEditionReview,
+  'DELIVERY_SAFETY' => stringsOf(context).clubEditionDeliverySafety,
+  'PLAYER_EXPERIENCE' => stringsOf(context).clubEditionPlayerExperience,
+  'CONTENT_REPORT' => stringsOf(context).clubEditionContentReport,
+  _ => key,
+};
+
+String _editionValidationLabel(BuildContext context, String error) => switch (error) {
+  '请填写非负的实际工时' => stringsOf(context).clubEditionInvalidHours,
+  '请填写证据哈希' => stringsOf(context).clubEditionHashRequired,
+  '请填写 64 位 SHA-256 哈希' => stringsOf(context).clubEditionHashInvalid,
+  '请先在顶部选择要报的期次' => stringsOf(context).clubEditionPickFirst,
+  _ => error,
+};

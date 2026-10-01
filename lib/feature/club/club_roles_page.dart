@@ -1,3 +1,5 @@
+import 'club_customer_labels.dart';
+import '../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -46,7 +48,7 @@ class _ClubRolesPageState extends ConsumerState<ClubRolesPage> {
   List<ClubMember> _members = <ClubMember>[];
   List<RoleOption> _roles = <RoleOption>[];
   List<RoleAssignment> _assignments = <RoleAssignment>[];
-  String _ownerName = '主理人';
+  String _ownerName = '';
   int? _selectedMemberId;
   String _selectedMemberName = '';
   String _selectedRoleCode = '';
@@ -85,21 +87,21 @@ class _ClubRolesPageState extends ConsumerState<ClubRolesPage> {
       if (!access.activeDeclared) {
         setState(() {
           _state = ClubOpsLoadState.error;
-          _error = '角色权限暂时不可用';
+          _error = stringsOf(context).clubRolesAccessUnavailable;
         });
         return;
       }
       if (!access.active || !access.canManageRoles) {
         setState(() {
           _state = ClubOpsLoadState.noPermission;
-          _error = '仅俱乐部主理人可管理角色';
+          _error = stringsOf(context).clubRolesOwnerOnly;
         });
         return;
       }
       if (access.clubId != widget.clubId) {
         setState(() {
           _state = ClubOpsLoadState.error;
-          _error = '角色权限暂时不可用';
+          _error = stringsOf(context).clubRolesAccessUnavailable;
         });
         return;
       }
@@ -109,7 +111,7 @@ class _ClubRolesPageState extends ConsumerState<ClubRolesPage> {
       setState(() {
         _loginRequired = clubLoginRequired(error);
         _state = clubOpsFailureState(error);
-        _error = clubOpsErrorMessage(error, '角色权限暂时不可用');
+        _error = clubOpsErrorMessage(error, stringsOf(context).clubRolesAccessUnavailable);
       });
     }
   }
@@ -123,7 +125,7 @@ class _ClubRolesPageState extends ConsumerState<ClubRolesPage> {
       if (data == null) {
         setState(() {
           _state = ClubOpsLoadState.error;
-          _error = '角色目录暂时不可用';
+          _error = stringsOf(context).clubRolesDirectoryUnavailable;
         });
         return;
       }
@@ -136,8 +138,8 @@ class _ClubRolesPageState extends ConsumerState<ClubRolesPage> {
           .toList();
       final String ownerName = all
           .where((ClubMember m) => m.isOwner)
-          .map((ClubMember m) => m.displayName)
-          .followedBy(<String>['主理人'])
+          .map((ClubMember m) => clubMemberDisplayName(context, m))
+          .followedBy(<String>[stringsOf(context).clubRolesOwner])
           .first;
       final int? requested = widget.memberId;
       final int? preselected =
@@ -147,9 +149,7 @@ class _ClubRolesPageState extends ConsumerState<ClubRolesPage> {
           : null;
       final String preselectedName = preselected == null
           ? ''
-          : selectable
-                .firstWhere((ClubMember m) => m.memberId == preselected)
-                .displayName;
+          : clubMemberDisplayName(context, selectable.firstWhere((ClubMember m) => m.memberId == preselected));
       setState(() {
         _roles = data.roles;
         _assignments = data.assignments;
@@ -163,7 +163,7 @@ class _ClubRolesPageState extends ConsumerState<ClubRolesPage> {
       if (!mounted) return;
       setState(() {
         _state = clubOpsFailureState(error);
-        _error = clubOpsErrorMessage(error, '角色目录暂时不可用');
+        _error = clubOpsErrorMessage(error, stringsOf(context).clubRolesDirectoryUnavailable);
       });
     }
   }
@@ -180,7 +180,7 @@ class _ClubRolesPageState extends ConsumerState<ClubRolesPage> {
     if (picked == null || !mounted) return;
     setState(() {
       _selectedMemberId = picked.memberId;
-      _selectedMemberName = picked.displayName;
+      _selectedMemberName = clubMemberDisplayName(context, picked);
     });
   }
 
@@ -196,7 +196,7 @@ class _ClubRolesPageState extends ConsumerState<ClubRolesPage> {
       ),
       children: <Widget>[
         Text(
-          '选择成员',
+          stringsOf(context).clubRolesSelectMember,
           style: TextStyle(
             fontSize: CyTokens.typeSectionTitle,
             fontWeight: FontWeight.w700,
@@ -207,14 +207,14 @@ class _ClubRolesPageState extends ConsumerState<ClubRolesPage> {
         ..._members.map(
           (ClubMember member) => ClubOpsRow(
             key: Key('roles-member-${member.memberId}'),
-            title: member.displayName,
+            title: clubMemberDisplayName(context, member),
             leading: CyAvatar(
               url: member.avatar,
-              fallback: member.displayName,
+              fallback: clubMemberDisplayName(context, member),
               size: 36,
             ),
             trailing: Text(
-              _selectedMemberId == member.memberId ? '已选' : '选择',
+              _selectedMemberId == member.memberId ? stringsOf(context).clubRolesSelected : stringsOf(context).clubRolesSelect,
               style: TextStyle(
                 fontSize: CyTokens.typeLabel,
                 color: _selectedMemberId == member.memberId
@@ -257,7 +257,7 @@ class _ClubRolesPageState extends ConsumerState<ClubRolesPage> {
       ),
       children: <Widget>[
         Text(
-          '选择角色',
+          stringsOf(context).clubRolesSelectRole,
           style: TextStyle(
             fontSize: CyTokens.typeSectionTitle,
             fontWeight: FontWeight.w700,
@@ -272,7 +272,7 @@ class _ClubRolesPageState extends ConsumerState<ClubRolesPage> {
             meta: role.summary,
             metaLines: 2,
             trailing: Text(
-              _selectedRoleCode == role.roleCode ? '已选' : '选择',
+              _selectedRoleCode == role.roleCode ? stringsOf(context).clubRolesSelected : stringsOf(context).clubRolesSelect,
               style: TextStyle(
                 fontSize: CyTokens.typeLabel,
                 color: _selectedRoleCode == role.roleCode
@@ -292,11 +292,11 @@ class _ClubRolesPageState extends ConsumerState<ClubRolesPage> {
     final int? memberId = _selectedMemberId;
     final String roleCode = _selectedRoleCode;
     if (memberId == null) {
-      CyNativeNotice.show(context, '先选择一位成员', isError: true);
+      CyNativeNotice.show(context, stringsOf(context).clubRolesMemberRequired, isError: true);
       return;
     }
     if (roleCode.isEmpty) {
-      CyNativeNotice.show(context, '先选择一个角色', isError: true);
+      CyNativeNotice.show(context, stringsOf(context).clubRolesRoleRequired, isError: true);
       return;
     }
     RoleOption? role;
@@ -307,7 +307,7 @@ class _ClubRolesPageState extends ConsumerState<ClubRolesPage> {
       }
     }
     if (role == null || !RoleOption.allowed(roleCode, eventScoped: _activityId != null)) {
-      CyNativeNotice.show(context, '该角色不适用于当前范围', isError: true);
+      CyNativeNotice.show(context, stringsOf(context).clubRolesInvalidScope, isError: true);
       return;
     }
     final String key = 'assign:$memberId:$roleCode';
@@ -328,7 +328,7 @@ class _ClubRolesPageState extends ConsumerState<ClubRolesPage> {
           );
       if (!mounted) return;
       _requestIds.remove(intentKey);
-      CyNativeNotice.show(context, '角色已分配');
+      CyNativeNotice.show(context, stringsOf(context).clubRolesAssigned);
       setState(() => _selectedRoleCode = '');
       await _loadManagement();
     } catch (error) {
@@ -338,7 +338,7 @@ class _ClubRolesPageState extends ConsumerState<ClubRolesPage> {
       }
       CyNativeNotice.show(
         context,
-        clubOpsErrorMessage(error, '分配失败'),
+        clubOpsErrorMessage(error, stringsOf(context).clubRolesAssignFailed),
         isError: true,
       );
     } finally {
@@ -355,9 +355,9 @@ class _ClubRolesPageState extends ConsumerState<ClubRolesPage> {
     if (_actingKey.isNotEmpty) return;
     final bool confirmed = await cyConfirm(
       context,
-      title: '撤销 ${assignment.memberName} 的「${assignment.roleName}」？',
-      content: '撤销后该成员立即失去对应入口。此操作不可撤销。',
-      confirmText: '撤销角色',
+      title: stringsOf(context).clubRolesRevokeTitle(assignment.memberName, assignment.roleName),
+      content: stringsOf(context).clubRolesRevokeBody,
+      confirmText: stringsOf(context).clubRolesRevokeAction,
       danger: true,
     );
     if (!confirmed || !mounted) return;
@@ -382,14 +382,14 @@ class _ClubRolesPageState extends ConsumerState<ClubRolesPage> {
           );
       if (!mounted) return;
       _requestIds.remove(intentKey);
-      CyNativeNotice.show(context, '角色已撤销');
+      CyNativeNotice.show(context, stringsOf(context).clubRolesRevoked);
       await _loadManagement();
     } catch (error) {
       if (!mounted) return;
       if (_isClientFailure(error)) _requestIds.remove(intentKey);
       CyNativeNotice.show(
         context,
-        clubOpsErrorMessage(error, '撤销失败'),
+        clubOpsErrorMessage(error, stringsOf(context).clubRolesRevokeFailed),
         isError: true,
       );
     } finally {
@@ -409,7 +409,7 @@ class _ClubRolesPageState extends ConsumerState<ClubRolesPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              const CyPageTitle('角色与权限'),
+              CyPageTitle(stringsOf(context).clubRolesTitle),
               Expanded(child: _body()),
             ],
           ),
@@ -423,7 +423,7 @@ class _ClubRolesPageState extends ConsumerState<ClubRolesPage> {
     // 而真因只是没登录 —— 登录后原地重取,人留在这一页。
     if (_loginRequired) {
       return ClubLoginGate(
-        message: '登录后查看角色与权限',
+        message: stringsOf(context).clubRolesLogin,
         onSignedIn: _load,
       );
     }
@@ -432,16 +432,16 @@ class _ClubRolesPageState extends ConsumerState<ClubRolesPage> {
         return const CySkeleton(type: CySkeletonType.card, count: 4);
       case ClubOpsLoadState.noPermission:
         return StatusView(
-          message: '你没有管理角色的权限',
+          message: stringsOf(context).clubRolesDenied,
           sub: _error.isEmpty
-              ? '只有主理人可以分配角色。想帮忙管角色,让主理人先把你提为主理人。'
+              ? stringsOf(context).clubRolesDeniedHelp
               : _error,
           icon: CupertinoIcons.lock,
           large: true,
         );
       case ClubOpsLoadState.networkError:
         return StatusView(
-          message: '网络连接失败',
+          message: stringsOf(context).clubRolesNetworkFailed,
           sub: _error,
           icon: CupertinoIcons.exclamationmark_triangle,
           large: true,
@@ -449,7 +449,7 @@ class _ClubRolesPageState extends ConsumerState<ClubRolesPage> {
         );
       case ClubOpsLoadState.error:
         return StatusView(
-          message: '角色管理暂时不可用',
+          message: stringsOf(context).clubRolesUnavailable,
           sub: _error,
           icon: CupertinoIcons.exclamationmark_triangle,
           large: true,
@@ -457,9 +457,9 @@ class _ClubRolesPageState extends ConsumerState<ClubRolesPage> {
         );
       case ClubOpsLoadState.ready:
         if (_members.isEmpty) {
-          return const StatusView(
-            message: '还没有可委派的成员',
-            sub: '先邀请成员加入俱乐部，再为他们分配运营角色。',
+          return StatusView(
+            message: stringsOf(context).clubRolesEmpty,
+            sub: stringsOf(context).clubRolesEmptyBody,
             icon: Icons.group_add_outlined,
             large: true,
           );
@@ -474,14 +474,14 @@ class _ClubRolesPageState extends ConsumerState<ClubRolesPage> {
       padding: const EdgeInsets.only(bottom: CyTokens.space6),
       children: <Widget>[
         ClubOpsSection(
-          title: '当前委派',
+          title: stringsOf(context).clubRolesCurrent,
           children: <Widget>[
             ClubOpsCard(
               children: <Widget>[
                 ClubOpsRow(
-                  title: _ownerName,
-                  meta: '全部权限，不可撤销',
-                  value: '主理人',
+                  title: _ownerName.isEmpty ? stringsOf(context).clubRolesOwner : _ownerName,
+                  meta: stringsOf(context).clubRolesOwnerAccess,
+                  value: stringsOf(context).clubRolesOwner,
                   valueColor: palette.textPrimary,
                 ),
                 ..._assignments.map(
@@ -494,7 +494,7 @@ class _ClubRolesPageState extends ConsumerState<ClubRolesPage> {
                     valueColor: palette.textPrimary,
                     trailing: ClubOpsRowLink(
                       key: Key('roles-revoke-${item.id}'),
-                      label: '撤销',
+                      label: stringsOf(context).clubRolesRevoke,
                       enabled: _actingKey.isEmpty,
                       onTap: () => _revokeRole(item),
                     ),
@@ -505,16 +505,16 @@ class _ClubRolesPageState extends ConsumerState<ClubRolesPage> {
           ],
         ),
         ClubOpsSection(
-          title: '分配固定角色',
-          caption: '选择成员后，从下方分配一个固定角色',
+          title: stringsOf(context).clubRolesFixed,
+          caption: stringsOf(context).clubRolesFixedBody,
           children: <Widget>[
             ClubOpsCard(
               children: <Widget>[
                 CyCell(
                   key: const Key('roles-pick-member'),
-                  title: '选择成员',
+                  title: stringsOf(context).clubRolesSelectMember,
                   trailing: Text(
-                    _selectedMemberName.isEmpty ? '未选择' : _selectedMemberName,
+                    _selectedMemberName.isEmpty ? stringsOf(context).clubRolesUnselected : _selectedMemberName,
                     style: TextStyle(
                       fontSize: CyTokens.typeLabel,
                       color: palette.textTertiary,
@@ -524,9 +524,9 @@ class _ClubRolesPageState extends ConsumerState<ClubRolesPage> {
                 ),
                 CyCell(
                   key: const Key('roles-pick-role'),
-                  title: '角色',
+                  title: stringsOf(context).clubRolesRole,
                   trailing: Text(
-                    _selectedRoleName.isEmpty ? '未选择' : _selectedRoleName,
+                    _selectedRoleName.isEmpty ? stringsOf(context).clubRolesUnselected : _selectedRoleName,
                     style: TextStyle(
                       fontSize: CyTokens.typeLabel,
                       color: palette.textTertiary,
@@ -540,7 +540,7 @@ class _ClubRolesPageState extends ConsumerState<ClubRolesPage> {
               padding: const EdgeInsets.only(top: CyTokens.space3),
               child: CyNativeButton(
                 key: const Key('roles-assign'),
-                label: '分配',
+                label: stringsOf(context).clubRolesAssign,
                 width: double.infinity,
                 onPressed:
                     (_selectedMemberId == null ||
@@ -560,7 +560,7 @@ class _ClubRolesPageState extends ConsumerState<ClubRolesPage> {
             0,
           ),
           child: Text(
-            '撤销角色要二次确认；撤销后该成员立即失去对应入口。',
+            stringsOf(context).clubRolesRevokeExplanation,
             style: TextStyle(
               fontSize: CyTokens.typeCaption,
               height: 1.5,

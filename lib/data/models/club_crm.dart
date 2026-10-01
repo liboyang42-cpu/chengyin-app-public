@@ -45,6 +45,7 @@ class ClubCustomerList {
 
 class ClubCustomerItem {
   const ClubCustomerItem({
+    this.displaySource,
     required this.memberId,
     required this.displayName,
     required this.avatar,
@@ -52,6 +53,8 @@ class ClubCustomerItem {
     required this.metaText,
     required this.subText,
   });
+
+  final ClubCustomerItemDisplaySource? displaySource;
 
   final int memberId;
   final String displayName;
@@ -69,6 +72,13 @@ class ClubCustomerItem {
     final String remark = _text(json['remark']);
     final String displayName = _text(json['displayName']);
     return ClubCustomerItem(
+      displaySource: ClubCustomerItemDisplaySource(
+        nameMissing: displayName.isEmpty,
+        pendingCount: pendingCount,
+        verifiedCount: verifiedCount,
+        lastTopicName: _text(json['lastTopicName']),
+        lastVisitDate: _text(json['lastVisitDate']),
+      ),
       memberId: memberId,
       displayName: displayName.isEmpty ? '未留姓名' : displayName,
       avatar: _text(json['avatar']),
@@ -148,6 +158,7 @@ class ClubCustomerDetail {
 
 class ClubCustomerSummary {
   const ClubCustomerSummary({
+    this.displaySource,
     required this.memberId,
     required this.displayName,
     required this.avatar,
@@ -159,6 +170,8 @@ class ClubCustomerSummary {
     required this.paidAmountText,
     required this.amountVisible,
   });
+
+  final ClubCustomerSummaryDisplaySource? displaySource;
 
   final int memberId;
   final String displayName;
@@ -190,6 +203,11 @@ class ClubCustomerSummary {
     }
     final String displayName = _text(json['displayName']);
     return ClubCustomerSummary(
+      displaySource: ClubCustomerSummaryDisplaySource(
+        nameMissing: displayName.isEmpty,
+        lastInteractionTime: _text(json['lastInteractionTime']),
+        remark: remark,
+      ),
       memberId: memberId,
       displayName: displayName.isEmpty ? '未留姓名' : displayName,
       avatar: _text(json['avatar']),
@@ -209,6 +227,7 @@ class ClubCustomerSummary {
 
 class ClubCustomerRecord {
   const ClubCustomerRecord({
+    this.displaySource,
     required this.key,
     required this.topicId,
     required this.title,
@@ -217,6 +236,8 @@ class ClubCustomerRecord {
     required this.statusLabel,
     required this.tone,
   });
+
+  final ClubCustomerRecordDisplaySource? displaySource;
 
   final String key;
   final int? topicId;
@@ -252,6 +273,11 @@ class ClubCustomerRecord {
     }
     final Object? rawTopicId = json['topicId'];
     return ClubCustomerRecord(
+      displaySource: ClubCustomerRecordDisplaySource(
+        titleMissing: _text(json['title']).isEmpty,
+        occurredAt: json['occurredAt'],
+        statusCode: statusCode,
+      ),
       key: key,
       topicId: _tryPositiveId(rawTopicId),
       title: _text(json['title']).isEmpty ? '未命名活动' : _text(json['title']),
@@ -261,6 +287,35 @@ class ClubCustomerRecord {
       tone: _statusTone[statusCode] ?? 'muted',
     );
   }
+}
+
+/// Source facts retained solely for localized presentation; legacy/manual
+/// models without provenance keep their original supplied display strings.
+class ClubCustomerItemDisplaySource {
+  const ClubCustomerItemDisplaySource({required this.nameMissing,
+    required this.pendingCount, required this.verifiedCount,
+    required this.lastTopicName, required this.lastVisitDate});
+  final bool nameMissing;
+  final int pendingCount;
+  final int verifiedCount;
+  final String lastTopicName;
+  final String lastVisitDate;
+}
+
+class ClubCustomerSummaryDisplaySource {
+  const ClubCustomerSummaryDisplaySource({required this.nameMissing,
+    required this.lastInteractionTime, required this.remark});
+  final bool nameMissing;
+  final String lastInteractionTime;
+  final String remark;
+}
+
+class ClubCustomerRecordDisplaySource {
+  const ClubCustomerRecordDisplaySource({required this.titleMissing,
+    required this.occurredAt, required this.statusCode});
+  final bool titleMissing;
+  final Object? occurredAt;
+  final String statusCode;
 }
 
 /// K3 核销详情(俱乐部端)。

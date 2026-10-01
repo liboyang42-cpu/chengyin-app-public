@@ -1,10 +1,12 @@
+import 'club_api_messages.dart';
+import 'club_customer_labels.dart';
+import '../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/providers.dart';
-import '../../core/network/dio_client.dart';
 import '../../core/theme/cy_palette.dart';
 import '../../core/theme/cy_tokens.dart';
 import '../../core/widgets/cy_native_button.dart';
@@ -98,7 +100,7 @@ class _ClubCustomerDetailPageState
     ], _draftRemark);
     if (!draft.valid) {
       setState(() {
-        _draftError = draft.error;
+        _draftError = _draftErrorLabel(context, draft.error);
         _draftErrorFromSave = false;
       });
       return;
@@ -125,7 +127,7 @@ class _ClubCustomerDetailPageState
     final draft = buildClubTagRemarkDraft(_draftTags, _draftRemark);
     if (!draft.valid) {
       setState(() {
-        _draftError = draft.error;
+        _draftError = _draftErrorLabel(context, draft.error);
         _draftErrorFromSave = false;
       });
       return;
@@ -150,7 +152,7 @@ class _ClubCustomerDetailPageState
           );
       if (!mounted) return;
       setState(() => _editing = false);
-      CyNativeNotice.show(context, '已保存');
+      CyNativeNotice.show(context, stringsOf(context).clubCustomerSaved);
       ref.invalidate(clubCustomerDetailProvider(_key));
     } on Exception catch (error) {
       if (!mounted) return;
@@ -159,8 +161,8 @@ class _ClubCustomerDetailPageState
         // ★ 这里照说后端原话(clubCrmApi 已把 DioException 归一成中文)——
         //   换成通用人话会抹掉「为什么没保存上」。
         _draftError = unknown
-            ? '网络不稳定，标签与备注可能没保存成功，请重新打开确认'
-            : friendlyOrBackendMessage(error, fallback: '标签与备注没能保存，请稍后重试');
+            ? stringsOf(context).clubCustomerSaveUncertain
+            : clubApiErrorMessage(context, error, fallback: stringsOf(context).clubCustomerSaveFailed);
         _draftErrorFromSave = true;
       });
     } finally {
@@ -184,10 +186,10 @@ class _ClubCustomerDetailPageState
         child: SafeArea(
           bottom: false,
           child: detail.when(
-            loading: () => const CySkeleton(label: '正在加载客户详情'),
+            loading: () => CySkeleton(label: stringsOf(context).clubCustomerLoading),
             error: (Object error, StackTrace _) => _errorView(error),
             data: (ClubCustomerDetail value) => switch (gate.decision) {
-              ClubAccessDecision.deny => _noPermissionView(gate.reason),
+              ClubAccessDecision.deny => _noPermissionView(localizedClubAccessReason(context, gate)),
               ClubAccessDecision.checking => const CySkeleton(),
               _ => _body(context, value),
             },
@@ -201,24 +203,24 @@ class _ClubCustomerDetailPageState
     final failure = classifyClubCrmFailure(error);
     if (failure.auth) {
       return _noPermissionView(
-        friendlyOrBackendMessage(error, fallback: '当前岗位没有客户查看权限，请联系主理人'),
+        clubApiErrorMessage(context, error, fallback: stringsOf(context).clubCustomerContactHost),
       );
     }
     if (widget.memberId <= 0) {
       return StatusView(
-        message: '打不开这位客户',
-        sub: '缺少客户信息，请从客户列表重新进入',
+        message: stringsOf(context).clubCustomerCannotOpen,
+        sub: stringsOf(context).clubCustomerMissing,
         icon: CupertinoIcons.person_crop_circle_badge_xmark,
         large: true,
         onRetry: _goBack,
-        retryLabel: '返回客户列表',
+        retryLabel: stringsOf(context).clubCustomerBack,
       );
     }
     return StatusView(
-      message: '客户详情加载失败',
+      message: stringsOf(context).clubCustomerLoadFailed,
       sub: failure.network
-          ? '网络不稳定，稍后再试一次'
-          : friendlyOrBackendMessage(error, fallback: '客户详情没能加载，请稍后重试'),
+          ? stringsOf(context).clubCustomerNetworkRetry
+          : clubApiErrorMessage(context, error, fallback: stringsOf(context).clubCustomerRetryLater),
       icon: CupertinoIcons.cloud,
       large: true,
       onRetry: () => ref.invalidate(clubCustomerDetailProvider(_key)),
@@ -227,12 +229,12 @@ class _ClubCustomerDetailPageState
 
   Widget _noPermissionView(String reason) {
     return StatusView(
-      message: '当前岗位没有客户查看权限',
-      sub: reason.isEmpty ? '请联系主理人调整角色权限，或返回客户列表' : reason,
+      message: stringsOf(context).clubCustomersNoPermission,
+      sub: reason.isEmpty ? stringsOf(context).clubCustomerPermissionHelp : reason,
       icon: CupertinoIcons.lock,
       large: true,
       onRetry: _goBack,
-      retryLabel: '返回客户列表',
+      retryLabel: stringsOf(context).clubCustomerBack,
     );
   }
 
@@ -253,7 +255,7 @@ class _ClubCustomerDetailPageState
               child: Padding(
                 padding: const EdgeInsets.only(top: CyTokens.space4),
                 child: Text(
-                  summary.displayName,
+                  clubCustomerSummaryName(context, summary),
                   style: TextStyle(
                     fontSize: CyTokens.typePageTitle,
                     fontWeight: FontWeight.w600,
@@ -264,14 +266,14 @@ class _ClubCustomerDetailPageState
             ),
             CyAvatar(
               url: summary.avatar,
-              fallback: summary.displayName,
+              fallback: clubCustomerSummaryName(context, summary),
               size: 56,
             ),
           ],
         ),
         const SizedBox(height: CyTokens.space1),
         Text(
-          summary.lastInteractionText,
+          clubCustomerInteraction(context, summary),
           style: TextStyle(color: palette.textSecondary),
         ),
         const SizedBox(height: CyTokens.space4),
@@ -284,10 +286,10 @@ class _ClubCustomerDetailPageState
           ),
           child: Row(
             children: <Widget>[
-              Text('累计实付', style: TextStyle(color: palette.textSecondary)),
+              Text(stringsOf(context).clubCustomerPaidTotal, style: TextStyle(color: palette.textSecondary)),
               const Spacer(),
               Text(
-                summary.paidAmountText,
+                summary.amountVisible ? summary.paidAmountText : stringsOf(context).clubCustomerAmountHidden,
                 style: TextStyle(
                   color: summary.amountVisible
                       ? palette.textPrimary
@@ -306,22 +308,22 @@ class _ClubCustomerDetailPageState
           ),
         ],
         const SizedBox(height: CyTokens.space5),
-        const CySectionTitle('客户概览'),
+        CySectionTitle(stringsOf(context).clubCustomerOverview),
         const SizedBox(height: CyTokens.space2),
         Row(
           children: <Widget>[
-            _Stat(label: '到店次数', value: '${summary.arrivedCount}'),
-            _Stat(label: '待核销', value: '${summary.pendingCount}'),
-            _Stat(label: '已退款', value: '${summary.refundedCount}'),
+            _Stat(label: stringsOf(context).clubCustomerVisits, value: '${summary.arrivedCount}'),
+            _Stat(label: stringsOf(context).clubCustomerPending, value: '${summary.pendingCount}'),
+            _Stat(label: stringsOf(context).clubCustomerRefunded, value: '${summary.refundedCount}'),
           ],
         ),
         const SizedBox(height: CyTokens.space5),
-        const CySectionTitle('参与记录'),
+        CySectionTitle(stringsOf(context).clubCustomerActivity),
         const SizedBox(height: CyTokens.space2),
         if (detail.records.isEmpty)
-          const StatusView(
-            message: '暂无参与记录',
-            sub: '该客户还没有报名或核销过',
+          StatusView(
+            message: stringsOf(context).clubCustomerActivityEmpty,
+            sub: stringsOf(context).clubCustomerActivityEmptyBody,
             icon: CupertinoIcons.doc_text,
           )
         else
@@ -347,7 +349,7 @@ class _ClubCustomerDetailPageState
                           ),
                         ),
                         Text(
-                          record.monthText,
+                          clubCustomerRecordMonth(context, record),
                           style: CyType.caption1.copyWith(
                             color: palette.textSecondary,
                           ),
@@ -355,7 +357,7 @@ class _ClubCustomerDetailPageState
                       ],
                     ),
                   ),
-                  title: Text(record.title),
+                  title: Text(clubCustomerRecordTitle(context, record)),
                   subtitle: _RecordStatus(record: record),
                   trailing: Icon(
                     CupertinoIcons.chevron_forward,
@@ -368,17 +370,17 @@ class _ClubCustomerDetailPageState
         const SizedBox(height: CyTokens.space5),
         Row(
           children: <Widget>[
-            Expanded(child: CySectionTitle(_editing ? '编辑标签与备注' : '标签与备注')),
+            Expanded(child: CySectionTitle(_editing ? stringsOf(context).clubCustomerEditNotes : stringsOf(context).clubCustomerNotes)),
             if (_editing)
               Semantics(
                 button: true,
                 excludeSemantics: true,
-                label: '取消编辑标签与备注',
+                label: stringsOf(context).clubCustomerCancelNotes,
                 child: CupertinoButton(
                   padding: EdgeInsets.zero,
                   minimumSize: const Size(44, 44),
                   onPressed: _cancelEdit,
-                  child: const Text('取消'),
+                  child: Text(stringsOf(context).clubCustomerCancel),
                 ),
               ),
           ],
@@ -429,7 +431,7 @@ class _ClubCustomerDetailPageState
                   padding: EdgeInsets.zero,
                   minimumSize: const Size(44, 44),
                   onPressed: () => _startEdit(detail),
-                  child: const Text('编辑'),
+                  child: Text(stringsOf(context).clubCustomerEdit),
                 ),
             ],
           ),
@@ -471,7 +473,7 @@ class _ClubCustomerDetailPageState
                   key: const Key('club-customer-tag-input'),
                   controller: _tagCtrl,
                   maxLength: kClubTagMaxLength,
-                  placeholder: '加个标签，例如：常客',
+                  placeholder: stringsOf(context).clubCustomerTagPlaceholder,
                   onSubmitted: (_) => _addTag(),
                 ),
               ),
@@ -479,12 +481,12 @@ class _ClubCustomerDetailPageState
               Semantics(
                 button: true,
                 excludeSemantics: true,
-                label: '添加标签',
+                label: stringsOf(context).clubCustomerAddTag,
                 child: CupertinoButton(
                   padding: EdgeInsets.zero,
                   minimumSize: const Size(44, 44),
                   onPressed: _addTag,
-                  child: const Text('添加'),
+                  child: Text(stringsOf(context).clubCustomerAdd),
                 ),
               ),
             ],
@@ -496,14 +498,14 @@ class _ClubCustomerDetailPageState
             maxLength: kClubRemarkMaxLength,
             maxLines: 3,
             minLines: 3,
-            placeholder: '备注：口味偏好、常带谁、下次要留意什么',
+            placeholder: stringsOf(context).clubCustomerNotePlaceholder,
             onChanged: (String value) => _draftRemark = value,
           ),
           if (_draftError.isNotEmpty) ...<Widget>[
             const SizedBox(height: CyTokens.space2),
             if (_draftErrorFromSave)
-              const Text(
-                '标签与备注没保存成功',
+              Text(
+                stringsOf(context).clubCustomerSaveErrorTitle,
                 style: TextStyle(color: CyTokens.statusDanger),
               ),
             Text(
@@ -513,7 +515,7 @@ class _ClubCustomerDetailPageState
           ],
           const SizedBox(height: CyTokens.space3),
           CyNativeButton(
-            label: '保存',
+            label: stringsOf(context).clubCustomerSave,
             loading: _saving,
             onPressed: _saving ? null : _save,
           ),
@@ -564,6 +566,13 @@ class _RecordStatus extends StatelessWidget {
       'danger' => CyTokens.statusDanger,
       _ => palette.textTertiary,
     };
-    return Text('${record.statusLabel} · 报名记录', style: TextStyle(color: color));
+    return Text(stringsOf(context).clubCustomerRegistration(clubCustomerRecordStatus(context, record)), style: TextStyle(color: color));
   }
 }
+
+String _draftErrorLabel(BuildContext context, String error) => switch (error) {
+  '备注最多 $kClubRemarkMaxLength 字' => stringsOf(context).clubCustomerRemarkLimit(kClubRemarkMaxLength),
+  '单个标签最多 $kClubTagMaxLength 字' => stringsOf(context).clubCustomerTagLength(kClubTagMaxLength),
+  '标签最多 $kClubTagMaxCount 个' => stringsOf(context).clubCustomerTagCount(kClubTagMaxCount),
+  _ => error,
+};

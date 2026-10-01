@@ -1,3 +1,4 @@
+import '../club/club_api_messages.dart';
 import '../../core/theme/cy_palette.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -8,6 +9,7 @@ import '../../data/models/verification_scan.dart';
 import '../../data/models/scan_result.dart';
 import 'scan_choice.dart';
 import '../../core/providers.dart';
+import '../../l10n/strings.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/cy_tokens.dart';
 import '../../core/widgets/cy_native_button.dart';
@@ -68,14 +70,17 @@ class _MerchantScanPageState extends ConsumerState<MerchantScanPage> {
       setState(() {
         _resultOk = false;
         // 「暂不支持此动态码」和「二维码格式错误」是两回事,原样区分。
-        _resultMsg = scan.message ?? '二维码格式错误';
+        _resultMsg = scan.message == '暂不支持此动态码'
+            ? stringsOf(context).merchantRedemptionUnsupported
+            : stringsOf(context).merchantRedemptionInvalid;
       });
       return;
     }
+    final ticketSuccess = stringsOf(context).merchantRedemptionTicketSuccess;
     try {
       final String msg = switch (scan.kind) {
         ScanKind.group =>
-          await ref.read(groupCodeApiProvider).redeem(scan.code),
+          await _redeemGroup(scan.code),
         ScanKind.coupon => await ref.read(couponApiProvider).verify(scan.code),
         // ⚠️ 用 **Detailed** 版本,不用 scanQrCode ——
         //   后者在"需要选章"时抛异常,而且抛的那句话是
@@ -86,7 +91,7 @@ class _MerchantScanPageState extends ConsumerState<MerchantScanPage> {
         ScanKind.legacyTicket => await _legacy(scan),
         ScanKind.dynamicTicket => _dynamicMsg(
           await ref.read(activityApiProvider).scanDynamicCode(scan.code),
-          scan.successTitle,
+          ticketSuccess,
         ),
         ScanKind.invalid => '',
       };
@@ -100,20 +105,27 @@ class _MerchantScanPageState extends ConsumerState<MerchantScanPage> {
       setState(() {
         _resultOk = false;
         // 后端原因原样展示:码无效/已过期/已核销/无权限等,客户端不改写。
-        _resultMsg = e.toString().replaceFirst('Exception: ', '');
+        _resultMsg = clubApiErrorMessage(context, e);
       });
     }
+  }
+
+  Future<String> _redeemGroup(String code) async {
+    final localSuccess = stringsOf(context).boundedApiGroupSuccess;
+    final receipt = await ref.read(groupCodeApiProvider).redeemWithReceipt(code);
+    return receipt.isLocalFallback ? localSuccess : receipt.message;
   }
 
   /// 旧版票码。★ 走 **Detailed** 版本 + 选章面板,不用 scanQrCode ——
   /// 后者在"需要选章"时抛异常,抛的那句还是「请到商家核销页扫码」
   /// (这里就是商家核销页),而且会把候选列表连同 data 一起丢掉。
   Future<String> _legacy(VerificationScan scan) async {
+    final cancelledMessage = stringsOf(context).merchantRedemptionCancelled;
     final ScanResult r = await ref
         .read(registrationApiProvider)
         .scanQrCodeDetailed(type: scan.legacyType!, code: scan.code);
     // 拿到结果之后页面可能已经不在了 —— 弹面板前先确认。
-    if (!mounted) throw Exception('已取消,这张票还没核销');
+    if (!mounted) throw Exception(cancelledMessage);
     return resolveScanChoice(
       context: context,
       ref: ref,
@@ -125,7 +137,8 @@ class _MerchantScanPageState extends ConsumerState<MerchantScanPage> {
   /// 动态票码成功后的话:后端带回章节就说清是哪一章。
   String _dynamicMsg(Map<String, dynamic> data, String fallback) {
     final Object? chapter = data['chapterId'];
-    return chapter == null ? fallback : '$fallback(章节 $chapter)';
+    if (chapter == null || !mounted) return fallback;
+    return stringsOf(context).merchantRedemptionChapterResult(fallback, chapter.toString());
   }
 
   Future<void> _scanNext() async {
@@ -140,9 +153,9 @@ class _MerchantScanPageState extends ConsumerState<MerchantScanPage> {
   Future<void> _manualInput() async {
     final String? code = await showCySystemTextInputAlert(
       context: context,
-      title: '手动输入核销码',
-      placeholder: '请玩家出示码并念给你',
-      confirmText: '核销',
+      title: stringsOf(context).merchantRedemptionManualTitle,
+      placeholder: stringsOf(context).merchantRedemptionPlayerReadHint,
+      confirmText: stringsOf(context).merchantRedemptionRedeem,
       keyboardKind: CySystemKeyboardKind.ascii,
     );
     if (code == null || code.isEmpty) return;
@@ -162,7 +175,7 @@ class _MerchantScanPageState extends ConsumerState<MerchantScanPage> {
           padding: EdgeInsets.zero,
           child: Semantics(
             button: true,
-            label: '手动输入',
+            label: stringsOf(context).merchantRedemptionManual,
             child: const Icon(CupertinoIcons.keyboard),
           ),
         ),
@@ -182,7 +195,7 @@ class _MerchantScanPageState extends ConsumerState<MerchantScanPage> {
               // 不显式 stretch 会把 58rpx 大标题推到屏幕正中,与小程序完全不同。
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
-                const CyPageTitle('核销玩家票'),
+                CyPageTitle(stringsOf(context).merchantRedemptionTitle),
                 Expanded(
                   child: Stack(
                     children: <Widget>[
@@ -259,7 +272,7 @@ class _ResultOverlay extends StatelessWidget {
                 style: textTheme.titleMedium,
               ),
               SizedBox(height: CyTokens.space5),
-              CyNativeButton(onPressed: onNext, label: '继续扫描'),
+              CyNativeButton(onPressed: onNext, label: stringsOf(context).merchantRedemptionNext),
             ],
           ),
         ),

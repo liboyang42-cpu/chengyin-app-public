@@ -1,3 +1,5 @@
+import '../../l10n/strings.dart';
+import 'merchant_node_strings.dart';
 import 'dart:async';
 import 'dart:io';
 
@@ -163,7 +165,7 @@ class _MerchantNodeNpcPageState extends ConsumerState<MerchantNodeNpcPage> {
     // 真正算数的是后端那道 —— 这里只省一次往返。
     final String? why = _draft.saveBlocker;
     if (why != null) {
-      CyNativeNotice.show(context, why, isError: true);
+      CyNativeNotice.show(context, merchantNodeLocalText(context, why), isError: true);
       return;
     }
     setState(() => _saving = true);
@@ -189,7 +191,7 @@ class _MerchantNodeNpcPageState extends ConsumerState<MerchantNodeNpcPage> {
         _name.text = _npc.name;
         _greeting.text = _npc.greeting;
       });
-      CyNativeNotice.show(context, '已保存');
+      CyNativeNotice.show(context, stringsOf(context).merchantNodeSaved);
     } on MerchantApiException catch (e) {
       if (!mounted) return;
       // 「承接已失效或未生效,不能编辑节点内容」等状态态原样透传 ——
@@ -213,7 +215,7 @@ class _MerchantNodeNpcPageState extends ConsumerState<MerchantNodeNpcPage> {
       if (!mounted) return;
       setState(() => _recording = false);
       if (path == null) {
-        CyNativeNotice.show(context, '这次没录上,再试一次', isError: true);
+        CyNativeNotice.show(context, stringsOf(context).merchantNodeRecordingFailed, isError: true);
         return;
       }
       await _submitVoice(path);
@@ -223,7 +225,7 @@ class _MerchantNodeNpcPageState extends ConsumerState<MerchantNodeNpcPage> {
     //   用户还不知道要它干什么。
     if (!await _recorder.hasPermission()) {
       if (mounted) {
-        CyNativeNotice.show(context, '需要麦克风权限才能录音', isError: true);
+        CyNativeNotice.show(context, stringsOf(context).merchantNodeMicrophoneNeeded, isError: true);
       }
       return;
     }
@@ -257,7 +259,7 @@ class _MerchantNodeNpcPageState extends ConsumerState<MerchantNodeNpcPage> {
         ),
       );
       _syncVoicePoll();
-      CyNativeNotice.show(context, '录音已提交,正在生成声音');
+      CyNativeNotice.show(context, stringsOf(context).merchantNodeVoiceSubmitted);
     } catch (e) {
       if (!mounted) return;
       CyNativeNotice.show(
@@ -293,9 +295,9 @@ class _MerchantNodeNpcPageState extends ConsumerState<MerchantNodeNpcPage> {
   Future<void> _resetVoice() async {
     final bool ok = await cyConfirm(
       context,
-      title: '清除这个点位的声音?',
-      content: '清除后角色回到没有声音的状态,可以重新录。',
-      confirmText: '清除',
+      title: stringsOf(context).merchantNodeClearVoiceTitle,
+      content: stringsOf(context).merchantNodeClearVoiceBody,
+      confirmText: stringsOf(context).merchantNodeClear,
       danger: true,
     );
     if (!ok || !mounted) return;
@@ -307,7 +309,7 @@ class _MerchantNodeNpcPageState extends ConsumerState<MerchantNodeNpcPage> {
       // 清除后回读:服务端的四态才是界面的输入。
       await _refreshVoiceStatus();
       if (!mounted) return;
-      CyNativeNotice.show(context, '已清除');
+      CyNativeNotice.show(context, stringsOf(context).merchantNodeCleared);
     } catch (e) {
       if (!mounted) return;
       CyNativeNotice.show(
@@ -362,8 +364,8 @@ class _MerchantNodeNpcPageState extends ConsumerState<MerchantNodeNpcPage> {
       navigationBar: CupertinoNavigationBar(
         middle: Text(
           widget.nodeName?.trim().isNotEmpty == true
-              ? '${widget.nodeName!.trim()} · 角色'
-              : '点位角色',
+              ? stringsOf(context).merchantNodeCharacterTitle(widget.nodeName!.trim())
+              : stringsOf(context).merchantNodeNodeCharacter,
         ),
       ),
       child: Material(
@@ -377,18 +379,18 @@ class _MerchantNodeNpcPageState extends ConsumerState<MerchantNodeNpcPage> {
                   context,
                   _loadError!,
                   onRetry: _load,
-                  what: '点位角色',
+                  what: stringsOf(context).merchantNodeNodeCharacter,
                 )
               : ListView(
                   padding: const EdgeInsets.all(CyTokens.space4),
                   children: <Widget>[
                     Text(
-                      '给这个点位配一个 AI 角色。玩家走到这里时,它用你填的招呼语开口。',
+                      stringsOf(context).merchantNodeNodeCharacterIntro,
                       style: t.bodySmall?.copyWith(color: p.textSecondary),
                     ),
                     const SizedBox(height: CyTokens.space4),
 
-                    const CySectionTitle('角色形象'),
+                    CySectionTitle(stringsOf(context).merchantNodeCharacterAppearance),
                     const SizedBox(height: CyTokens.space2),
                     _avatarBlock(p, t),
                     const SizedBox(height: CyTokens.space4),
@@ -396,26 +398,26 @@ class _MerchantNodeNpcPageState extends ConsumerState<MerchantNodeNpcPage> {
                     _textField(
                       key: 'node-npc-name',
                       controller: _name,
-                      label: '角色名字',
-                      hint: '比如「阿福」「看店的老张」',
+                      label: stringsOf(context).merchantNodeCharacterName,
+                      hint: stringsOf(context).merchantNodeCharacterNameHint,
                     ),
                     _textField(
                       key: 'node-npc-greeting',
                       controller: _greeting,
-                      label: '招呼语(可空)',
-                      hint: '玩家走到这个点位时它先说的那句',
+                      label: stringsOf(context).merchantNodeGreetingOptional,
+                      hint: stringsOf(context).merchantNodeNodeGreetingHint,
                       maxLines: 2,
                     ),
 
                     const SizedBox(height: CyTokens.space2),
-                    const CySectionTitle('角色的声音'),
+                    CySectionTitle(stringsOf(context).merchantNodeCharacterVoice),
                     const SizedBox(height: CyTokens.space1),
                     _voiceBlock(p, t),
 
                     const SizedBox(height: CyTokens.space4),
                     CyNativeButton(
                       key: const Key('node-npc-save'),
-                      label: _saving ? '保存中…' : '保存',
+                      label: _saving ? stringsOf(context).merchantNodeSaving : stringsOf(context).merchantNodeSave,
                       loading: _saving,
                       onPressed: _saving ? null : _save,
                     ),
@@ -434,7 +436,7 @@ class _MerchantNodeNpcPageState extends ConsumerState<MerchantNodeNpcPage> {
         key: const Key('node-npc-avatar-upload'),
         onPressed: _uploading ? null : _pickAvatar,
         role: CyNativeButtonRole.secondary,
-        label: _uploading ? '上传中…' : '上传角色照片',
+        label: _uploading ? stringsOf(context).merchantNodeUploading : stringsOf(context).merchantNodeUploadCharacter,
       );
     }
     return Row(
@@ -449,7 +451,7 @@ class _MerchantNodeNpcPageState extends ConsumerState<MerchantNodeNpcPage> {
           padding: EdgeInsets.zero,
           minimumSize: const Size(88, 44),
           onPressed: _uploading ? null : _pickAvatar,
-          child: Text(_uploading ? '上传中…' : '换一张'),
+          child: Text(_uploading ? stringsOf(context).merchantNodeUploading : stringsOf(context).merchantNodeChangeImage),
         ),
         if (_uploading) const CupertinoActivityIndicator(),
       ],
@@ -459,7 +461,7 @@ class _MerchantNodeNpcPageState extends ConsumerState<MerchantNodeNpcPage> {
   Widget _voiceBlock(CyPalette p, TextTheme t) {
     final ChapterNodeNpc npc = _npc;
     final Widget line = Text(
-      npc.voiceLabel,
+      merchantNodeLocalText(context, npc.voiceLabel),
       key: const Key('node-npc-voice-status'),
       style: t.bodySmall?.copyWith(
         color: npc.isVoiceFailed ? p.statusWarning : p.textSecondary,
@@ -470,8 +472,7 @@ class _MerchantNodeNpcPageState extends ConsumerState<MerchantNodeNpcPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Text(
-          '可以录一句招呼词,让角色用你的声音说话(可选)。'
-          '声音生成好之前角色照样能用,只是没声音。',
+          stringsOf(context).merchantNodeVoiceHint,
           style: t.bodySmall?.copyWith(color: p.textSecondary),
         ),
         const SizedBox(height: CyTokens.space2),
@@ -485,12 +486,12 @@ class _MerchantNodeNpcPageState extends ConsumerState<MerchantNodeNpcPage> {
               CyNativeButton(
                 key: const Key('node-npc-voice-record'),
                 label: _recording
-                    ? '停止并提交'
+                    ? stringsOf(context).merchantNodeStopSubmit
                     : _voiceBusy
-                    ? '提交中…'
+                    ? stringsOf(context).merchantNodeSubmitting
                     : npc.isVoiceFailed
-                    ? '重新录一段'
-                    : '录一段声音',
+                    ? stringsOf(context).merchantNodeRecordAgain
+                    : stringsOf(context).merchantNodeRecordVoice,
                 role: CyNativeButtonRole.secondary,
                 loading: _voiceBusy && !_recording,
                 onPressed: (_voiceBusy && !_recording) ? null : _toggleRecord,
@@ -498,14 +499,14 @@ class _MerchantNodeNpcPageState extends ConsumerState<MerchantNodeNpcPage> {
             if (npc.isVoiceReady)
               CyNativeButton(
                 key: const Key('node-npc-voice-play'),
-                label: _playing ? '停止播放' : '试听',
+                label: _playing ? stringsOf(context).merchantNodeStopPlaying : stringsOf(context).merchantNodeListen,
                 role: CyNativeButtonRole.secondary,
                 onPressed: _playSample,
               ),
             if (npc.isVoiceReady || npc.isVoiceFailed)
               CyNativeButton(
                 key: const Key('node-npc-voice-reset'),
-                label: '清除声音',
+                label: stringsOf(context).merchantNodeClearVoice,
                 role: CyNativeButtonRole.secondary,
                 loading: _voiceBusy,
                 onPressed: _voiceBusy ? null : _resetVoice,
@@ -513,7 +514,7 @@ class _MerchantNodeNpcPageState extends ConsumerState<MerchantNodeNpcPage> {
             if (npc.isVoiceGenerating)
               CyNativeButton(
                 key: const Key('node-npc-voice-refresh'),
-                label: '刷新状态',
+                label: stringsOf(context).merchantNodeRefreshStatus,
                 role: CyNativeButtonRole.secondary,
                 onPressed: _refreshVoiceStatus,
               ),

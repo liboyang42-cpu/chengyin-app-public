@@ -10,7 +10,7 @@ enum MerchantReviewStatus {
 
   static MerchantReviewStatus parse(Object? value) => values.firstWhere(
     (MerchantReviewStatus status) => status.wire == value,
-    orElse: () => throw const FormatException('评价状态不完整'),
+    orElse: () => throw const MerchantReviewLocalFormatException('评价状态不完整'),
   );
 }
 
@@ -45,7 +45,7 @@ class MerchantReviewEligibility {
     if (rawCanCreate != canCreate ||
         (canCreate && reasonCode != 'ELIGIBLE') ||
         (!canCreate && reasonCode == 'ELIGIBLE')) {
-      throw const FormatException('评价资格回执不一致');
+      throw const MerchantReviewLocalFormatException('评价资格回执不一致');
     }
     return MerchantReviewEligibility(
       canCreate: canCreate,
@@ -87,23 +87,24 @@ class MerchantReviewItem {
     required this.canReply,
     required this.canReport,
     this.canEditReply = false,
+    this.hasAuthorNicknameFallback = false,
   });
 
   factory MerchantReviewItem.fromJson(Map<String, dynamic> json) {
     final int id = _positiveInt(json['id'], 'id');
     final int rating = _integer(json['rating'], 'rating');
     if (rating < 1 || rating > 5) {
-      throw const FormatException('评分必须在 1 到 5 之间');
+      throw const MerchantReviewLocalFormatException('评分必须在 1 到 5 之间');
     }
     final Object? rawImages = json['imageUrls'];
     if (rawImages is! List || rawImages.length > 9) {
-      throw const FormatException('评价图片不完整');
+      throw const MerchantReviewLocalFormatException('评价图片不完整');
     }
     final List<Uri> images = rawImages
         .map<Uri>((Object? value) {
           final Uri? uri = Uri.tryParse(value is String ? value.trim() : '');
           if (uri == null || uri.scheme != 'https' || uri.host.isEmpty) {
-            throw const FormatException('评价图片地址不安全');
+            throw const MerchantReviewLocalFormatException('评价图片地址不安全');
           }
           return uri;
         })
@@ -122,10 +123,10 @@ class MerchantReviewItem {
     );
     final String? reply = _optionalText(json['merchantReply']);
     if (canReply && (status != MerchantReviewStatus.visible || reply != null)) {
-      throw const FormatException('评价回复权限与状态不一致');
+      throw const MerchantReviewLocalFormatException('评价回复权限与状态不一致');
     }
     if (canReport && status != MerchantReviewStatus.visible) {
-      throw const FormatException('评价举报权限与状态不一致');
+      throw const MerchantReviewLocalFormatException('评价举报权限与状态不一致');
     }
     return MerchantReviewItem(
       id: id,
@@ -133,6 +134,7 @@ class MerchantReviewItem {
       content: _text(json['content']),
       imageUrls: images,
       authorNickname: _text(json['authorNickname'], fallback: '城瘾玩家'),
+      hasAuthorNicknameFallback: (json['authorNickname'] as String?)?.trim().isNotEmpty != true,
       authorAvatar: _optionalText(json['authorAvatar']),
       verifiedRedemption: verified,
       status: status,
@@ -151,6 +153,7 @@ class MerchantReviewItem {
   final String content;
   final List<Uri> imageUrls;
   final String authorNickname;
+  final bool hasAuthorNicknameFallback;
   final String? authorAvatar;
   final bool verifiedRedemption;
   final MerchantReviewStatus status;
@@ -185,23 +188,23 @@ class MerchantReviewPage {
     required int expectedPageSize,
   }) {
     if (json['mode'] != expectedMode.wire) {
-      throw const FormatException('评价列表视角不匹配');
+      throw const MerchantReviewLocalFormatException('评价列表视角不匹配');
     }
     final int pageNum = _positiveInt(json['pageNum'], 'pageNum');
     final int pageSize = _positiveInt(json['pageSize'], 'pageSize');
     if (pageNum != expectedPageNum || pageSize != expectedPageSize) {
-      throw const FormatException('评价分页回执不匹配');
+      throw const MerchantReviewLocalFormatException('评价分页回执不匹配');
     }
     final int total = _nonNegativeInt(json['total'], 'total');
     final bool hasMore = _boolean(json['hasMore'], 'hasMore');
     final Object? rawItems = json['items'];
     if (rawItems is! List || rawItems.length > pageSize) {
-      throw const FormatException('评价列表不完整');
+      throw const MerchantReviewLocalFormatException('评价列表不完整');
     }
     final List<MerchantReviewItem> items = rawItems
         .map<MerchantReviewItem>((Object? value) {
           if (value is! Map<String, dynamic>) {
-            throw const FormatException('评价行不完整');
+            throw const MerchantReviewLocalFormatException('评价行不完整');
           }
           return MerchantReviewItem.fromJson(value);
         })
@@ -211,28 +214,28 @@ class MerchantReviewPage {
           (MerchantReviewItem item) =>
               item.status != MerchantReviewStatus.visible,
         )) {
-      throw const FormatException('公开列表包含未公开评价');
+      throw const MerchantReviewLocalFormatException('公开列表包含未公开评价');
     }
     final int loadedThrough = (pageNum - 1) * pageSize + items.length;
     if (loadedThrough > total || hasMore != (loadedThrough < total)) {
-      throw const FormatException('评价分页总数不一致');
+      throw const MerchantReviewLocalFormatException('评价分页总数不一致');
     }
     final Object? rawAverage = json['averageRating'];
     final double? average = switch (rawAverage) {
       null => null,
       final num value when value >= 1 && value <= 5 => value.toDouble(),
-      _ => throw const FormatException('评价均分不完整'),
+      _ => throw const MerchantReviewLocalFormatException('评价均分不完整'),
     };
     final MerchantReviewEligibility? eligibility;
     if (expectedMode == MerchantReviewMode.public) {
       final Object? rawEligibility = json['eligibility'];
       if (rawEligibility is! Map<String, dynamic>) {
-        throw const FormatException('评价资格回执不完整');
+        throw const MerchantReviewLocalFormatException('评价资格回执不完整');
       }
       eligibility = MerchantReviewEligibility.fromJson(rawEligibility);
     } else {
       if (json['eligibility'] != null) {
-        throw const FormatException('商家管理列表不应包含个人资格');
+        throw const MerchantReviewLocalFormatException('商家管理列表不应包含个人资格');
       }
       eligibility = null;
     }
@@ -274,7 +277,7 @@ class MerchantReviewImageUrlPolicy {
     if (!RegExp(
       r'^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$',
     ).hasMatch(normalizedBucket)) {
-      throw ArgumentError('OSS bucket 配置不合法');
+      throw MerchantReviewLocalArgumentError('OSS bucket 配置不合法');
     }
     final String rawEndpoint = endpoint.trim();
     final Uri? endpointUri = Uri.tryParse(
@@ -288,7 +291,7 @@ class MerchantReviewImageUrlPolicy {
         (endpointUri.path.isNotEmpty && endpointUri.path != '/') ||
         endpointUri.hasQuery ||
         endpointUri.hasFragment) {
-      throw ArgumentError('OSS endpoint 配置不合法');
+      throw MerchantReviewLocalArgumentError('OSS endpoint 配置不合法');
     }
     final String endpointHost = endpointUri.host.toLowerCase();
     final String expectedHost = endpointHost.startsWith('$normalizedBucket.')
@@ -304,7 +307,7 @@ class MerchantReviewImageUrlPolicy {
     final Uri? uri = Uri.tryParse(value);
     if (uri == null ||
         !_isApprovedReviewUploadUrl(value, <String>{uri.host.toLowerCase()})) {
-      throw ArgumentError('上传回执不符合评价图片安全合同');
+      throw MerchantReviewLocalArgumentError('上传回执不符合评价图片安全合同');
     }
     return MerchantReviewImageUrlPolicy._(
       Set<String>.unmodifiable(<String>{
@@ -354,7 +357,7 @@ class MerchantReviewCreateDraft {
       '$merchantRowId|$registrationId|$rating|${content.trim()}|${imageUrls.join(',')}';
 
   Map<String, dynamic> toJson({required String requestId}) {
-    if (validationError != null) throw ArgumentError(validationError);
+    if (validationError != null) throw MerchantReviewLocalArgumentError(validationError);
     _validateRequestId(requestId);
     return <String, dynamic>{
       'merchantRowId': merchantRowId,
@@ -388,7 +391,7 @@ class MerchantReviewReplyDraft {
   String get fingerprint => '$reviewId|$expectedVersion|${content.trim()}';
 
   Map<String, dynamic> toJson({required String requestId}) {
-    if (validationError != null) throw ArgumentError(validationError);
+    if (validationError != null) throw MerchantReviewLocalArgumentError(validationError);
     _validateRequestId(requestId);
     return <String, dynamic>{
       'reviewId': reviewId,
@@ -420,7 +423,7 @@ class MerchantReviewReportDraft {
   String get fingerprint => '$reviewId|$expectedVersion|${reason.trim()}';
 
   Map<String, dynamic> toJson({required String requestId}) {
-    if (validationError != null) throw ArgumentError(validationError);
+    if (validationError != null) throw MerchantReviewLocalArgumentError(validationError);
     _validateRequestId(requestId);
     return <String, dynamic>{
       'reviewId': reviewId,
@@ -447,7 +450,7 @@ class MerchantReviewReceipt {
   }) {
     final int reviewId = _positiveInt(json['reviewId'], 'reviewId');
     if (reviewId != expectedReviewId) {
-      throw const FormatException('评价操作回执串单');
+      throw const MerchantReviewLocalFormatException('评价操作回执串单');
     }
     final String status = _text(json['status']);
     final int? version = json['version'] == null
@@ -469,15 +472,15 @@ class MerchantReviewReceipt {
             (replayed
                 ? auditTaskId != null
                 : status != 'PENDING_REVIEW' || auditTaskId == null)) {
-          throw const FormatException('评价提交回执不完整');
+          throw const MerchantReviewLocalFormatException('评价提交回执不完整');
         }
       case MerchantReviewAction.reply:
         if (status != 'VISIBLE' || version == null) {
-          throw const FormatException('公开回复回执不完整');
+          throw const MerchantReviewLocalFormatException('公开回复回执不完整');
         }
       case MerchantReviewAction.report:
         if (status != 'PENDING_PLATFORM_REVIEW' || auditTaskId == null) {
-          throw const FormatException('举报复核回执不完整');
+          throw const MerchantReviewLocalFormatException('举报复核回执不完整');
         }
     }
     return MerchantReviewReceipt(
@@ -498,44 +501,44 @@ class MerchantReviewReceipt {
 
 int _integer(Object? value, String field) {
   if (value is int) return value;
-  throw FormatException('$field 不完整');
+  throw MerchantReviewLocalFormatException('$field 不完整', field: field);
 }
 
 int _positiveInt(Object? value, String field) {
   final int parsed = _integer(value, field);
-  if (parsed <= 0) throw FormatException('$field 不完整');
+  if (parsed <= 0) throw MerchantReviewLocalFormatException('$field 不完整', field: field);
   return parsed;
 }
 
 int _nonNegativeInt(Object? value, String field) {
   final int parsed = _integer(value, field);
-  if (parsed < 0) throw FormatException('$field 不完整');
+  if (parsed < 0) throw MerchantReviewLocalFormatException('$field 不完整', field: field);
   return parsed;
 }
 
 bool _boolean(Object? value, String field) {
   if (value is bool) return value;
-  throw FormatException('$field 不完整');
+  throw MerchantReviewLocalFormatException('$field 不完整', field: field);
 }
 
 String _text(Object? value, {String fallback = ''}) {
   if (value == null) return fallback;
-  if (value is! String) throw const FormatException('文本回执不完整');
+  if (value is! String) throw const MerchantReviewLocalFormatException('文本回执不完整');
   return value.trim().isEmpty ? fallback : value.trim();
 }
 
 String? _optionalText(Object? value) {
   if (value == null) return null;
-  if (value is! String) throw const FormatException('文本回执不完整');
+  if (value is! String) throw const MerchantReviewLocalFormatException('文本回执不完整');
   final String normalized = value.trim();
   return normalized.isEmpty ? null : normalized;
 }
 
 DateTime? _optionalDateTime(Object? value) {
   if (value == null || value == '') return null;
-  if (value is! String) throw const FormatException('时间回执不完整');
+  if (value is! String) throw const MerchantReviewLocalFormatException('时间回执不完整');
   final DateTime? parsed = DateTime.tryParse(value.replaceFirst(' ', 'T'));
-  if (parsed == null) throw const FormatException('时间回执不完整');
+  if (parsed == null) throw const MerchantReviewLocalFormatException('时间回执不完整');
   return parsed;
 }
 
@@ -543,7 +546,7 @@ void _validateRequestId(String requestId) {
   if (requestId.isEmpty ||
       requestId.length > 64 ||
       !RegExp(r'^[A-Za-z0-9._:-]+$').hasMatch(requestId)) {
-    throw ArgumentError('请求标识不合法');
+    throw MerchantReviewLocalArgumentError('请求标识不合法');
   }
 }
 
@@ -578,4 +581,16 @@ bool _isApprovedReviewUploadUrl(String raw, Set<String> allowedHosts) {
       hasNonEmpty('x-oss-expires') &&
       hasNonEmpty('x-oss-signature');
   return v1 || v4;
+}
+
+/// Explicit provenance for app-authored schema failures, retaining FormatException compatibility.
+class MerchantReviewLocalFormatException extends FormatException {
+  const MerchantReviewLocalFormatException(String message, {this.field}) : super(message);
+  final String? field;
+}
+
+/// App-authored draft/configuration errors; never wraps backend message text.
+class MerchantReviewLocalArgumentError extends ArgumentError {
+  MerchantReviewLocalArgumentError(String? message) : localMessage = message ?? '', super(message);
+  final String localMessage;
 }

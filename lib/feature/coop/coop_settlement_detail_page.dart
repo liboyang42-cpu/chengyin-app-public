@@ -1,3 +1,4 @@
+import '../../data/models/coop_failure.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,6 +13,8 @@ import '../../data/models/coop_finance.dart';
 import '../../data/models/coop_mybiz.dart';
 import '../merchant/merchant_money.dart';
 import 'coop_guard.dart';
+import '../../l10n/strings.dart';
+import '../../l10n/app_localizations.dart';
 
 @immutable
 class CoopSettlementRef {
@@ -40,22 +43,22 @@ class CoopSettlementDetail {
 
 final coopSettlementDetailProvider = FutureProvider.autoDispose
     .family<CoopSettlementDetail, CoopSettlementRef>((ref, key) async {
-      if (key.recordId.isEmpty) throw Exception('缺少结算记录标识');
+      if (key.recordId.isEmpty) throw CoopFailure.local(CoopFailureKind.missingSettlementId, '缺少结算记录标识');
       if (key.source == 'finance') {
         final int? topicId = int.tryParse(key.recordId);
         final rows = await ref.watch(coopApiProvider).finance();
         final row = rows.where((r) => r.topicId == topicId).firstOrNull;
-        if (row == null) throw Exception('这条结算记录不存在或已不可见');
+        if (row == null) throw CoopFailure.local(CoopFailureKind.settlementUnavailable, '这条结算记录不存在或已不可见');
         return CoopSettlementDetail.finance(row);
       }
       if (key.source != 'ledger' && key.source != 'mybiz') {
-        throw Exception('结算记录来源无效');
+        throw CoopFailure.local(CoopFailureKind.invalidSettlementSource, '结算记录来源无效');
       }
       final int? id = int.tryParse(key.recordId);
       final data = await ref.watch(coopApiProvider).myBiz();
       final rows = CoopMyBiz.fromJson(data).settlements;
       final row = rows.where((r) => r.id == id).firstOrNull;
-      if (row == null) throw Exception('这条结算记录不存在或已不可见');
+      if (row == null) throw CoopFailure.local(CoopFailureKind.settlementUnavailable, '这条结算记录不存在或已不可见');
       return CoopSettlementDetail.merchant(row);
     });
 
@@ -71,8 +74,9 @@ class CoopSettlementDetailPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    const String title = '结算详情';
-    const String needLogin = '登录后查看结算详情';
+    final strings = stringsOf(context);
+    final String title = strings.coopSettlementTitle;
+    final String needLogin = strings.coopSettlementLogin;
     final Widget? gate = coopLoginGate(
       context,
       ref,
@@ -86,9 +90,9 @@ class CoopSettlementDetailPage extends ConsumerWidget {
       // 显式给浅色底,理由见 coop_guard.dart。
       backgroundColor: CyPalette.of(context).bgPage,
       navigationBar: CupertinoNavigationBar(
-        middle: const Text(title),
+        middle: Text(title),
         leading: Semantics(
-          label: '返回',
+          label: strings.coopSettlementBack,
           button: true,
           child: CupertinoButton(
             minimumSize: const Size(44, 44),
@@ -120,8 +124,8 @@ class CoopSettlementDetailPage extends ConsumerWidget {
                     ref.invalidate(coopSettlementDetailProvider(key)),
               )
             : StatusView(
-                message: '结算详情没加载出来',
-                sub: coopErrorSub(error),
+                message: strings.coopSettlementLoadFailed,
+                sub: coopErrorSub(error, context: context),
                 large: true,
                 onRetry: () =>
                     ref.invalidate(coopSettlementDetailProvider(key)),
@@ -138,10 +142,14 @@ class _DetailBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = stringsOf(context);
     final merchant = detail.merchant;
     final finance = detail.finance;
-    final title = merchant?.topicTitle ?? finance!.topicName;
-    final perspective = merchant != null ? '承接分润' : '主办分润';
+    final title = merchant != null
+        ? ((merchant.topicName ?? '').trim().isNotEmpty ? merchant.topicName!.trim()
+            : merchant.topicId != null ? strings.coopSettlementTopicId(merchant.topicId!) : strings.coopSettlementUnnamed)
+        : finance!.hasCustomTopicName ? finance.topicName : strings.coopSettlementUnnamed;
+    final perspective = merchant != null ? strings.coopSettlementRecipientShare : strings.coopSettlementOrganizerShare;
     final amount = merchant != null
         ? (merchant.amount == null
               ? '—'
@@ -149,47 +157,52 @@ class _DetailBody extends StatelessWidget {
         : (finance!.settled ? summaryMoney(finance.myIncome) : '—');
     final String status;
     if (merchant != null) {
-      status = merchant.statusText;
+      status = switch (merchant.status) {
+        0 => strings.coopSettlementAwaitingCredit,
+        1 => strings.coopSettlementInBalance,
+        2 => strings.coopSettlementVoidStatus,
+        _ => strings.coopSettlementUnknownStatus,
+      };
     } else if (!finance!.settled) {
-      status = '待结算';
+      status = strings.coopSettlementPending;
     } else {
       final income = cny(finance.myIncome);
       if (income == null) {
-        status = '金额待确认';
+        status = strings.coopSettlementAmountUnknown;
       } else if (double.tryParse(income) == 0) {
-        status = '无需入账';
+        status = strings.coopSettlementNoCredit;
       } else {
-        status = finance.myIncomeArrived ? '已入账' : '待入账';
+        status = finance.myIncomeArrived ? strings.coopSettlementCredited : strings.coopSettlementAwaitingCredit;
       }
     }
     final lines = merchant != null
         ? <_DetailLine>[
-            _DetailLine('收款方', merchant.payeeText),
+            _DetailLine(strings.coopSettlementPayee, merchant.payeeType?.trim().toLowerCase() == 'club' ? strings.coopSettlementClubShare : strings.coopSettlementMerchantShare),
             if (merchant.verifiedSales != null)
               _DetailLine(
-                '核销销售额',
+                strings.coopSettlementVerifiedSales,
                 '¥${merchant.verifiedSales!.toStringAsFixed(2)}',
               ),
             if (merchant.verifiedHeads != null)
-              _DetailLine('核销人数', '${merchant.verifiedHeads} 人'),
+              _DetailLine(strings.coopSettlementVerifiedHeads, strings.coopSettlementPeople(merchant.verifiedHeads!)),
             if (merchant.shareRuleText != null)
-              _DetailLine('分润方式', merchant.shareRuleText!),
-            _DetailLine('我的分润', amount, strong: true),
+              _DetailLine(strings.coopSettlementShareRule, _shareRule(merchant, strings)!),
+            _DetailLine(strings.coopSettlementMyShare, amount, strong: true),
           ]
         : <_DetailLine>[
             if (finance!.totalSales != null)
-              _DetailLine('总销售额', summaryMoney(finance.totalSales)),
+              _DetailLine(strings.coopSettlementTotalSales, summaryMoney(finance.totalSales)),
             if (finance.verifiedSales != null)
-              _DetailLine('核销销售额', summaryMoney(finance.verifiedSales)),
+              _DetailLine(strings.coopSettlementVerifiedSales, summaryMoney(finance.verifiedSales)),
             if (finance.platformAmount != null)
-              _DetailLine('平台服务费', summaryMoney(finance.platformAmount)),
+              _DetailLine(strings.coopSettlementPlatformFee, summaryMoney(finance.platformAmount)),
             if (finance.merchantTotal != null)
-              _DetailLine('商家应收', summaryMoney(finance.merchantTotal)),
-            _DetailLine('我的分润', amount, strong: true),
+              _DetailLine(strings.coopSettlementMerchantDue, summaryMoney(finance.merchantTotal)),
+            _DetailLine(strings.coopSettlementMyShare, amount, strong: true),
           ];
     final timeline = merchant != null
-        ? _merchantTimeline(merchant)
-        : _financeTimeline(finance!, status);
+        ? _merchantTimeline(merchant, strings)
+        : _financeTimeline(finance!, strings);
     return ListView(
       padding: const EdgeInsets.all(CyTokens.pageX),
       children: <Widget>[
@@ -221,12 +234,12 @@ class _DetailBody extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: CyTokens.space3),
-                  CyTag(label: status),
+                  Flexible(child: CyTag(label: status)),
                 ],
               ),
               const SizedBox(height: CyTokens.space5),
               Text(
-                '我的分润',
+                strings.coopSettlementMyShare,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: CyPalette.of(context).textSecondary,
                 ),
@@ -249,7 +262,7 @@ class _DetailBody extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              const CySectionTitle('金额分解'),
+              CySectionTitle(strings.coopSettlementBreakdown),
               const SizedBox(height: CyTokens.space2),
               for (var i = 0; i < lines.length; i++) ...<Widget>[
                 _AmountRow(line: lines[i]),
@@ -268,7 +281,7 @@ class _DetailBody extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              const CySectionTitle('结算进度'),
+              CySectionTitle(strings.coopSettlementProgress),
               const SizedBox(height: CyTokens.space2),
               for (var i = 0; i < timeline.length; i++)
                 _TimelineRow(
@@ -305,54 +318,56 @@ String _dateText(String? value) {
   return text.length > 16 ? text.substring(0, 16) : text;
 }
 
-List<_TimelineEvent> _merchantTimeline(CoopSettlementRow row) {
+List<_TimelineEvent> _merchantTimeline(CoopSettlementRow row, AppLocalizations strings) {
   final events = <_TimelineEvent>[
     if (_dateText(row.createTime).isNotEmpty)
-      _TimelineEvent('结算记录已创建', _dateText(row.createTime)),
+      _TimelineEvent(strings.coopSettlementCreated, _dateText(row.createTime)),
     if (_dateText(row.settleTime).isNotEmpty)
-      _TimelineEvent('合作已结算', _dateText(row.settleTime)),
+      _TimelineEvent(strings.coopSettlementSettled, _dateText(row.settleTime)),
   ];
   switch (row.status) {
     case 0:
       final payable = _dateText(row.payableTime);
       events.add(
         payable.isEmpty
-            ? const _TimelineEvent('等待入账', '时间待确认')
-            : _TimelineEvent('预计入账', payable),
+            ? _TimelineEvent(strings.coopSettlementWaiting, strings.coopSettlementTimeUnknown)
+            : _TimelineEvent(strings.coopSettlementExpected, payable),
       );
     case 1:
       final paid = _dateText(row.payoutTime);
-      events.add(_TimelineEvent('已入余额', paid.isEmpty ? '到账时间待确认' : paid));
+      events.add(_TimelineEvent(strings.coopSettlementInBalance, paid.isEmpty ? strings.coopSettlementArrivalUnknown : paid));
     case 2:
       final updated = _dateText(row.updateTime);
-      events.add(_TimelineEvent('结算已作废', updated.isEmpty ? '时间待确认' : updated));
+      events.add(_TimelineEvent(strings.coopSettlementVoided, updated.isEmpty ? strings.coopSettlementTimeUnknown : updated));
     default:
       if (events.isEmpty) {
-        events.add(const _TimelineEvent('结算状态待确认', '请稍后刷新'));
+        events.add(_TimelineEvent(strings.coopSettlementStatusUnknown, strings.coopSettlementRefreshLater));
       }
   }
   return events;
 }
 
-List<_TimelineEvent> _financeTimeline(CoopFinanceRow row, String status) {
+List<_TimelineEvent> _financeTimeline(CoopFinanceRow row, AppLocalizations strings) {
   final events = <_TimelineEvent>[
-    _TimelineEvent(row.settled ? '主题已结算' : '主题待结算', '当前状态'),
+    _TimelineEvent(row.settled ? strings.coopSettlementThemeSettled : strings.coopSettlementThemePending, strings.coopSettlementCurrent),
   ];
-  switch (status) {
-    case '已入账':
-      events.add(const _TimelineEvent('我的分润已入账', '已到账'));
-    case '待入账':
-      events.add(const _TimelineEvent('我的分润待入账', '等待到账'));
-    case '无需入账':
-      events.add(const _TimelineEvent('本期无需入账', '分润为 0'));
+  // Branch on the original flags and parsed amount, never translated labels.
+  if (row.settled && cny(row.myIncome) != null) {
+    if (double.tryParse(cny(row.myIncome)!) == 0) {
+      events.add(_TimelineEvent(strings.coopSettlementPeriodNoCredit, strings.coopSettlementZeroShare));
+    } else if (row.myIncomeArrived) {
+      events.add(_TimelineEvent(strings.coopSettlementShareCredited, strings.coopSettlementArrived));
+    } else {
+      events.add(_TimelineEvent(strings.coopSettlementSharePending, strings.coopSettlementWaitingArrival));
+    }
   }
   final payable = _dateText(row.merchantPayableTime);
   if (payable.isNotEmpty) {
-    events.add(_TimelineEvent('商家应收可入账', payable));
+    events.add(_TimelineEvent(strings.coopSettlementMerchantAvailable, payable));
   }
   final paid = _dateText(row.merchantPayoutTime);
   if (paid.isNotEmpty) {
-    events.add(_TimelineEvent('商家应收已打款', paid));
+    events.add(_TimelineEvent(strings.coopSettlementMerchantPaid, paid));
   }
   return events;
 }
@@ -396,7 +411,7 @@ class _AmountRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: CyTokens.space4),
-          Text(
+          Flexible(child: Text(
             line.value,
             textAlign: TextAlign.right,
             style:
@@ -409,7 +424,7 @@ class _AmountRow extends StatelessWidget {
                         FontFeature.tabularFigures(),
                       ],
                     ),
-          ),
+          )),
         ],
       ),
     );
@@ -480,3 +495,10 @@ class _TimelineRow extends StatelessWidget {
     );
   }
 }
+
+String? _shareRule(CoopSettlementRow row, AppLocalizations strings) => switch (row.shareMode) {
+  0 => strings.coopSettlementTraffic,
+  1 => row.shareRate == null ? strings.coopSettlementPercentage : strings.coopSettlementRate('${row.shareRate}'),
+  2 => row.fixedFee == null ? strings.coopSettlementFixed : strings.coopSettlementFixedAmount(row.fixedFee!.toStringAsFixed(2)),
+  _ => null,
+};

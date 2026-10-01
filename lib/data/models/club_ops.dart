@@ -191,6 +191,7 @@ class SeriesOccurrence {
     required this.meta,
     required this.badge,
     required this.badgeKind,
+    this.displaySource,
   });
 
   final int? occurrenceId;
@@ -199,6 +200,10 @@ class SeriesOccurrence {
   final String meta;
   final String badge;
   final String badgeKind;
+
+  /// Explicit provenance for locally composed display strings. Legacy/manual
+  /// rows retain their supplied copy when this source is absent.
+  final SeriesOccurrenceDisplaySource? displaySource;
 
   /// ★ signupCount 为 null = 报名数没算出来:既不显示「0 人已报名」也不放开编辑。
   factory SeriesOccurrence.fromJson(Map<String, dynamic> json) {
@@ -222,6 +227,14 @@ class SeriesOccurrence {
       meta = '$signup 人已报名${editable ? '' : ' · 不可编辑'}';
     }
     return SeriesOccurrence(
+      displaySource: SeriesOccurrenceDisplaySource(
+        occurrenceAt: json['occurrenceAt'],
+        cancelled: cancelled,
+        signupCount: signup,
+        refundedCount: refunded,
+        editable: editable,
+        lockReason: lockReason,
+      ),
       occurrenceId: json['occurrenceId'] == null
           ? null
           : asInt(json['occurrenceId']),
@@ -251,6 +264,24 @@ class SeriesOccurrence {
     return '${parsed.month}月${parsed.day}日 周${weeks[parsed.weekday % 7]} '
         '${two(parsed.hour)}:${two(parsed.minute)}';
   }
+}
+
+class SeriesOccurrenceDisplaySource {
+  const SeriesOccurrenceDisplaySource({
+    required this.occurrenceAt,
+    required this.cancelled,
+    required this.signupCount,
+    required this.refundedCount,
+    required this.editable,
+    required this.lockReason,
+  });
+
+  final Object? occurrenceAt;
+  final bool cancelled;
+  final int? signupCount;
+  final int? refundedCount;
+  final bool editable;
+  final String lockReason;
 }
 
 /// 本场取消状态:`/api/club/event-ops/occurrence/status`。

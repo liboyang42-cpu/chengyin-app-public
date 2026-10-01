@@ -528,6 +528,18 @@ class ClubOpsApi {
     return NotificationCampaign.tryFromJson(_data(body));
   }
 
+  /// Read asynchronous delivery results without sending or retrying a campaign.
+  Future<NotificationCampaign?> notificationStatus({
+    required int campaignId,
+  }) async {
+    final body = await _postJson(
+      '/api/club/event-notification/status',
+      <String, dynamic>{'campaignId': campaignId},
+    );
+    _ensureOk(body);
+    return NotificationCampaign.tryFromJson(_data(body));
+  }
+
   /// `POST /api/club/event-notification/retry` → 只重试失败项的发送回执。
   Future<NotificationCampaign?> notificationRetry({
     required int campaignId,

@@ -11,6 +11,7 @@ class CoopFinanceRow {
   const CoopFinanceRow({
     required this.topicId,
     required this.topicName,
+    this.hasCustomTopicName = true,
     this.lifecycle,
     this.settled = false,
     this.settledKnown = true,
@@ -28,6 +29,8 @@ class CoopFinanceRow {
 
   final int topicId;
   final String topicName;
+  /// False only for an absent server name; identical supplied text stays raw.
+  final bool hasCustomTopicName;
   final String? lifecycle;
   final bool settled;
 
@@ -92,6 +95,7 @@ class CoopFinanceRow {
     return CoopFinanceRow(
       topicId: (json['topicId'] as num?)?.toInt() ?? 0,
       topicName: (json['topicName'] as String?) ?? '未命名主题',
+      hasCustomTopicName: json['topicName'] != null,
       lifecycle: str('lifecycle'),
       settled: flag('settled'),
       settledKnown: json['settled'] is bool,

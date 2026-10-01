@@ -1,3 +1,5 @@
+import 'club_api_messages.dart';
+import '../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -33,22 +35,22 @@ class ClubDissolutionBlockersPage extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              const CyPageTitle('解散前待处理'),
+              CyPageTitle(stringsOf(context).clubDissolutionPendingTitle),
               Expanded(
                 child: blockers.when(
                   loading: () => const CySkeleton(),
                   error: (Object err, StackTrace st) => StatusView(
-                    message: '待处理明细没加载出来',
-                    sub: '请稍后重试',
+                    message: stringsOf(context).clubDissolutionLoadFailed,
+                    sub: stringsOf(context).clubDissolutionRetryLater,
                     icon: CupertinoIcons.exclamationmark_triangle,
                     onRetry: () =>
                         ref.invalidate(clubDissolutionBlockersProvider(clubId)),
                   ),
                   data: (DissolutionBlockers b) {
                     if (b.isEmpty) {
-                      return const StatusView(
-                        message: '资金阻断已处理完',
-                        sub: '返回俱乐部编辑页后，可重新发起解散。',
+                      return StatusView(
+                        message: stringsOf(context).clubDissolutionClear,
+                        sub: stringsOf(context).clubDissolutionClearBody,
                         icon: CupertinoIcons.checkmark_circle,
                         large: true,
                       );
@@ -57,7 +59,7 @@ class ClubDissolutionBlockersPage extends ConsumerWidget {
                       padding: const EdgeInsets.all(CyTokens.space4),
                       children: <Widget>[
                         Text(
-                          '这些资金事实即使原合作或主题已隐藏也会保留。请逐笔处理，系统确认终态后才能解散俱乐部。',
+                          stringsOf(context).clubDissolutionExplanation,
                           style: Theme.of(context).textTheme.bodySmall
                               ?.copyWith(
                                 color: AppColors.textSecondary,
@@ -66,7 +68,7 @@ class ClubDissolutionBlockersPage extends ConsumerWidget {
                         ),
                         if (b.deposits.isNotEmpty) ...<Widget>[
                           const SizedBox(height: CyTokens.space5),
-                          const CySectionTitle('合作保证金'),
+                          CySectionTitle(stringsOf(context).clubDissolutionDeposits),
                           const SizedBox(height: CyTokens.space2),
                           ...b.deposits.map(
                             (ClubDeposit d) => _DepositCard(
@@ -78,7 +80,7 @@ class ClubDissolutionBlockersPage extends ConsumerWidget {
                         ],
                         if (b.settlements.isNotEmpty) ...<Widget>[
                           const SizedBox(height: CyTokens.space5),
-                          const CySectionTitle('未打款结算'),
+                          CySectionTitle(stringsOf(context).clubDissolutionSettlements),
                           const SizedBox(height: CyTokens.space2),
                           ...b.settlements.map(
                             (ClubSettlement s) =>
@@ -107,10 +109,10 @@ class ClubDissolutionBlockersPage extends ConsumerWidget {
       await ref.read(clubApiProvider).retryDepositRefund(inviteId);
       if (!context.mounted) return;
       ref.invalidate(clubDissolutionBlockersProvider(clubId));
-      CyNativeNotice.show(context, '退款已受理');
+      CyNativeNotice.show(context, stringsOf(context).clubDissolutionRefundAccepted);
     } catch (e) {
       if (!context.mounted) return;
-      CyNativeNotice.show(context, e.toString(), isError: true);
+      CyNativeNotice.show(context, clubApiErrorMessage(context, e), isError: true);
     }
   }
 }
@@ -134,23 +136,25 @@ class _DepositCard extends StatelessWidget {
               children: <Widget>[
                 Expanded(
                   child: Text(
-                    '保证金 #${deposit.id}',
+                    stringsOf(context).clubDissolutionDeposit(deposit.id),
                     style: textTheme.bodyMedium,
                   ),
                 ),
-                Text(
-                  deposit.statusText,
+                Flexible(
+                  child: Text(
+                  _depositStatus(context, deposit.depositStatus),
                   style: textTheme.labelMedium?.copyWith(
                     color: deposit.depositStatus == 5
                         ? AppColors.danger
                         : AppColors.textSecondary,
                   ),
                 ),
+                ),
               ],
             ),
             const SizedBox(height: CyTokens.space1),
             Text(
-              '${deposit.amountText}${deposit.topicText}',
+              '${deposit.amount == null ? stringsOf(context).clubDissolutionAmountUnknown : deposit.amountText}${deposit.topicId == null ? '' : stringsOf(context).clubDissolutionTopic(deposit.topicId!)}',
               style: textTheme.labelSmall?.copyWith(
                 color: AppColors.textSecondary,
               ),
@@ -158,13 +162,13 @@ class _DepositCard extends StatelessWidget {
             const SizedBox(height: CyTokens.space3),
             if (deposit.retryable)
               CyNativeButton(
-                label: '重试原路退款',
+                label: stringsOf(context).clubDissolutionRetryRefund,
                 onPressed: onRetry,
                 role: CyNativeButtonRole.secondary,
                 height: 44,
               )
             else
-              _ContactText(text: '联系平台逐笔处理'),
+              _ContactText(text: stringsOf(context).clubDissolutionContactEach),
           ],
         ),
       ),
@@ -190,27 +194,29 @@ class _SettlementCard extends StatelessWidget {
               children: <Widget>[
                 Expanded(
                   child: Text(
-                    '结算 #${settlement.id}',
+                    stringsOf(context).clubDissolutionSettlement(settlement.id),
                     style: textTheme.bodyMedium,
                   ),
                 ),
-                Text(
-                  settlement.directionText,
+                Flexible(
+                  child: Text(
+                  _settlementDirection(context, settlement.direction),
                   style: textTheme.labelMedium?.copyWith(
                     color: AppColors.textSecondary,
                   ),
+                ),
                 ),
               ],
             ),
             const SizedBox(height: CyTokens.space1),
             Text(
-              '${settlement.amountText}${settlement.topicText}',
+              '${settlement.amount == null ? stringsOf(context).clubDissolutionAmountUnknown : settlement.amountText}${settlement.topicId == null ? '' : stringsOf(context).clubDissolutionTopic(settlement.topicId!)}',
               style: textTheme.labelSmall?.copyWith(
                 color: AppColors.textSecondary,
               ),
             ),
             const SizedBox(height: CyTokens.space3),
-            const _ContactText(text: '联系平台确认打款'),
+            _ContactText(text: stringsOf(context).clubDissolutionContactPayment),
           ],
         ),
       ),
@@ -233,3 +239,16 @@ class _ContactText extends StatelessWidget {
     );
   }
 }
+
+String _depositStatus(BuildContext context, int status) => switch (status) {
+  1 => stringsOf(context).clubDissolutionPaying,
+  2 => stringsOf(context).clubDissolutionFrozen,
+  5 => stringsOf(context).clubDissolutionUnpaid,
+  _ => stringsOf(context).clubDissolutionStatusUnknown,
+};
+
+String _settlementDirection(BuildContext context, String direction) => switch (direction) {
+  'incoming' => stringsOf(context).clubDissolutionIncoming,
+  'outgoing' => stringsOf(context).clubDissolutionOutgoing,
+  _ => stringsOf(context).clubDissolutionDirectionUnknown,
+};

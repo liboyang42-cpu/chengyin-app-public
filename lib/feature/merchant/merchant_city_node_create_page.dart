@@ -1,3 +1,4 @@
+import '../../l10n/strings.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -122,7 +123,7 @@ class _MerchantCityNodeCreatePageState
       }
       setState(() {
         _access = _AccessState.error;
-        _accessError = msg.isEmpty ? '网络异常，商家权限没能读取' : msg;
+        _accessError = msg.isEmpty ? stringsOf(context).merchantNodeAccessNetwork : msg;
       });
     }
   }
@@ -151,7 +152,7 @@ class _MerchantCityNodeCreatePageState
       if (!mounted) return;
       setState(() {
         _shopLoaded = true;
-        _shopLoadError = '网络异常,店铺资料没读出来';
+        _shopLoadError = stringsOf(context).merchantNodeShopNetwork;
       });
     }
   }
@@ -198,7 +199,7 @@ class _MerchantCityNodeCreatePageState
       if (!mounted) return;
       setState(() {
         _submitting = false;
-        _error = '网络异常,请重试';
+        _error = stringsOf(context).merchantNodeNetworkRetry;
       });
     }
   }
@@ -239,10 +240,10 @@ class _MerchantCityNodeCreatePageState
     if (!_draftDirty) return true;
     final bool leave = await cyConfirm(
       context,
-      title: '放弃未提交草稿吗',
-      content: '玩法或店址还没有提交，直接离开会丢失本页草稿。',
-      confirmText: '离开',
-      cancelText: '继续编辑',
+      title: stringsOf(context).merchantNodeDiscardTitle,
+      content: stringsOf(context).merchantNodeDiscardBody,
+      confirmText: stringsOf(context).merchantNodeLeave,
+      cancelText: stringsOf(context).merchantNodeKeepEditing,
       danger: true,
     );
     return leave;
@@ -264,7 +265,7 @@ class _MerchantCityNodeCreatePageState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            const CyPageTitle('报名成为节点', subtitle: '配一个自己店铺的玩法就行,商家信息用你的入驻资料'),
+            CyPageTitle(stringsOf(context).merchantNodeApplyTitle, subtitle: stringsOf(context).merchantNodeApplySubtitle),
             Expanded(child: _body(context)),
             if (_access == _AccessState.ready)
               Padding(
@@ -276,8 +277,8 @@ class _MerchantCityNodeCreatePageState
                       ? _submit
                       : null,
                   label: _submittedApplicationId != null
-                      ? '重新读取申请状态'
-                      : '提交投放申请',
+                      ? stringsOf(context).merchantNodeReadApplication
+                      : stringsOf(context).merchantNodeSubmitApplication,
                   width: double.infinity,
                   loading: _submitting,
                 ),
@@ -292,16 +293,16 @@ class _MerchantCityNodeCreatePageState
     switch (_access) {
       case _AccessState.loading:
         // 真源整页只有这一行状态字:没权限的岗位不该先撞一串注定失败的请求。
-        return const Center(child: Text('正在核对经营团队权限…'));
+        return Center(child: Text(stringsOf(context).merchantNodeCheckingPermissions));
       case _AccessState.denied:
-        return merchantDeniedView(title: '当前岗位不能管理据点', sub: '请联系店主或店长调整经营团队岗位');
+        return merchantDeniedView(title: stringsOf(context).merchantNodeManageDenied, sub: stringsOf(context).merchantNodeContactManager);
       case _AccessState.error:
         return StatusView(
-          message: '商家权限加载失败',
+          message: stringsOf(context).merchantNodeAccessFailed,
           sub: _accessError,
           large: true,
           onRetry: _loadAccess,
-          retryLabel: '重试',
+          retryLabel: stringsOf(context).merchantNodeRetry,
         );
       case _AccessState.ready:
         return ListView(
@@ -314,7 +315,7 @@ class _MerchantCityNodeCreatePageState
               const SizedBox(height: CyTokens.space3),
               // 快照用 cy-inline-error 的 title/sub 两行:只说后端原话,
               // 商家不知道「刚才这一步是提交还是读取失败了」。
-              Text('投放申请未提交', style: Theme.of(context).textTheme.titleSmall),
+              Text(stringsOf(context).merchantNodeNotSubmitted, style: Theme.of(context).textTheme.titleSmall),
               const SizedBox(height: CyTokens.space1),
               Text(
                 _error!,
@@ -325,7 +326,7 @@ class _MerchantCityNodeCreatePageState
               const SizedBox(height: CyTokens.space3),
               // 不说"失败" —— 申请已经提交了,说失败会让商家再提一次。
               Text(
-                '申请状态暂未同步：申请已提交,但审核状态还没同步出来,可以回列表刷新看看。',
+                stringsOf(context).merchantNodeAwaitSync,
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ],
@@ -338,23 +339,23 @@ class _MerchantCityNodeCreatePageState
     final TextTheme t = Theme.of(context).textTheme;
     return _card(
       context,
-      step: '① 店铺玩法',
+      step: stringsOf(context).merchantNodeStepExperience,
       done: _templateId != null,
       children: <Widget>[
         if (_templateId != null) ...<Widget>[
-          Text(_templateTitle ?? '已配置玩法', style: t.titleSmall),
+          Text(_templateTitle ?? stringsOf(context).merchantNodeConfigured, style: t.titleSmall),
           const SizedBox(height: CyTokens.space2),
           CyNativeButton(
             onPressed: _pickTemplate,
-            label: '重新配置',
+            label: stringsOf(context).merchantNodeReconfigure,
             role: CyNativeButtonRole.secondary,
           ),
         ] else ...<Widget>[
-          Text('玩家到店后玩的就是这一关 —— 完成方式、奖励、剧情都在配置页里设。', style: t.bodySmall),
+          Text(stringsOf(context).merchantNodeExperienceHint, style: t.bodySmall),
           const SizedBox(height: CyTokens.space2),
           CyNativeButton(
             onPressed: _pickTemplate,
-            label: '去配置玩法',
+            label: stringsOf(context).merchantNodeConfigure,
             role: CyNativeButtonRole.secondary,
           ),
         ],
@@ -366,14 +367,14 @@ class _MerchantCityNodeCreatePageState
     final TextTheme t = Theme.of(context).textTheme;
     final List<Widget> body;
     if (!_shopLoaded) {
-      body = <Widget>[Text('正在读你的店铺资料…', style: t.bodySmall)];
+      body = <Widget>[Text(stringsOf(context).merchantNodeLoadingShop, style: t.bodySmall)];
     } else if (_shopLoadError != null) {
       body = <Widget>[
         Text(_shopLoadError!, style: t.bodySmall),
         const SizedBox(height: CyTokens.space2),
         CyNativeButton(
           onPressed: _loadShop,
-          label: '重试',
+          label: stringsOf(context).merchantNodeRetry,
           role: CyNativeButtonRole.secondary,
         ),
       ];
@@ -381,18 +382,18 @@ class _MerchantCityNodeCreatePageState
       // 档案里没坐标 —— 后端也会拒(「你的店铺资料里还没有坐标」),
       // 但在这里给出路:直接在地图上点一下店门口,不用绕去店铺资料。
       body = <Widget>[
-        Text('你的店铺资料里还没有坐标,得在地图上点一下店门口。', style: t.bodySmall),
+        Text(stringsOf(context).merchantNodeMissingCoordinates, style: t.bodySmall),
         const SizedBox(height: CyTokens.space2),
         CyNativeButton(
           onPressed: _repick,
-          label: '在地图上标店址',
+          label: stringsOf(context).merchantNodeMarkLocation,
           role: CyNativeButtonRole.secondary,
         ),
       ];
     } else {
       body = <Widget>[
         Text(
-          _shopName?.isNotEmpty == true ? _shopName! : '我的店',
+          _shopName?.isNotEmpty == true ? _shopName! : stringsOf(context).merchantNodeMyStore,
           style: t.titleSmall,
         ),
         if ((_shopAddress ?? '').isNotEmpty) ...<Widget>[
@@ -410,8 +411,7 @@ class _MerchantCityNodeCreatePageState
           //   不说的话,坐标偏了没人会发现 —— 表现成"玩家一直打不了卡",
           //   而商家完全不知道问题在哪。
           Text(
-            '这是你入驻时填的店址。玩家要走到这里 $_radiusM 米内才算到达 ——'
-            '偏了他会一直打不了卡,先看一眼对不对。',
+            stringsOf(context).merchantNodeAddressHint(_radiusM),
             style: t.bodySmall,
           ),
           const SizedBox(height: CyTokens.space2),
@@ -420,12 +420,12 @@ class _MerchantCityNodeCreatePageState
               _confirmed = true;
               _draftDirty = true;
             }),
-            label: '确认这个店址',
+            label: stringsOf(context).merchantNodeConfirmAddress,
           ),
           const SizedBox(height: CyTokens.space2),
           CyNativeButton(
             onPressed: _repick,
-            label: '重新选择',
+            label: stringsOf(context).merchantNodeChooseAgain,
             role: CyNativeButtonRole.secondary,
           ),
         ],
@@ -433,13 +433,13 @@ class _MerchantCityNodeCreatePageState
           const SizedBox(height: CyTokens.space2),
           CyNativeButton(
             onPressed: _repick,
-            label: '重新选择店址',
+            label: stringsOf(context).merchantNodeChooseAddressAgain,
             role: CyNativeButtonRole.secondary,
           ),
         ],
       ];
     }
-    return _card(context, step: '② 确认店址', done: _confirmed, children: body);
+    return _card(context, step: stringsOf(context).merchantNodeStepAddress, done: _confirmed, children: body);
   }
 
   Widget _card(
@@ -465,7 +465,7 @@ class _MerchantCityNodeCreatePageState
               Expanded(child: Text(step, style: t.labelLarge)),
               if (done)
                 Text(
-                  '已完成 ✓',
+                  stringsOf(context).merchantNodeCompleted,
                   style: t.labelSmall?.copyWith(color: p.statusSuccess),
                 ),
             ],

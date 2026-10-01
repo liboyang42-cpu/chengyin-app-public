@@ -38,9 +38,13 @@ class _FakeCoupon implements CouponApi {
 class _FakeGroup implements GroupCodeApi {
   String? seen;
   @override
-  Future<String> redeem(String code) async {
+  Future<String> redeem(String code) async =>
+      (await redeemWithReceipt(code)).message;
+
+  @override
+  Future<GroupCodeRedemptionReceipt> redeemWithReceipt(String code) async {
     seen = code;
-    return '已记录接待该团';
+    return const GroupCodeRedemptionReceipt('已记录接待该团');
   }
   @override
   dynamic noSuchMethod(Invocation i) => super.noSuchMethod(i);

@@ -19,6 +19,9 @@ import 'package:chengyin_app/core/providers.dart';
 import 'package:chengyin_app/data/api/club_api.dart';
 import 'package:chengyin_app/data/models/club_post.dart';
 import 'package:chengyin_app/feature/club/club_posts_section.dart';
+import 'package:chengyin_app/feature/club/club_controller.dart';
+import 'package:chengyin_app/data/models/club.dart';
+import 'package:chengyin_app/l10n/app_localizations.dart';
 
 class _FakeClubApi implements ClubApi {
   _FakeClubApi({this.posts = const <ClubPost>[], this.onCreate});
@@ -49,12 +52,19 @@ Future<void> _pump(
   WidgetTester t,
   _FakeClubApi api, {
   required bool canPost,
+  Locale locale = const Locale('zh'),
 }) async {
   await t.binding.setSurfaceSize(const Size(390, 900));
   await t.pumpWidget(
     ProviderScope(
-      overrides: <dynamic>[clubApiProvider.overrideWithValue(api)].cast(),
+      overrides: <dynamic>[
+        clubApiProvider.overrideWithValue(api),
+        clubMembersProvider(7).overrideWith((ref) async => <ClubMember>[]),
+      ].cast(),
       child: MaterialApp(
+        locale: locale,
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
         home: Scaffold(
           body: SingleChildScrollView(
             child: ClubPostsSection(clubId: 7, canPost: canPost),
@@ -67,6 +77,15 @@ Future<void> _pump(
 }
 
 void main() {
+  testWidgets('English post empty state respects membership permissions', (tester) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await _pump(tester, _FakeClubApi(), canPost: false, locale: const Locale('en'));
+    expect(find.text('This club has no posts yet'), findsOneWidget);
+    expect(find.text('Join the club to post'), findsOneWidget);
+    expect(find.byKey(const Key('club-post-compose')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('★★ 非成员没有发帖入口 —— 点下去后端必拒', (WidgetTester t) async {
     await _pump(t, _FakeClubApi(), canPost: false);
     expect(find.byKey(const Key('club-post-compose')), findsNothing);

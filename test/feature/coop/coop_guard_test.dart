@@ -99,7 +99,7 @@ void main() {
     );
 
     expect(find.text('合作池没能加载出来'), findsOneWidget);
-    expect(find.text('网络不稳定,请稍后重试'), findsOneWidget);
+    expect(find.text('网络异常，请稍后重试'), findsOneWidget);
     expect(find.text('去登录'), findsNothing, reason: '断网被推去登录,登完还是失败');
   });
 }

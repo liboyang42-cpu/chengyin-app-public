@@ -1,3 +1,6 @@
+import '../../l10n/error_presentation.dart';
+import '../../l10n/strings.dart';
+import '../../core/network/request_session_scope.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -59,12 +62,15 @@ Future<List<String>> pickAndUploadImages(
   PublishCropAspect? cropAspect,
   Rect? sourceRect,
 }) async {
+  final scope = RequestSessionScope.current;
+  bool active() => context.mounted && (scope?.isCurrent() ?? true);
+  if (!active()) return const <String>[];
   // [sourceRect] = S4 锚点:传**触发元素**的矩形,action sheet 才从它旁边弹。
   final CyImagePickSource? source = await cyChooseImageSource(
     context,
     sourceRect: sourceRect,
   );
-  if (source == null || !context.mounted) return const <String>[];
+  if (source == null || !active()) return const <String>[];
 
   final ImagePicker picker = ImagePicker();
   final ImageSource imageSource = source == CyImagePickSource.camera
@@ -74,7 +80,7 @@ Future<List<String>> pickAndUploadImages(
       shouldPickMultipleClubImages(source: source, maxCount: maxCount)
       ? await picker.pickMultiImage(limit: maxCount, imageQuality: 85)
       : await _pickSingle(picker, imageSource);
-  if (files.isEmpty) return const <String>[];
+  if (files.isEmpty || !active()) return const <String>[];
 
   final api = ref.read(playApiProvider);
   if (cropAspect != null) {
@@ -87,8 +93,11 @@ Future<List<String>> pickAndUploadImages(
           ) ??
           const <String>[];
     } catch (e) {
-      if (!context.mounted) return const <String>[];
-      final msg = e is PlayException ? e.message : '图片裁剪或上传失败,请重试';
+      if (!active()) return const <String>[];
+      final msg = presentError(e, stringsOf(context),
+        fallback: stringsOf(context).imageCropUploadFailed,
+        originalApiMessage: e is PlayException ? e.message : null,
+      ).noticeText;
       CyNativeNotice.show(context, msg, isError: true);
       return const <String>[];
     }
@@ -96,11 +105,15 @@ Future<List<String>> pickAndUploadImages(
 
   final List<String> uploaded = <String>[];
   for (final XFile f in files) {
+    if (!active()) return const <String>[];
     try {
       uploaded.add(await api.uploadImage(f.path));
     } catch (e) {
-      if (!context.mounted) return uploaded;
-      final msg = e is PlayException ? e.message : '上传失败,请重试';
+      if (!active()) return uploaded;
+      final msg = presentError(e, stringsOf(context),
+        fallback: stringsOf(context).imageUploadFailed,
+        originalApiMessage: e is PlayException ? e.message : null,
+      ).noticeText;
       CyNativeNotice.show(context, msg, isError: true);
       return uploaded;
     }

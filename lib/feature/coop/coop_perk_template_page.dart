@@ -1,3 +1,5 @@
+import 'coop_strings.dart';
+import '../../l10n/strings.dart';
 import '../../core/theme/cy_palette.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -32,8 +34,8 @@ class CoopPerkTemplatePage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    const String title = '常备权益';
-    const String needLogin = '登录后查看常备权益';
+    final String title = stringsOf(context).coopTemplateTitle;
+    final String needLogin = stringsOf(context).coopTemplateLogin;
     final Widget? gate = coopLoginGate(
       context,
       ref,
@@ -46,7 +48,7 @@ class CoopPerkTemplatePage extends ConsumerWidget {
       // 显式给浅色底:根 CupertinoTheme 恒暗、Material `Theme` 换不动它,
       // 不传的话这里就是黑底配浅色盘的黑字(见 coop_guard.dart)。
       backgroundColor: CyPalette.of(context).bgPage,
-      navigationBar: const CupertinoNavigationBar(middle: Text(title)),
+      navigationBar: CupertinoNavigationBar(middle: Text(title)),
       child: Stack(
         children: <Widget>[
           Positioned.fill(
@@ -62,16 +64,16 @@ class CoopPerkTemplatePage extends ConsumerWidget {
                   : StatusView(
                       // 照小程序真源原文(pages/merchant/decor/perks 的
                       // cy-error title),换措辞会让 copy_parity 掉一格。
-                      message: '权益加载失败',
-                      sub: coopErrorSub(e),
+                      message: stringsOf(context).coopPerksLoadFailed,
+                      sub: coopErrorSub(e, context: context),
                       large: true,
                       onRetry: () => ref.invalidate(coopPerkTemplatesProvider),
                     ),
               data: (List<CoopPerkTemplate> perks) {
                 if (perks.isEmpty) {
-                  return const StatusView(
-                    message: '还没有常备权益',
-                    sub: '把可核销的礼品、优惠券或折扣整理成清单',
+                  return StatusView(
+                    message: stringsOf(context).coopTemplateEmpty,
+                    sub: stringsOf(context).coopTemplateEmptyHint,
                     large: true,
                   );
                 }
@@ -98,7 +100,7 @@ class CoopPerkTemplatePage extends ConsumerWidget {
                           ScrollController scrollController,
                         ) => _PerkFormSheet(scrollController: scrollController),
                   ),
-                  label: '添加权益',
+                  label: stringsOf(context).coopAddPerk,
                   icon: const CyNativeButtonIcon(
                     sfSymbol: 'plus',
                     fallback: CupertinoIcons.add,
@@ -171,9 +173,9 @@ class _PerkCardState extends ConsumerState<_PerkCard> {
     //   只说清删的是模板本身、已经申报出去的供给独立存快照。
     final bool ok = await cyConfirm(
       context,
-      title: '删除「${widget.perk.name}」?',
-      content: '删除的是这个模板本身;已经申报到具体合作里的供给是独立记录,不会跟着变。',
-      confirmText: '删除',
+      title: stringsOf(context).coopDeleteName(widget.perk.name),
+      content: stringsOf(context).coopTemplateDeleteBody,
+      confirmText: stringsOf(context).coopDelete,
       danger: true,
     );
     if (!ok || !mounted) return;
@@ -185,7 +187,7 @@ class _PerkCardState extends ConsumerState<_PerkCard> {
       if (!mounted) return;
       CyNativeNotice.show(
         context,
-        e.toString().replaceFirst('Exception: ', ''),
+        coopErrorSub(e, context: context),
         isError: true,
       );
     } finally {
@@ -198,11 +200,11 @@ class _PerkCardState extends ConsumerState<_PerkCard> {
     final p = widget.perk;
     final textTheme = Theme.of(context).textTheme;
     final meta = <String>[
-      if (p.retailValue != null) '零售价 ¥${p.retailValue!.toStringAsFixed(2)}',
-      if (p.unitCost != null) '成本 ¥${p.unitCost!.toStringAsFixed(2)}',
+      if (p.retailValue != null) stringsOf(context).coopTemplateRetail(p.retailValue!.toStringAsFixed(2)),
+      if (p.unitCost != null) stringsOf(context).coopTemplateCost(p.unitCost!.toStringAsFixed(2)),
       // quota 是 0 和没填是两回事:没填不提;真是 0 就照实说 0 份。
-      if (p.quota != null) '可接待 ${p.quota} 份',
-      if (p.validText != null) '至 ${p.validText}',
+      if (p.quota != null) stringsOf(context).coopTemplateQuota(p.quota!),
+      if (p.validText != null) stringsOf(context).coopTemplateUntil(p.validText!),
     ];
     return CySwipeActionsRow(
       key: Key('coop-perk-row-${p.id}'),
@@ -216,9 +218,9 @@ class _PerkCardState extends ConsumerState<_PerkCard> {
       trailing: <CyContextualAction>[
         CyContextualAction(
           id: 'coop-perk-delete-${p.id}',
-          label: '删除',
+          label: stringsOf(context).coopDelete,
           // VoiceOver 文案逐字沿用旧行内钮「删除 {名称}」,删的是哪条要自解释。
-          semanticLabel: '删除 ${p.name}',
+          semanticLabel: stringsOf(context).coopDeleteNameSemantics(p.name),
           icon: CupertinoIcons.delete,
           destructive: true,
           isEnabled: !_busy,
@@ -241,7 +243,7 @@ class _PerkCardState extends ConsumerState<_PerkCard> {
                 const SizedBox(width: CyTokens.space2),
                 // ★ 「需删除重建」是内部术语,商家看不懂 —— 说清后果:这条已经
                 //   不满足申报门槛了,选不了。
-                CyTag(label: p.usable ? p.typeText : '已失效 · 请重新添加'),
+                CyTag(label: p.usable ? coopPerkType(context, p.perkType) : stringsOf(context).coopExpiredRecreate),
               ],
             ),
             if (meta.isNotEmpty) ...<Widget>[
@@ -291,14 +293,14 @@ class _PerkFormSheetState extends ConsumerState<_PerkFormSheet> {
   // 与后端五道校验闸逐条对齐(ApiCoopController.perkTemplateSave),
   // 原话作为提示,省一次往返。
   String? _validate() {
-    if (_nameCtrl.text.trim().isEmpty) return '请填写权益名称';
+    if (_nameCtrl.text.trim().isEmpty) return stringsOf(context).coopPerkNameRequired;
     final retailText = _retailCtrl.text.trim();
     final retail = double.tryParse(retailText);
     if (!_amountPattern.hasMatch(retailText) ||
         retail == null ||
         retail <= 0 ||
         retail > 99999999.99) {
-      return '权益零售价须为不超过99999999.99的正数,最多两位小数';
+      return stringsOf(context).coopTemplateRetailError;
     }
     if (_costCtrl.text.trim().isNotEmpty) {
       final costText = _costCtrl.text.trim();
@@ -307,11 +309,11 @@ class _PerkFormSheetState extends ConsumerState<_PerkFormSheet> {
           cost == null ||
           cost < 0 ||
           cost > 99999999.99) {
-        return '成本价须为0至99999999.99,最多两位小数';
+        return stringsOf(context).coopTemplateCostError;
       }
     }
     final quota = int.tryParse(_quotaCtrl.text.trim());
-    if (quota == null || quota <= 0) return '请填写正整数可接待份数';
+    if (quota == null || quota <= 0) return stringsOf(context).coopTemplateQuotaError;
     return null;
   }
 
@@ -343,7 +345,7 @@ class _PerkFormSheetState extends ConsumerState<_PerkFormSheet> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString().replaceFirst('Exception: ', '');
+        _error = coopErrorSub(e, context: context);
         _saving = false;
       });
       return;
@@ -359,7 +361,7 @@ class _PerkFormSheetState extends ConsumerState<_PerkFormSheet> {
       initialDateTime: _validEnd ?? today,
       minimumDate: today,
       maximumDate: DateTime(today.year + 10, today.month, today.day),
-      title: '选择有效期',
+      title: stringsOf(context).coopChooseExpiry,
     );
     if (picked != null && mounted) setState(() => _validEnd = picked);
   }
@@ -402,13 +404,13 @@ class _PerkFormSheetState extends ConsumerState<_PerkFormSheet> {
     return CupertinoPageScaffold(
       backgroundColor: palette.bgPage,
       navigationBar: CupertinoNavigationBar(
-        middle: const Text('添加常备权益'),
+        middle: Text(stringsOf(context).coopTemplateAdd),
         leading: CupertinoButton(
           key: const Key('coop-perk-cancel'),
           minimumSize: const Size(44, 44),
           padding: EdgeInsets.zero,
           onPressed: _saving ? null : () => Navigator.of(context).pop(),
-          child: const Text('取消'),
+          child: Text(stringsOf(context).cancel),
         ),
       ),
       child: SafeArea(
@@ -429,7 +431,7 @@ class _PerkFormSheetState extends ConsumerState<_PerkFormSheet> {
                 for (int i = 0; i < CoopPerkTemplate.typeLabels.length; i++)
                   i: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: Text(CoopPerkTemplate.typeLabels[i]),
+                    child: Text(coopPerkType(context, i)),
                   ),
               },
               onValueChanged: (int? value) {
@@ -440,14 +442,14 @@ class _PerkFormSheetState extends ConsumerState<_PerkFormSheet> {
             _field(
               key: const Key('coop-perk-name'),
               controller: _nameCtrl,
-              placeholder: '权益名称（必填）',
+              placeholder: stringsOf(context).coopPerkName,
               textInputAction: TextInputAction.next,
             ),
             const SizedBox(height: CyTokens.space2),
             _field(
               key: const Key('coop-perk-retail'),
               controller: _retailCtrl,
-              placeholder: '权益零售价（必填）',
+              placeholder: stringsOf(context).coopTemplateRetailInput,
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
               ),
@@ -457,7 +459,7 @@ class _PerkFormSheetState extends ConsumerState<_PerkFormSheet> {
             _field(
               key: const Key('coop-perk-cost'),
               controller: _costCtrl,
-              placeholder: '成本价（可选，仅自己可见）',
+              placeholder: stringsOf(context).coopTemplateCostInput,
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
               ),
@@ -467,7 +469,7 @@ class _PerkFormSheetState extends ConsumerState<_PerkFormSheet> {
             _field(
               key: const Key('coop-perk-quota'),
               controller: _quotaCtrl,
-              placeholder: '可接待份数（必填）',
+              placeholder: stringsOf(context).coopTemplateQuotaInput,
               keyboardType: TextInputType.number,
               textInputAction: TextInputAction.done,
               inputFormatters: <TextInputFormatter>[
@@ -478,8 +480,8 @@ class _PerkFormSheetState extends ConsumerState<_PerkFormSheet> {
             Semantics(
               button: true,
               label: _validEnd == null
-                  ? '选择有效期，可选'
-                  : '有效期 ${_formatDate(_validEnd!)}',
+                  ? stringsOf(context).coopOptionalExpiryChoice
+                  : stringsOf(context).coopExpiryDate(_formatDate(_validEnd!)),
               child: CupertinoButton(
                 key: const Key('coop-perk-valid-end'),
                 minimumSize: const Size.fromHeight(44),
@@ -496,7 +498,7 @@ class _PerkFormSheetState extends ConsumerState<_PerkFormSheet> {
                   children: <Widget>[
                     Expanded(
                       child: Text(
-                        _validEnd == null ? '有效期（可选）' : _formatDate(_validEnd!),
+                        _validEnd == null ? stringsOf(context).coopOptionalExpiry : _formatDate(_validEnd!),
                         textAlign: TextAlign.left,
                       ),
                     ),
@@ -525,7 +527,7 @@ class _PerkFormSheetState extends ConsumerState<_PerkFormSheet> {
                         height: 18,
                         child: CupertinoActivityIndicator(),
                       )
-                    : const Text('保存权益'),
+                    : Text(stringsOf(context).coopSavePerk),
               ),
             ),
           ],

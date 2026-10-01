@@ -1,3 +1,5 @@
+import '../../l10n/strings.dart';
+import 'merchant_director_strings.dart';
 import 'dart:async';
 import 'dart:math';
 
@@ -97,7 +99,7 @@ class _MerchantGameNodePageState extends ConsumerState<MerchantGameNodePage> {
         if (mounted) {
           setState(() {
             _loading = false;
-            _error = const GameSessionContractException('活动参数无效');
+            _error = const _DirectorLocalException('活动参数无效');
           });
         }
         return;
@@ -114,7 +116,7 @@ class _MerchantGameNodePageState extends ConsumerState<MerchantGameNodePage> {
         _pendingUnknown = false;
         _pendingWrite = null;
         _legacyPending = false;
-        _error = const GameSessionContractException('登录身份无效，请重新登录');
+        _error = const _DirectorLocalException('登录身份无效，请重新登录');
       } else {
         _identityUnavailable = false;
       }
@@ -255,7 +257,7 @@ class _MerchantGameNodePageState extends ConsumerState<MerchantGameNodePage> {
       } catch (_) {
         if (mounted) {
           setState(
-            () => _error = const GameSessionContractException('无法安全保存本次操作，请重试'),
+            () => _error = const _DirectorLocalException('无法安全保存本次操作，请重试'),
           );
         }
         return;
@@ -302,7 +304,7 @@ class _MerchantGameNodePageState extends ConsumerState<MerchantGameNodePage> {
     if (ownerMemberId <= 0 || ownerMemberId != pending.ownerMemberId) {
       setState(() {
         _identityUnavailable = true;
-        _error = const GameSessionContractException('登录身份已变更，请重新登录');
+        _error = const _DirectorLocalException('登录身份已变更，请重新登录');
       });
       return;
     }
@@ -349,8 +351,8 @@ class _MerchantGameNodePageState extends ConsumerState<MerchantGameNodePage> {
     final result = await showCupertinoModalPopup<({String code, String text})>(
       context: context,
       builder: (context) => CupertinoActionSheet(
-        title: const Text('拒绝站点邀请'),
-        message: const Text('选择真实原因，提交后将由服务端记录。'),
+        title: Text(stringsOf(context).merchantDirectorDeclineTitle),
+        message: Text(stringsOf(context).merchantDirectorDeclineHint),
         actions: <Widget>[
           for (final reason in const <(String, String)>[
             ('SCHEDULE_CONFLICT', '档期冲突'),
@@ -361,12 +363,12 @@ class _MerchantGameNodePageState extends ConsumerState<MerchantGameNodePage> {
               onPressed: () =>
                   Navigator.pop(context, (code: reason.$1, text: reason.$2)),
               isDestructiveAction: true,
-              child: Text(reason.$2),
+              child: Text(merchantDirectorLocalText(context, reason.$2)),
             ),
         ],
         cancelButton: CupertinoActionSheetAction(
           onPressed: () => Navigator.pop(context),
-          child: const Text('取消'),
+          child: Text(stringsOf(context).merchantDirectorCancel),
         ),
       ),
     );
@@ -403,7 +405,7 @@ class _MerchantGameNodePageState extends ConsumerState<MerchantGameNodePage> {
                 child: Column(
                   children: <Widget>[
                     _SheetHeader(
-                      title: '完成本站准备',
+                      title: stringsOf(context).merchantDirectorReadyTitle,
                       onCancel: () => Navigator.pop(sheetContext),
                       onDone: () {
                         final capacity = int.tryParse(controller.text) ?? 0;
@@ -414,7 +416,7 @@ class _MerchantGameNodePageState extends ConsumerState<MerchantGameNodePage> {
                             checked.values.every((value) => value);
                         if (!valid) {
                           setSheetState(
-                            () => validationError = '请完成全部清单，并检查接待人数和服务时间',
+                            () => validationError = stringsOf(context).merchantDirectorReadyValidation,
                           );
                           return;
                         }
@@ -469,15 +471,15 @@ class _MerchantGameNodePageState extends ConsumerState<MerchantGameNodePage> {
                                 ],
                               ),
                             ),
-                          const _FieldLabel('接待容量'),
+                          _FieldLabel(stringsOf(context).merchantDirectorCapacity),
                           CupertinoTextField(
                             controller: controller,
                             keyboardType: TextInputType.number,
-                            placeholder: '每个时段最多接待人数',
+                            placeholder: stringsOf(context).merchantDirectorCapacityHint,
                           ),
                           const SizedBox(height: CyTokens.space3),
                           _SystemDateTimeButton(
-                            label: '服务开始',
+                            label: stringsOf(context).merchantDirectorStart,
                             value: _dateTime(start),
                             onPressed: () async {
                               final now = DateTime.now();
@@ -489,7 +491,7 @@ class _MerchantGameNodePageState extends ConsumerState<MerchantGameNodePage> {
                                 maximumDate: now.add(
                                   const Duration(days: 3650),
                                 ),
-                                title: '服务开始',
+                                title: stringsOf(context).merchantDirectorStart,
                               );
                               if (picked != null && context.mounted) {
                                 setSheetState(() => start = picked);
@@ -497,7 +499,7 @@ class _MerchantGameNodePageState extends ConsumerState<MerchantGameNodePage> {
                             },
                           ),
                           _SystemDateTimeButton(
-                            label: '服务结束',
+                            label: stringsOf(context).merchantDirectorEnd,
                             value: _dateTime(end),
                             onPressed: () async {
                               final now = DateTime.now();
@@ -509,18 +511,18 @@ class _MerchantGameNodePageState extends ConsumerState<MerchantGameNodePage> {
                                 maximumDate: now.add(
                                   const Duration(days: 3650),
                                 ),
-                                title: '服务结束',
+                                title: stringsOf(context).merchantDirectorEnd,
                               );
                               if (picked != null && context.mounted) {
                                 setSheetState(() => end = picked);
                               }
                             },
                           ),
-                          const _FieldLabel('准备备注（选填）'),
+                          _FieldLabel(stringsOf(context).merchantDirectorNote),
                           CupertinoTextField(
                             controller: note,
                             maxLength: 200,
-                            placeholder: '给主办方留一句现场说明',
+                            placeholder: stringsOf(context).merchantDirectorNoteHint,
                           ),
                         ],
                       ),
@@ -558,7 +560,7 @@ class _MerchantGameNodePageState extends ConsumerState<MerchantGameNodePage> {
     final result = await showCupertinoModalPopup<({String code, String text})>(
       context: context,
       builder: (context) => CupertinoActionSheet(
-        title: const Text('暂停本站'),
+        title: Text(stringsOf(context).merchantDirectorPauseStation),
         actions: <Widget>[
           for (final reason in const <(String, String)>[
             ('CAPACITY', '现场满员'),
@@ -570,12 +572,12 @@ class _MerchantGameNodePageState extends ConsumerState<MerchantGameNodePage> {
               isDestructiveAction: true,
               onPressed: () =>
                   Navigator.pop(context, (code: reason.$1, text: reason.$2)),
-              child: Text(reason.$2),
+              child: Text(merchantDirectorLocalText(context, reason.$2)),
             ),
         ],
         cancelButton: CupertinoActionSheetAction(
           onPressed: () => Navigator.pop(context),
-          child: const Text('取消'),
+          child: Text(stringsOf(context).merchantDirectorCancel),
         ),
       ),
     );
@@ -587,7 +589,7 @@ class _MerchantGameNodePageState extends ConsumerState<MerchantGameNodePage> {
           const <MerchantGameFallback>[];
       if (options.isEmpty) {
         setState(
-          () => _error = const GameSessionContractException('暂停需先在服务端配置备援预案'),
+          () => _error = const _DirectorLocalException('暂停需先在服务端配置备援预案'),
         );
         return;
       }
@@ -606,12 +608,12 @@ class _MerchantGameNodePageState extends ConsumerState<MerchantGameNodePage> {
                   mainAxisSize: MainAxisSize.min,
                   children: <Widget>[
                     _SheetHeader(
-                      title: '预计恢复与备援预案',
+                      title: stringsOf(context).merchantDirectorFallbackTitle,
                       onCancel: () => Navigator.pop(sheetContext),
                       onDone: () => Navigator.pop(sheetContext, true),
                     ),
                     _SystemDateTimeButton(
-                      label: '预计恢复时间',
+                      label: stringsOf(context).merchantDirectorResumeTime,
                       value: _dateTime(resumeAt),
                       onPressed: () async {
                         final now = DateTime.now();
@@ -621,7 +623,7 @@ class _MerchantGameNodePageState extends ConsumerState<MerchantGameNodePage> {
                           initialDateTime: resumeAt,
                           minimumDate: now,
                           maximumDate: now.add(const Duration(days: 3650)),
-                          title: '预计恢复时间',
+                          title: stringsOf(context).merchantDirectorResumeTime,
                         );
                         if (picked != null && context.mounted) {
                           setSheetState(() => resumeAt = picked);
@@ -679,13 +681,13 @@ class _MerchantGameNodePageState extends ConsumerState<MerchantGameNodePage> {
                 mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
                   _SheetHeader(
-                    title: '核验玩家提交',
+                    title: stringsOf(context).merchantDirectorVerify,
                     onCancel: () => Navigator.pop(sheetContext),
                     onDone: () {
                       if (!RegExp(
                         r'^[1-9]\d{0,18}$',
                       ).hasMatch(id.text.trim())) {
-                        setSheetState(() => validationError = '请输入有效的提交 ID');
+                        setSheetState(() => validationError = stringsOf(context).merchantDirectorInvalidSubmission);
                         return;
                       }
                       Navigator.pop(sheetContext, true);
@@ -704,14 +706,14 @@ class _MerchantGameNodePageState extends ConsumerState<MerchantGameNodePage> {
                   CupertinoTextField(
                     controller: id,
                     keyboardType: TextInputType.number,
-                    placeholder: '提交 ID',
+                    placeholder: stringsOf(context).merchantDirectorSubmissionId,
                   ),
                   const SizedBox(height: CyTokens.space3),
                   CupertinoSlidingSegmentedControl<String>(
                     groupValue: decision,
-                    children: const <String, Widget>{
-                      'APPROVE': Text('通过'),
-                      'REJECT': Text('驳回'),
+                    children: <String, Widget>{
+                      'APPROVE': Text(stringsOf(context).merchantDirectorApprove),
+                      'REJECT': Text(stringsOf(context).merchantDirectorReject),
                     },
                     onValueChanged: (v) {
                       if (v != null) setSheetState(() => decision = v);
@@ -721,10 +723,10 @@ class _MerchantGameNodePageState extends ConsumerState<MerchantGameNodePage> {
                     const SizedBox(height: CyTokens.space3),
                     CupertinoSlidingSegmentedControl<String>(
                       groupValue: reason,
-                      children: const <String, Widget>{
-                        'ANSWER_MISMATCH': Text('答案不匹配'),
-                        'EVIDENCE_UNCLEAR': Text('凭证不清'),
-                        'DUPLICATE_SUBMISSION': Text('重复提交'),
+                      children: <String, Widget>{
+                        'ANSWER_MISMATCH': Text(stringsOf(context).merchantDirectorMismatch),
+                        'EVIDENCE_UNCLEAR': Text(stringsOf(context).merchantDirectorUnclearEvidence),
+                        'DUPLICATE_SUBMISSION': Text(stringsOf(context).merchantDirectorDuplicate),
                       },
                       onValueChanged: (v) {
                         if (v != null) setSheetState(() => reason = v);
@@ -760,20 +762,20 @@ class _MerchantGameNodePageState extends ConsumerState<MerchantGameNodePage> {
     final int? selected = await showCupertinoModalPopup<int>(
       context: context,
       builder: (BuildContext sheetContext) => CupertinoActionSheet(
-        title: const Text('切换本站'),
+        title: Text(stringsOf(context).merchantDirectorSwitchStation),
         actions: <Widget>[
           for (final MerchantGameStation station in projection.stations)
             CupertinoActionSheetAction(
               isDefaultAction: station.nodeId == _selectedNodeId,
               onPressed: () => Navigator.pop(sheetContext, station.nodeId),
               child: Text(
-                station.nodeName.isEmpty ? '未命名站点' : station.nodeName,
+                station.nodeName.isEmpty ? stringsOf(context).merchantDirectorUnnamed : station.nodeName,
               ),
             ),
         ],
         cancelButton: CupertinoActionSheetAction(
           onPressed: () => Navigator.pop(sheetContext),
-          child: const Text('取消'),
+          child: Text(stringsOf(context).merchantDirectorCancel),
         ),
       ),
     );
@@ -799,11 +801,11 @@ class _MerchantGameNodePageState extends ConsumerState<MerchantGameNodePage> {
     return CupertinoPageScaffold(
       backgroundColor: palette.bgPage,
       navigationBar: CupertinoNavigationBar(
-        middle: const Text('本站准备与运行'),
+        middle: Text(stringsOf(context).merchantDirectorTitle),
         leading: Semantics(
           container: true,
           button: true,
-          label: canPop ? '返回上一页' : '返回商家中心',
+          label: canPop ? stringsOf(context).merchantDirectorBack : stringsOf(context).merchantDirectorMerchantHome,
           onTap: onBack,
           excludeSemantics: true,
           child: CupertinoNavigationBarBackButton(onPressed: onBack),
@@ -814,7 +816,7 @@ class _MerchantGameNodePageState extends ConsumerState<MerchantGameNodePage> {
             ? const LoadingView()
             : _error != null && _projection == null
             ? StatusView(
-                message: _error.toString().replaceFirst('Exception: ', ''),
+                message: _directorErrorText(context, _error),
                 icon: CupertinoIcons.exclamationmark_circle,
                 onRetry: _load,
               )
@@ -827,9 +829,9 @@ class _MerchantGameNodePageState extends ConsumerState<MerchantGameNodePage> {
     final projection = _projection!;
     final station = _station;
     if (station == null) {
-      return const StatusView(
-        message: '暂无本站任务',
-        sub: '俱乐部或主办方发出站点邀请后，会显示在这里',
+      return StatusView(
+        message: stringsOf(context).merchantDirectorNoTasks,
+        sub: stringsOf(context).merchantDirectorNoTasksHint,
         icon: CupertinoIcons.map_pin_ellipse,
         large: true,
       );
@@ -855,11 +857,11 @@ class _MerchantGameNodePageState extends ConsumerState<MerchantGameNodePage> {
               children: <Widget>[
                 Expanded(
                   child: Text(
-                    station.nodeName.isEmpty ? '未命名站点' : station.nodeName,
+                    station.nodeName.isEmpty ? stringsOf(context).merchantDirectorUnnamed : station.nodeName,
                     style: TextStyle(color: palette.textPrimary),
                   ),
                 ),
-                Text('切换', style: TextStyle(color: palette.textSecondary)),
+                Text(stringsOf(context).merchantDirectorSwitch, style: TextStyle(color: palette.textSecondary)),
                 const SizedBox(width: CyTokens.space1),
                 const Icon(CupertinoIcons.chevron_forward, size: 18),
               ],
@@ -892,17 +894,17 @@ class _MerchantGameNodePageState extends ConsumerState<MerchantGameNodePage> {
               ),
               const SizedBox(height: CyTokens.space2),
               Text(
-                station.statusText,
+                merchantDirectorLocalText(context, station.statusText),
                 style: const TextStyle(fontWeight: FontWeight.w600),
               ),
               if (station.capacity != null)
                 Text(
-                  '接待人数 ${station.capacity}',
+                  stringsOf(context).merchantDirectorCapacityCount(station.capacity!),
                   style: TextStyle(color: palette.textSecondary),
                 ),
               if (station.pendingVerificationCount > 0)
                 Text(
-                  '待核验 ${station.pendingVerificationCount}',
+                  stringsOf(context).merchantDirectorVerificationCount(station.pendingVerificationCount),
                   style: TextStyle(color: palette.textSecondary),
                 ),
             ],
@@ -914,25 +916,25 @@ class _MerchantGameNodePageState extends ConsumerState<MerchantGameNodePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              const _SectionHeader(title: '本站执行卡', sub: '无需猜剧情，只按公开步骤接待玩家'),
+              _SectionHeader(title: stringsOf(context).merchantDirectorExecutionCard, sub: stringsOf(context).merchantDirectorExecutionHint),
               if (station.playerTaskPrompt.isEmpty)
                 Text(
-                  '主办方尚未配置本站任务，当前不要引导玩家开始。',
+                  stringsOf(context).merchantDirectorUnconfigured,
                   style: TextStyle(color: palette.textSecondary),
                 )
               else ...<Widget>[
-                _Info('玩家会做什么', station.playerTaskPrompt, palette),
+                _Info(stringsOf(context).merchantDirectorPlayerTask, station.playerTaskPrompt, palette),
                 _Info(
-                  '商家只需做什么',
+                  stringsOf(context).merchantDirectorMerchantTask,
                   station.merchantInstruction.isEmpty
-                      ? '按核验编号确认玩家已完成公开任务；不代替玩家解题。'
+                      ? stringsOf(context).merchantDirectorMerchantTaskHint
                       : station.merchantInstruction,
                   palette,
                 ),
                 _Info(
-                  '不能透露什么',
+                  stringsOf(context).merchantDirectorDoNotReveal,
                   station.hiddenInfoReminder.isEmpty
-                      ? '不要透露答案、其他角色线索或后台剧情条件。'
+                      ? stringsOf(context).merchantDirectorDoNotRevealHint
                       : station.hiddenInfoReminder,
                   palette,
                 ),
@@ -949,14 +951,14 @@ class _MerchantGameNodePageState extends ConsumerState<MerchantGameNodePage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                const _SectionHeader(title: '站点邀请', sub: '接受后才能填写准备清单并开放本站'),
+                _SectionHeader(title: stringsOf(context).merchantDirectorInvitation, sub: stringsOf(context).merchantDirectorInvitationHint),
                 Row(
                   children: <Widget>[
                     if (_allows('STATION_DECLINE'))
                       Expanded(
                         child: CupertinoButton.tinted(
                           onPressed: _writeBlocked ? null : _decline,
-                          child: const Text('拒绝邀请'),
+                          child: Text(stringsOf(context).merchantDirectorDecline),
                         ),
                       ),
                     if (_allows('STATION_DECLINE') && _allows('STATION_ACCEPT'))
@@ -970,7 +972,7 @@ class _MerchantGameNodePageState extends ConsumerState<MerchantGameNodePage> {
                                   'STATION_ACCEPT',
                                   const <String, dynamic>{},
                                 ),
-                          child: Text(_writing ? '确认中…' : '接受邀请'),
+                          child: Text(_writing ? stringsOf(context).merchantDirectorConfirming : stringsOf(context).merchantDirectorAccept),
                         ),
                       ),
                   ],
@@ -987,7 +989,7 @@ class _MerchantGameNodePageState extends ConsumerState<MerchantGameNodePage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                const _SectionHeader(title: '准备清单', sub: '全部完成后，本站才可进入准备完成状态'),
+                _SectionHeader(title: stringsOf(context).merchantDirectorChecklist, sub: stringsOf(context).merchantDirectorChecklistHint),
                 for (final GameChecklistItem item in station.checklist)
                   Padding(
                     padding: const EdgeInsets.only(bottom: CyTokens.space2),
@@ -1010,7 +1012,7 @@ class _MerchantGameNodePageState extends ConsumerState<MerchantGameNodePage> {
                 CupertinoButton.filled(
                   key: const Key('merchant-game-ready-action'),
                   onPressed: _writeBlocked ? null : _ready,
-                  child: const Text('确认准备完成'),
+                  child: Text(stringsOf(context).merchantDirectorConfirmReady),
                 ),
               ],
             ),
@@ -1026,11 +1028,11 @@ class _MerchantGameNodePageState extends ConsumerState<MerchantGameNodePage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                const _SectionHeader(title: '本站运行', sub: '只处理本站当前可执行的动作'),
+                _SectionHeader(title: stringsOf(context).merchantDirectorOperation, sub: stringsOf(context).merchantDirectorOperationHint),
                 if (canLiveCheckin)
                   CyNativeButton(
                     key: const Key('merchant-game-live-code'),
-                    label: '出示打卡码',
+                    label: stringsOf(context).merchantDirectorShowCode,
                     onPressed: _writeBlocked
                         ? null
                         : () => showChapterNodeCodeSheet(
@@ -1042,14 +1044,14 @@ class _MerchantGameNodePageState extends ConsumerState<MerchantGameNodePage> {
                 if (_allows('STATION_PAUSE'))
                   CupertinoButton.tinted(
                     onPressed: _writeBlocked ? null : _pause,
-                    child: const Text('暂停接待'),
+                    child: Text(stringsOf(context).merchantDirectorPause),
                   ),
                 if (station.status == 'ACTIVE' &&
                     station.pendingVerificationCount > 0 &&
                     _allows('VERIFY_SUBMISSION'))
                   CupertinoButton.filled(
                     onPressed: _writeBlocked ? null : _verify,
-                    child: const Text('核验玩家提交'),
+                    child: Text(stringsOf(context).merchantDirectorVerify),
                   ),
               ],
             ),
@@ -1063,7 +1065,7 @@ class _MerchantGameNodePageState extends ConsumerState<MerchantGameNodePage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                const _SectionHeader(title: '暂停信息', sub: '玩家端不会把暂停站点显示为可接待'),
+                _SectionHeader(title: stringsOf(context).merchantDirectorPauseInfo, sub: stringsOf(context).merchantDirectorPauseHint),
                 CupertinoButton.filled(
                   onPressed: _writeBlocked
                       ? null
@@ -1071,7 +1073,7 @@ class _MerchantGameNodePageState extends ConsumerState<MerchantGameNodePage> {
                           'STATION_RESUME',
                           const <String, dynamic>{},
                         ),
-                  child: const Text('恢复接待'),
+                  child: Text(stringsOf(context).merchantDirectorResume),
                 ),
               ],
             ),
@@ -1082,7 +1084,7 @@ class _MerchantGameNodePageState extends ConsumerState<MerchantGameNodePage> {
           Semantics(
             liveRegion: true,
             child: Text(
-              _error.toString().replaceFirst('Exception: ', ''),
+              _directorErrorText(context, _error),
               style: TextStyle(color: palette.textSecondary),
             ),
           ),
@@ -1094,26 +1096,26 @@ class _MerchantGameNodePageState extends ConsumerState<MerchantGameNodePage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                const Text(
-                  '操作结果待确认',
+                Text(
+                  stringsOf(context).merchantDirectorUnconfirmed,
                   style: TextStyle(fontWeight: FontWeight.w600),
                 ),
                 Text(
                   _legacyPending
-                      ? '旧版记录信息不完整，只会读取回执，不会重放操作。'
-                      : '已保留完整原请求，确认前不会提交新操作。',
+                      ? stringsOf(context).merchantDirectorLegacyPending
+                      : stringsOf(context).merchantDirectorPendingHint,
                   style: TextStyle(color: palette.textSecondary),
                 ),
                 CupertinoButton(
                   padding: EdgeInsets.zero,
                   onPressed: _writing || _loadInFlight ? null : _load,
-                  child: const Text('确认操作结果'),
+                  child: Text(stringsOf(context).merchantDirectorConfirmResult),
                 ),
                 CupertinoButton.filled(
                   onPressed: _writing || _pendingWrite == null
                       ? null
                       : _retryPending,
-                  child: Text(_writing ? '重试中…' : '使用原请求重试'),
+                  child: Text(_writing ? stringsOf(context).merchantDirectorRetrying : stringsOf(context).merchantDirectorRetryOriginal),
                 ),
               ],
             ),
@@ -1125,10 +1127,10 @@ class _MerchantGameNodePageState extends ConsumerState<MerchantGameNodePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              const Text('最近回执', style: TextStyle(fontWeight: FontWeight.w600)),
+              Text(stringsOf(context).merchantDirectorReceipts, style: TextStyle(fontWeight: FontWeight.w600)),
               if (_recentReceipts.isEmpty)
                 Text(
-                  '本次进入页面后还没有已确认操作',
+                  stringsOf(context).merchantDirectorNoReceipts,
                   style: TextStyle(color: palette.textSecondary),
                 ),
               for (final receipt in _recentReceipts)
@@ -1136,9 +1138,9 @@ class _MerchantGameNodePageState extends ConsumerState<MerchantGameNodePage> {
                   padding: const EdgeInsets.only(top: CyTokens.space2),
                   child: Row(
                     children: <Widget>[
-                      Expanded(child: Text(_actionText(receipt.action))),
+                      Expanded(child: Text(merchantDirectorLocalText(context, _actionText(receipt.action)))),
                       Text(
-                        'revision ${receipt.revision} · 已确认',
+                        stringsOf(context).merchantDirectorRevision(receipt.revision),
                         style: TextStyle(color: palette.textSecondary),
                       ),
                     ],
@@ -1153,23 +1155,23 @@ class _MerchantGameNodePageState extends ConsumerState<MerchantGameNodePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              const Text('本站复盘', style: TextStyle(fontWeight: FontWeight.w600)),
+              Text(stringsOf(context).merchantDirectorRecap, style: TextStyle(fontWeight: FontWeight.w600)),
               if (station.recap == null)
-                Text('复盘数据待确认', style: TextStyle(color: palette.textSecondary))
+                Text(stringsOf(context).merchantDirectorRecapPending, style: TextStyle(color: palette.textSecondary))
               else ...<Widget>[
-                _RecapRow('到站玩家', '${station.recap!.arrivedPlayers}'),
-                _RecapRow('任务提交', '${station.recap!.submissionCount}'),
+                _RecapRow(stringsOf(context).merchantDirectorArrivals, '${station.recap!.arrivedPlayers}'),
+                _RecapRow(stringsOf(context).merchantDirectorSubmissions, '${station.recap!.submissionCount}'),
                 _RecapRow(
-                  '核验通过 / 驳回',
+                  stringsOf(context).merchantDirectorVerificationTotals,
                   '${station.recap!.approvedCount} / ${station.recap!.rejectedCount}',
                 ),
-                _RecapRow('证据已记录', '${station.recap!.recordedCount}'),
+                _RecapRow(stringsOf(context).merchantDirectorRecorded, '${station.recap!.recordedCount}'),
                 _RecapRow(
-                  '正常完成 / 兜底完成',
+                  stringsOf(context).merchantDirectorCompletionTotals,
                   '${station.recap!.normalCompletedCount} / ${station.recap!.fallbackCompletedCount}',
                 ),
-                _RecapRow('暂停事件', '${station.recap!.pauseEventCount}'),
-                _RecapRow('公开授权内容', '${station.recap!.authorizedContentCount}'),
+                _RecapRow(stringsOf(context).merchantDirectorPauses, '${station.recap!.pauseEventCount}'),
+                _RecapRow(stringsOf(context).merchantDirectorAuthorizedContent, '${station.recap!.authorizedContentCount}'),
                 const SizedBox(height: CyTokens.space1),
                 Text(
                   '仅显示本站安全聚合，不公开玩家内容。',
@@ -1213,7 +1215,7 @@ class _SheetHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Row(
     children: <Widget>[
-      CupertinoButton(onPressed: onCancel, child: const Text('取消')),
+      CupertinoButton(onPressed: onCancel, child: Text(stringsOf(context).merchantDirectorCancel)),
       Expanded(
         child: Text(
           title,
@@ -1221,7 +1223,7 @@ class _SheetHeader extends StatelessWidget {
           style: const TextStyle(fontWeight: FontWeight.w600),
         ),
       ),
-      CupertinoButton(onPressed: onDone, child: const Text('完成')),
+      CupertinoButton(onPressed: onDone, child: Text(stringsOf(context).merchantDirectorDone)),
     ],
   );
 }
@@ -1242,7 +1244,7 @@ class _SystemDateTimeButton extends StatelessWidget {
     final palette = CyPalette.of(context);
     return Semantics(
       button: true,
-      label: '$label，当前 $value',
+      label: stringsOf(context).merchantDirectorCurrentValue(label, value),
       excludeSemantics: true,
       child: CupertinoButton(
         minimumSize: const Size(44, 44),
@@ -1469,23 +1471,23 @@ class _MerchantGameEntriesSectionState
     final projectError = joinedAsync.hasError || hostedAsync.hasError;
     final gameLoading = _entries == null && _entriesError == null;
     if (joined.isEmpty && hosted.isEmpty && entries.isEmpty && projectLoading) {
-      return const _MerchantProjectsState(
+      return _MerchantProjectsState(
         icon: CupertinoIcons.hourglass,
-        title: '项目加载中…',
+        title: stringsOf(context).merchantDirectorProjectsLoading,
       );
     }
     if (joined.isEmpty && hosted.isEmpty && entries.isEmpty && projectError) {
       return _MerchantProjectsState(
         icon: CupertinoIcons.wifi_slash,
-        title: '项目没取到',
-        actionLabel: '重试',
+        title: stringsOf(context).merchantDirectorProjectsFailed,
+        actionLabel: stringsOf(context).merchantDirectorRetry,
         onAction: _retryProjects,
       );
     }
     if (joined.isEmpty && hosted.isEmpty && entries.isEmpty && gameLoading) {
-      return const _MerchantProjectsState(
+      return _MerchantProjectsState(
         icon: CupertinoIcons.hourglass,
-        title: '项目加载中…',
+        title: stringsOf(context).merchantDirectorProjectsLoading,
       );
     }
     if (joined.isEmpty &&
@@ -1494,8 +1496,8 @@ class _MerchantGameEntriesSectionState
         !projectLoading) {
       return _MerchantProjectsState(
         icon: CupertinoIcons.tray,
-        title: '还没有项目',
-        actionLabel: '去发起',
+        title: stringsOf(context).merchantDirectorNoProjects,
+        actionLabel: stringsOf(context).merchantDirectorStartProject,
         onAction: () => context.push('/publish/pro?scope=MERCHANT'),
       );
     }
@@ -1579,9 +1581,9 @@ class _MerchantGameEntriesSectionState
             padding: const EdgeInsets.symmetric(horizontal: CyTokens.space1),
             child: Row(
               children: <Widget>[
-                const Expanded(
+                Expanded(
                   child: Text(
-                    '项目',
+                    stringsOf(context).merchantDirectorProjects,
                     style: TextStyle(fontWeight: FontWeight.w600),
                   ),
                 ),
@@ -1596,7 +1598,7 @@ class _MerchantGameEntriesSectionState
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: <Widget>[
-                        Text('全部 $projectTotal'),
+                        Text(stringsOf(context).merchantDirectorAllProjects(projectTotal)),
                         const SizedBox(width: CyTokens.space1),
                         const Icon(CupertinoIcons.chevron_forward, size: 16),
                       ],
@@ -1610,7 +1612,7 @@ class _MerchantGameEntriesSectionState
             Padding(
               padding: const EdgeInsets.only(bottom: CyTokens.space2),
               child: Text(
-                '正在更新项目…',
+                stringsOf(context).merchantDirectorProjectsUpdating,
                 style: TextStyle(
                   color: CyPalette.of(context).textSecondary,
                   fontSize: CyTokens.typeCaption,
@@ -1624,7 +1626,7 @@ class _MerchantGameEntriesSectionState
                 children: <Widget>[
                   Expanded(
                     child: Text(
-                      '部分项目没取到',
+                      stringsOf(context).merchantDirectorPartialProjects,
                       style: TextStyle(
                         color: CyPalette.of(context).textSecondary,
                         fontSize: CyTokens.typeCaption,
@@ -1635,7 +1637,7 @@ class _MerchantGameEntriesSectionState
                     minimumSize: const Size(44, 44),
                     padding: EdgeInsets.zero,
                     onPressed: _retryProjects,
-                    child: const Text('重试'),
+                    child: Text(stringsOf(context).merchantDirectorRetry),
                   ),
                 ],
               ),
@@ -1671,9 +1673,9 @@ class _MerchantProjectsState extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          const Padding(
+          Padding(
             padding: EdgeInsets.symmetric(horizontal: CyTokens.space1),
-            child: Text('项目', style: TextStyle(fontWeight: FontWeight.w600)),
+            child: Text(stringsOf(context).merchantDirectorProjects, style: TextStyle(fontWeight: FontWeight.w600)),
           ),
           const SizedBox(height: CyTokens.space2),
           _GameCard(
@@ -1782,10 +1784,20 @@ class _MerchantProjectCard extends StatelessWidget {
     return project?.bizType == 'activity' || entryOnly != null ? '活动' : null;
   }
 
-  String? get _meta {
-    final String? joined = registration?.assignmentText;
-    if (joined != null && joined.isNotEmpty) return joined;
-    final String hostedDate = _workbenchDate(project?.startTime);
+  String? _meta(BuildContext context) {
+    final TopicRegistration? joined = registration;
+    if (joined != null) {
+      final String chapter = (joined.chapterName ?? '').trim();
+      final String node = (joined.nodeName ?? '').trim();
+      final String date = _workbenchDate(context, joined.startDate);
+      final parts = <String>[
+        if (chapter.isNotEmpty) chapter,
+        if (node.isNotEmpty && node != chapter) node,
+        if (date.isNotEmpty) date,
+      ];
+      if (parts.isNotEmpty) return parts.join(' · ');
+    }
+    final String hostedDate = _workbenchDate(context, project?.startTime);
     return hostedDate.isEmpty ? null : hostedDate;
   }
 
@@ -1820,7 +1832,7 @@ class _MerchantProjectCard extends StatelessWidget {
     final projectRoute = _projectRoute;
     final String? statusLabel = _statusLabel;
     final String? categoryLabel = _categoryLabel;
-    final String? meta = _meta;
+    final String? meta = _meta(context);
     final cardAction = _cardAction;
     return KeyedSubtree(
       key: Key('merchant-project-$_bizType-$_id'),
@@ -1830,7 +1842,7 @@ class _MerchantProjectCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
             Semantics(
-              label: '打开$_roleLabel项目$_title',
+              label: stringsOf(context).merchantDirectorOpenProject(merchantDirectorLocalText(context, _roleLabel), _title),
               button: projectRoute != null,
               child: CupertinoButton(
                 padding: EdgeInsets.zero,
@@ -1867,14 +1879,14 @@ class _MerchantProjectCard extends StatelessWidget {
                                   children: <Widget>[
                                     if (statusLabel != null)
                                       _ProjectTag(
-                                        text: statusLabel,
+                                        text: merchantDirectorLocalText(context, statusLabel),
                                         foreground: palette.brand,
                                         background: palette.bgSurface,
                                         border: palette.borderSubtle,
                                       ),
                                     if (categoryLabel != null)
                                       _ProjectTag(
-                                        text: categoryLabel,
+                                        text: merchantDirectorLocalText(context, categoryLabel),
                                         foreground: palette.actionPrimaryFg,
                                         background: palette.actionPrimaryBg,
                                       ),
@@ -1944,7 +1956,7 @@ class _MerchantProjectCard extends StatelessWidget {
                     const SizedBox(width: CyTokens.space2),
                     Expanded(
                       child: Text(
-                        '${entry.activityName} · ${entry.stationCount} 个站点',
+                        stringsOf(context).merchantDirectorStationCount(entry.activityName, entry.stationCount),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(color: palette.textPrimary),
@@ -1978,7 +1990,7 @@ class _MerchantProjectCard extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: <Widget>[
                           Text(
-                            cardAction.label,
+                            merchantDirectorLocalText(context, cardAction.label),
                             style: CyType.caption2.copyWith(
                               color: palette.textPrimary,
                               fontWeight: FontWeight.w600,
@@ -2045,7 +2057,7 @@ class _ProjectMessageBadge extends ConsumerWidget {
     final CyPalette palette = CyPalette.of(context);
     final bool hasMessages = count > 0;
     final Widget content = Semantics(
-      label: hasMessages ? '本项目$count条消息' : '暂无项目消息',
+      label: hasMessages ? stringsOf(context).merchantDirectorMessageCount(count) : stringsOf(context).merchantDirectorNoMessages,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
@@ -2092,7 +2104,7 @@ class _ProjectTodoLine extends StatelessWidget {
     final MerchantProjectTodo? row = todo;
     if (row == null || row.actionableTotal <= 0) {
       return Text(
-        '今日无待办',
+        stringsOf(context).merchantDirectorNoTodo,
         style: TextStyle(
           color: CyPalette.of(context).textTertiary,
           fontSize: CyTokens.typeCaption,
@@ -2105,7 +2117,7 @@ class _ProjectTodoLine extends StatelessWidget {
       children: <Widget>[
         if (row.pendingVerify > 0)
           Text(
-            '待核销 ${row.pendingVerify}',
+            stringsOf(context).merchantDirectorRedeemCount(row.pendingVerify),
             key: Key('merchant-project-todo-verify-$projectKey'),
             style: TextStyle(
               color: CyPalette.of(context).statusSuccess,
@@ -2115,7 +2127,7 @@ class _ProjectTodoLine extends StatelessWidget {
           ),
         if (row.pendingScanConfirm > 0)
           Text(
-            '待扫码 ${row.pendingScanConfirm}',
+            stringsOf(context).merchantDirectorScanCount(row.pendingScanConfirm),
             key: Key('merchant-project-todo-scan-$projectKey'),
             style: TextStyle(
               color: CyPalette.of(context).statusWarning,
@@ -2169,7 +2181,7 @@ String _day(String? value) {
   return match?.group(0) ?? '';
 }
 
-String _workbenchDate(String? value) {
+String _workbenchDate(BuildContext context, String? value) {
   final String raw = (value ?? '').trim();
   if (raw.isEmpty) return '';
   final DateTime? date = DateTime.tryParse(raw);
@@ -2183,5 +2195,14 @@ String _workbenchDate(String? value) {
     '周六',
     '周日',
   ];
-  return '${weekdays[date.weekday - 1]} ${date.month}月${date.day}日';
+  return stringsOf(context).merchantDirectorDate(merchantDirectorLocalText(context, weekdays[date.weekday - 1]), date.month, date.day);
 }
+
+/// Local-only marker prevents translating a server error with identical wording.
+class _DirectorLocalException extends GameSessionContractException {
+  const _DirectorLocalException(super.message);
+}
+String _directorErrorText(BuildContext context, Object? error) =>
+    error is _DirectorLocalException
+        ? merchantDirectorLocalText(context, error.message)
+        : error.toString().replaceFirst('Exception: ', '');

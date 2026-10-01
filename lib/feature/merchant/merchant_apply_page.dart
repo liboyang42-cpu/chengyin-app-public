@@ -15,6 +15,7 @@ import '../../core/widgets/cy_native_progress.dart';
 import '../../core/widgets/cy_widgets.dart';
 import '../../core/widgets/status_view.dart';
 import '../../data/api/merchant_api.dart';
+import '../../l10n/strings.dart';
 import '../../data/models/merchant_apply.dart';
 import '../../data/models/merchant_application.dart';
 import '../../core/widgets/cy_net_image.dart';
@@ -42,6 +43,30 @@ class MerchantApplyPage extends ConsumerStatefulWidget {
   ConsumerState<MerchantApplyPage> createState() => _MerchantApplyPageState();
 }
 
+String _applicationStatusLabel(BuildContext context, MerchantApplication a) {
+  if (a.isDisabled) return stringsOf(context).merchantHomeDisabled;
+  if (a.status == 1 && a.accountStatus == 1) return stringsOf(context).merchantHomeActive;
+  if (a.isRejected) return stringsOf(context).merchantHomeRejected;
+  if (a.status == 1) return stringsOf(context).merchantHomeAwaitingActivation;
+  if (a.status == 0) return stringsOf(context).merchantHomeUnderReview;
+  return stringsOf(context).merchantHomeUnknownStatus;
+}
+
+String _applicationStatusText(BuildContext context, MerchantApplication a) {
+  if (a.isDisabled) {
+    final reason = a.disableReason.trim();
+    return reason.isEmpty ? stringsOf(context).merchantHomeDisabledNoReason : stringsOf(context).merchantHomeDisabledReason(reason);
+  }
+  if (a.status == 1 && a.accountStatus == 1) return stringsOf(context).merchantHomeActiveExplanation;
+  if (a.isRejected) {
+    final reason = a.rejectReason.trim();
+    return reason.isEmpty ? stringsOf(context).merchantHomeRejectedNoReason : stringsOf(context).merchantHomeRejectedReason(reason);
+  }
+  if (a.status == 1) return stringsOf(context).merchantHomeActivationExplanation;
+  if (a.status == 0) return stringsOf(context).merchantHomeReviewExplanation;
+  return stringsOf(context).merchantHomeUnknownExplanation;
+}
+
 class _MerchantApplyPageState extends ConsumerState<MerchantApplyPage> {
   int _step = 1;
   MerchantApplyForm _form = const MerchantApplyForm();
@@ -56,8 +81,8 @@ class _MerchantApplyPageState extends ConsumerState<MerchantApplyPage> {
   DateTime _businessStart = DateTime(2000, 1, 1, 10);
   DateTime _businessEnd = DateTime(2000, 1, 1, 22);
 
-  /// 撞上「已是俱乐部主理人」时置真:这条不是失败,是**永远不能申请**,
-  /// 界面要整页说清,而不是弹个 toast 让用户再试一次。
+  /// Only a server-reported conflict blocks submission. Club leadership itself
+  /// does not prevent a pending merchant application on current backend master.
   String? _blockedReason;
 
   /// 状态页上按了「重新申请」—— 落回向导,资料已回填。
@@ -98,10 +123,24 @@ class _MerchantApplyPageState extends ConsumerState<MerchantApplyPage> {
       applyStepReady(step, _form) &&
       (step != kApplyStepTitles.length || _publisherIdentity.satisfied);
 
+  String? _localizedBlocker(String? message) => switch (message) {
+    '请填写品牌名称' => stringsOf(context).merchantApplyNameRequired,
+    '请填写联系手机号' => stringsOf(context).merchantApplyPhoneRequired,
+    '请填写门店地址' => stringsOf(context).merchantApplyAddressRequired,
+    '请填写营业时间' => stringsOf(context).merchantApplyHoursRequired,
+    '请上传营业执照' => stringsOf(context).merchantApplyLicenseRequired,
+    '请填写真实姓名' => stringsOf(context).merchantApplyRealNameRequired,
+    '请填写真实姓名(2-20 个字)' => stringsOf(context).merchantApplyRealNameLength,
+    '姓名里不应包含数字' => stringsOf(context).merchantApplyRealNameDigits,
+    '身份证号格式不正确，请核对后重填' => stringsOf(context).merchantApplyIdInvalid,
+    '请先同意提供真实姓名与身份证号' => stringsOf(context).merchantApplyConsentRequired,
+    _ => message,
+  };
+
   String? _stepBlocker(int step) {
     final problem = applyStepBlocker(step, _form);
-    if (problem != null) return problem;
-    if (step == kApplyStepTitles.length) return _publisherIdentity.firstProblem;
+    if (problem != null) return _localizedBlocker(problem);
+    if (step == kApplyStepTitles.length) return _localizedBlocker(_publisherIdentity.firstProblem);
     return null;
   }
 
@@ -169,11 +208,11 @@ class _MerchantApplyPageState extends ConsumerState<MerchantApplyPage> {
                           CupertinoButton(
                             minimumSize: const Size(44, 44),
                             onPressed: () => Navigator.of(sheetContext).pop(),
-                            child: const Text('取消'),
+                            child: Text(stringsOf(context).cancel),
                           ),
                           Expanded(
                             child: Text(
-                              '设置经营时间',
+                              stringsOf(context).merchantApplyHoursTitle,
                               textAlign: TextAlign.center,
                               style: CupertinoTheme.of(
                                 context,
@@ -186,7 +225,7 @@ class _MerchantApplyPageState extends ConsumerState<MerchantApplyPage> {
                               if (!days.contains(true)) {
                                 CyNativeNotice.show(
                                   this.context,
-                                  '至少选择一个经营日',
+                                  stringsOf(context).merchantApplyDayRequired,
                                   isError: true,
                                 );
                                 return;
@@ -205,7 +244,7 @@ class _MerchantApplyPageState extends ConsumerState<MerchantApplyPage> {
                               });
                               Navigator.of(sheetContext).pop();
                             },
-                            child: const Text('完成'),
+                            child: Text(stringsOf(context).done),
                           ),
                         ],
                       ),
@@ -218,7 +257,7 @@ class _MerchantApplyPageState extends ConsumerState<MerchantApplyPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
                           Text(
-                            '经营日',
+                            stringsOf(context).merchantApplyDays,
                             style: Theme.of(context).textTheme.labelMedium
                                 ?.copyWith(color: palette.textSecondary),
                           ),
@@ -259,7 +298,7 @@ class _MerchantApplyPageState extends ConsumerState<MerchantApplyPage> {
                                                 selected: days[index],
                                                 button: true,
                                                 label:
-                                                    '周${_weekdayLabels[index]}',
+                                                    <String>[stringsOf(context).merchantApplyWeekday1, stringsOf(context).merchantApplyWeekday2, stringsOf(context).merchantApplyWeekday3, stringsOf(context).merchantApplyWeekday4, stringsOf(context).merchantApplyWeekday5, stringsOf(context).merchantApplyWeekday6, stringsOf(context).merchantApplyWeekday7][index],
                                                 onTap: () => toggleDay(index),
                                                 excludeSemantics: true,
                                                 child: CupertinoButton(
@@ -278,7 +317,7 @@ class _MerchantApplyPageState extends ConsumerState<MerchantApplyPage> {
                                                   onPressed: () =>
                                                       toggleDay(index),
                                                   child: Text(
-                                                    _weekdayLabels[index],
+                                                    <String>[stringsOf(context).merchantApplyDay1, stringsOf(context).merchantApplyDay2, stringsOf(context).merchantApplyDay3, stringsOf(context).merchantApplyDay4, stringsOf(context).merchantApplyDay5, stringsOf(context).merchantApplyDay6, stringsOf(context).merchantApplyDay7][index],
                                                     style: TextStyle(
                                                       color: days[index]
                                                           ? palette
@@ -305,20 +344,20 @@ class _MerchantApplyPageState extends ConsumerState<MerchantApplyPage> {
                         children: <Widget>[
                           Expanded(
                             child: _BusinessTimePicker(
-                              label: '开始时间',
+                              label: stringsOf(context).merchantApplyStartTime,
                               value: start,
                               onChanged: (DateTime value) =>
                                   setSheetState(() => start = value),
                             ),
                           ),
                           Text(
-                            '至',
+                            stringsOf(context).merchantApplyTo,
                             style: Theme.of(context).textTheme.labelMedium
                                 ?.copyWith(color: palette.textSecondary),
                           ),
                           Expanded(
                             child: _BusinessTimePicker(
-                              label: '结束时间',
+                              label: stringsOf(context).merchantApplyEndTime,
                               value: end,
                               onChanged: (DateTime value) =>
                                   setSheetState(() => end = value),
@@ -337,6 +376,8 @@ class _MerchantApplyPageState extends ConsumerState<MerchantApplyPage> {
     );
   }
 
+  // Persist the existing businessTime format; localized picker labels never
+  // change the submitted business data.
   static const List<String> _weekdayLabels = <String>[
     '一',
     '二',
@@ -374,7 +415,7 @@ class _MerchantApplyPageState extends ConsumerState<MerchantApplyPage> {
       if (!mounted) return;
       CyNativeNotice.show(
         context,
-        '营业执照没传上去:${e.toString().replaceFirst('Exception: ', '')}',
+        stringsOf(context).merchantApplyUploadError(e.toString().replaceFirst('Exception: ', '')),
         isError: true,
       );
     } finally {
@@ -393,6 +434,7 @@ class _MerchantApplyPageState extends ConsumerState<MerchantApplyPage> {
       final outcome = await registerPublisherIdentity(
         ref.read(publisherIdentityApiProvider),
         _publisherIdentity.form,
+        strings: stringsOf(context),
       );
       _publisherIdentity.setBusy(false);
       if (!mounted) return;
@@ -400,7 +442,9 @@ class _MerchantApplyPageState extends ConsumerState<MerchantApplyPage> {
         // 停在这一步:入驻单不许跟着发出去;报错条原地,「重新提交」再走一次。
         setState(() {
           _submitting = false;
-          _identityError = outcome.message;
+          _identityError = outcome.network
+              ? stringsOf(context).merchantApplyIdentityNetworkError
+              : outcome.message;
         });
         return;
       }
@@ -411,12 +455,12 @@ class _MerchantApplyPageState extends ConsumerState<MerchantApplyPage> {
     try {
       await ref.read(merchantApiProvider).submitApply(_form);
       if (!mounted) return;
-      CyNativeNotice.show(context, '申请已提交,等待审核');
+      CyNativeNotice.show(context, stringsOf(context).merchantApplySubmittedNotice);
       if (context.canPop()) context.pop();
     } catch (e) {
       if (!mounted) return;
       if (e is MerchantApiException && e.isClubLeaderConflict) {
-        // ★ 整页拦下并说清原因。这条规则重试一万次也不会变。
+        // Preserve the server rejection without inventing a permanent role rule.
         setState(() => _blockedReason = e.message);
         return;
       }
@@ -448,7 +492,7 @@ class _MerchantApplyPageState extends ConsumerState<MerchantApplyPage> {
       if (asyncApplication.isLoading) {
         return CupertinoPageScaffold(
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-          navigationBar: const CupertinoNavigationBar(middle: Text('入驻申请')),
+          navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).merchantApplyTitle)),
           child: const SafeArea(
             bottom: false,
             child: Center(child: CupertinoActivityIndicator()),
@@ -459,17 +503,17 @@ class _MerchantApplyPageState extends ConsumerState<MerchantApplyPage> {
         final Object error = asyncApplication.error!;
         return CupertinoPageScaffold(
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-          navigationBar: const CupertinoNavigationBar(middle: Text('入驻申请')),
+          navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).merchantApplyTitle)),
           child: SafeArea(
             bottom: false,
             child: StatusView(
-              message: '暂时无法确认申请状态',
+              message: stringsOf(context).merchantApplyStateUnavailable,
               sub: error is MerchantApiException
                   ? error.message
-                  : '检查网络后重新检查。',
+                  : stringsOf(context).merchantApplyCheckNetwork,
               large: true,
               onRetry: () => ref.invalidate(merchantApplicationProvider),
-              retryLabel: '重新检查',
+              retryLabel: stringsOf(context).merchantApplyCheckAgain,
             ),
           ),
         );
@@ -483,7 +527,7 @@ class _MerchantApplyPageState extends ConsumerState<MerchantApplyPage> {
     if (_blockedReason != null) {
       return CupertinoPageScaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        navigationBar: const CupertinoNavigationBar(middle: Text('无法申请')),
+        navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).merchantApplyCannotApply)),
         child: Material(
           color: Colors.transparent,
           child: SafeArea(
@@ -499,7 +543,7 @@ class _MerchantApplyPageState extends ConsumerState<MerchantApplyPage> {
                     color: CyPalette.of(context).textSecondary,
                   ),
                   const SizedBox(height: CyTokens.space3),
-                  Text('无法申请入驻', style: textTheme.titleLarge),
+                  Text(stringsOf(context).merchantApplyCannotApplyTitle, style: textTheme.titleLarge),
                   const SizedBox(height: CyTokens.space2),
                   Text(
                     _blockedReason!,
@@ -510,7 +554,7 @@ class _MerchantApplyPageState extends ConsumerState<MerchantApplyPage> {
                   ),
                   const SizedBox(height: CyTokens.space2),
                   Text(
-                    '如需改为商户身份,请先处理俱乐部主理人身份。',
+                    stringsOf(context).merchantApplyCannotApplyHint,
                     textAlign: TextAlign.center,
                     style: textTheme.bodySmall?.copyWith(
                       color: CyPalette.of(context).textTertiary,
@@ -526,12 +570,12 @@ class _MerchantApplyPageState extends ConsumerState<MerchantApplyPage> {
 
     final ready = _stepReady(_step);
     final blocker = _stepBlocker(_step);
-    final String backLabel = _step == 1 ? '返回' : '返回上一步';
+    final String backLabel = _step == 1 ? stringsOf(context).merchantApplyBack : stringsOf(context).merchantApplyPrevious;
 
     return CupertinoPageScaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       navigationBar: CupertinoNavigationBar(
-        middle: Text('入驻申请 · ${kApplyStepTitles[_step - 1]}'),
+        middle: Text(stringsOf(context).merchantApplyStepTitle(<String>[stringsOf(context).merchantApplyStepBasics, stringsOf(context).merchantApplyStepBusiness, stringsOf(context).merchantApplyStepCredentials, stringsOf(context).merchantApplyStepPreview][_step - 1])),
         leading: Semantics(
           container: true,
           button: true,
@@ -556,7 +600,7 @@ class _MerchantApplyPageState extends ConsumerState<MerchantApplyPage> {
               CyNativeProgress(
                 progress: _step / kApplyStepTitles.length,
                 height: 4,
-                semanticLabel: '入驻申请进度',
+                semanticLabel: stringsOf(context).merchantApplyProgress,
               ),
               Expanded(
                 child: ListView(
@@ -612,7 +656,7 @@ class _MerchantApplyPageState extends ConsumerState<MerchantApplyPage> {
                                   child: CupertinoActivityIndicator(),
                                 )
                               : Text(
-                                  _step < kApplyStepTitles.length ? '继续' : '提交',
+                                  _step < kApplyStepTitles.length ? stringsOf(context).merchantApplyContinue : stringsOf(context).merchantApplySubmit,
                                 ),
                         ),
                       ),
@@ -634,8 +678,8 @@ class _MerchantApplyPageState extends ConsumerState<MerchantApplyPage> {
           children: <Widget>[
             _field(
               key: const Key('merchant-apply-name'),
-              label: '店铺名称',
-              hint: '品牌名称',
+              label: stringsOf(context).merchantApplyName,
+              hint: stringsOf(context).merchantApplyNameHint,
               controller: _nameController,
               onChanged: (String v) => _form = _form.copyWith(name: v),
               keyboard: TextInputType.name,
@@ -643,15 +687,15 @@ class _MerchantApplyPageState extends ConsumerState<MerchantApplyPage> {
             ),
             _field(
               key: const Key('merchant-apply-preference'),
-              label: '经营类目',
-              hint: '如：餐饮、零售、文创',
+              label: stringsOf(context).merchantApplyCategory,
+              hint: stringsOf(context).merchantApplyCategoryHint,
               controller: _preferenceController,
               onChanged: (String v) => _form = _form.copyWith(preference: v),
             ),
             _field(
               key: const Key('merchant-apply-phone'),
-              label: '联系电话',
-              hint: '11位手机号',
+              label: stringsOf(context).merchantApplyPhone,
+              hint: stringsOf(context).merchantApplyPhoneHint,
               controller: _phoneController,
               onChanged: (String v) => _form = _form.copyWith(phone: v),
               keyboard: TextInputType.phone,
@@ -668,18 +712,18 @@ class _MerchantApplyPageState extends ConsumerState<MerchantApplyPage> {
           children: <Widget>[
             _field(
               key: const Key('merchant-apply-address'),
-              label: '店铺地址',
-              hint: '详细到门牌号',
+              label: stringsOf(context).merchantApplyAddress,
+              hint: stringsOf(context).merchantApplyAddressHint,
               controller: _addressController,
               onChanged: (String v) => _form = _form.copyWith(address: v),
               keyboard: TextInputType.streetAddress,
               autofillHints: const <String>[AutofillHints.fullStreetAddress],
             ),
             CyField(
-              label: '经营时间',
+              label: stringsOf(context).merchantApplyHours,
               child: Semantics(
                 button: true,
-                label: '经营时间，必填，点击设置营业日与时段',
+                label: stringsOf(context).merchantApplyHoursSemantics,
                 onTap: _pickBusinessTime,
                 excludeSemantics: true,
                 child: DecoratedBox(
@@ -704,7 +748,7 @@ class _MerchantApplyPageState extends ConsumerState<MerchantApplyPage> {
                         Expanded(
                           child: Text(
                             _form.businessTime.isEmpty
-                                ? '点击设置营业日与时段'
+                                ? stringsOf(context).merchantApplyHoursHint
                                 : _form.businessTime,
                             style: TextStyle(
                               color: _form.businessTime.isEmpty
@@ -727,8 +771,8 @@ class _MerchantApplyPageState extends ConsumerState<MerchantApplyPage> {
             ),
             _field(
               key: const Key('merchant-apply-description'),
-              label: '店铺介绍',
-              hint: '介绍你的品牌、特色产品或服务，让用户快速了解你。',
+              label: stringsOf(context).merchantApplyDescription,
+              hint: stringsOf(context).merchantApplyDescriptionHint,
               controller: _descriptionController,
               onChanged: (String v) => _form = _form.copyWith(description: v),
               maxLines: 4,
@@ -740,7 +784,7 @@ class _MerchantApplyPageState extends ConsumerState<MerchantApplyPage> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            const CySectionTitle('营业执照'),
+            CySectionTitle(stringsOf(context).merchantApplyLicense),
             const SizedBox(height: CyTokens.space2),
             if (_form.businessLicense.isEmpty)
               CupertinoButton(
@@ -753,7 +797,7 @@ class _MerchantApplyPageState extends ConsumerState<MerchantApplyPage> {
                   children: <Widget>[
                     const Icon(CupertinoIcons.photo_on_rectangle),
                     const SizedBox(width: CyTokens.space2),
-                    Text(_uploading ? '上传中…' : '上传营业执照'),
+                    Text(_uploading ? stringsOf(context).merchantApplyUploading : stringsOf(context).merchantApplyUploadLicense),
                   ],
                 ),
               )
@@ -772,7 +816,7 @@ class _MerchantApplyPageState extends ConsumerState<MerchantApplyPage> {
                   CupertinoButton(
                     minimumSize: const Size(44, 44),
                     onPressed: _uploading ? null : _pickLicense,
-                    child: const Text('重新上传'),
+                    child: Text(stringsOf(context).merchantApplyUploadAgain),
                   ),
                 ],
               ),
@@ -782,29 +826,30 @@ class _MerchantApplyPageState extends ConsumerState<MerchantApplyPage> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            const CySectionTitle('确认信息'),
+            CySectionTitle(stringsOf(context).merchantApplyConfirm),
             const SizedBox(height: CyTokens.space2),
-            _preview('店铺名称', _form.name),
-            _preview('经营类目', _form.preference),
-            _preview('联系电话', _form.phone),
-            _preview('店铺地址', _form.address),
-            _preview('经营时间', _form.businessTime),
-            _preview('店铺介绍', _form.description),
+            _preview(stringsOf(context).merchantApplyName, _form.name),
+            _preview(stringsOf(context).merchantApplyCategory, _form.preference),
+            _preview(stringsOf(context).merchantApplyPhone, _form.phone),
+            _preview(stringsOf(context).merchantApplyAddress, _form.address),
+            _preview(stringsOf(context).merchantApplyHours, _form.businessTime),
+            _preview(stringsOf(context).merchantApplyDescription, _form.description),
             const SizedBox(height: CyTokens.space3),
             // RUN-52 经营者实名:与 pages/merchant/apply 第 4 步同一个后端闸,
             // 不登记这两张单都提交不上去。已登记的人只看到一句状态。
             PublisherIdentityFields(
               controller: _publisherIdentity,
-              title: '经营者实名',
+              title: stringsOf(context).merchantApplyIdentityTitle,
+              // Preserve the original financial identity disclosure verbatim.
               footHint: '执照核验到主体,这一项核验到人 —— 能收款就得可追溯,二者不互相替代。',
             ),
             if (_identityError case final String message) ...<Widget>[
               const SizedBox(height: CyTokens.space2),
               CyInlineError(
                 key: const Key('merchant-apply-submit-error'),
-                title: '申请暂未提交',
+                title: stringsOf(context).merchantApplyNotSubmitted,
                 detail: message,
-                actionLabel: '重新提交',
+                actionLabel: stringsOf(context).merchantApplyResubmit,
                 onAction: _submit,
               ),
             ],
@@ -853,6 +898,14 @@ class _MerchantApplyPageState extends ConsumerState<MerchantApplyPage> {
   ///
   /// ★ 这一屏存在的意义是**驳回能重提**:没有它,被驳回的商家打开这页
   ///   看到的是空白向导,再交一份只会撞上后端那句「已提交过商家入驻申请」。
+  String _timelineText(MerchantApplication a) {
+    if (a.isDisabled) return stringsOf(context).merchantHomeDisabled;
+    if (a.status == 1 && a.accountStatus == 1) return stringsOf(context).merchantHomeActive;
+    if (a.isRejected) return stringsOf(context).merchantApplyNotApproved;
+    if (a.status == 1) return stringsOf(context).merchantApplyAwaitingConditions;
+    return stringsOf(context).merchantApplyAwaitingPrevious;
+  }
+
   Widget _statusPage(MerchantApplication a, TextTheme textTheme) {
     final palette = CyPalette.of(context);
     final Color badge = switch (a.badgeVariant) {
@@ -863,7 +916,7 @@ class _MerchantApplyPageState extends ConsumerState<MerchantApplyPage> {
     };
     return CupertinoPageScaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      navigationBar: const CupertinoNavigationBar(middle: Text('入驻申请')),
+      navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).merchantApplyTitle)),
       child: Material(
         color: Colors.transparent,
         child: SafeArea(
@@ -874,37 +927,37 @@ class _MerchantApplyPageState extends ConsumerState<MerchantApplyPage> {
                 child: ListView(
                   padding: const EdgeInsets.all(CyTokens.pageX),
                   children: <Widget>[
-                    const CySectionTitle('商家入驻申请'),
+                    CySectionTitle(stringsOf(context).merchantApplyFullTitle),
                     const SizedBox(height: CyTokens.space2),
                     _ApplyCard(
                       children: <Widget>[
-                        _StatusPill(label: a.statusLabel, color: badge),
+                        _StatusPill(label: _applicationStatusLabel(context, a), color: badge),
                         const SizedBox(height: CyTokens.space3),
-                        Text(a.statusText, style: textTheme.bodyMedium),
+                        Text(_applicationStatusText(context, a), style: textTheme.bodyMedium),
                         const SizedBox(height: CyTokens.space3),
-                        _preview('店铺名称', a.name),
-                        _preview('联系电话', a.phone),
-                        _preview('店铺地址', a.address),
+                        _preview(stringsOf(context).merchantApplyName, a.name),
+                        _preview(stringsOf(context).merchantApplyPhone, a.phone),
+                        _preview(stringsOf(context).merchantApplyAddress, a.address),
                       ],
                     ),
                     const SizedBox(height: CyTokens.space3),
                     _ApplyCard(
                       children: <Widget>[
                         _TimelineItem(
-                          title: '提交申请',
-                          sub: a.createTime.isEmpty ? '已提交' : a.createTime,
+                          title: stringsOf(context).merchantApplySubmitApplication,
+                          sub: a.createTime.isEmpty ? stringsOf(context).merchantApplySubmitted : a.createTime,
                           dot: palette.brand,
                         ),
                         _TimelineItem(
-                          title: '资料初审',
-                          sub: a.status == 0 ? '审核团队审核中' : '已完成',
+                          title: stringsOf(context).merchantApplyInitialReview,
+                          sub: a.status == 0 ? stringsOf(context).merchantApplyTeamReviewing : stringsOf(context).merchantApplyCompleted,
                           dot: a.status == 0
                               ? palette.statusWarning
                               : palette.brand,
                         ),
                         _TimelineItem(
-                          title: '审核结果',
-                          sub: a.timelineText,
+                          title: stringsOf(context).merchantApplyReviewResult,
+                          sub: _timelineText(a),
                           dot: a.timelineRejected
                               ? palette.statusDanger
                               : a.timelineDone
@@ -932,7 +985,7 @@ class _MerchantApplyPageState extends ConsumerState<MerchantApplyPage> {
                       key: const Key('merchant-apply-status-action'),
                       minimumSize: const Size.fromHeight(44),
                       onPressed: a.canReapply ? () => _reapply(a) : _exitApply,
-                      child: Text(a.canReapply ? '重新申请' : '返回'),
+                      child: Text(a.canReapply ? stringsOf(context).merchantApplyReapply : stringsOf(context).merchantApplyBack),
                     ),
                   ),
                 ),

@@ -6,6 +6,7 @@ import '../../core/theme/cy_tokens.dart';
 import '../../core/widgets/cy_inline_error.dart';
 import '../../core/widgets/cy_widgets.dart';
 import 'publisher_identity.dart';
+import '../../l10n/strings.dart';
 
 /// 发布者实名表单的页面侧状态(三入口共用)。
 ///
@@ -108,30 +109,30 @@ class PublisherIdentityFields extends StatelessWidget {
           const SizedBox(height: CyTokens.space2),
           if (controller.registered)
             Text(
-              kIdentityAlreadyRegisteredHint,
+              stringsOf(context).merchantApplyIdentityRegistered,
               style: CyType.footnote.copyWith(
                 color: CyPalette.of(context).textSecondary,
               ),
             )
           else ...<Widget>[
             CyField(
-              label: '真实姓名',
+              label: stringsOf(context).merchantApplyRealName,
               child: _textField(
                 context,
                 controller.realName,
                 key: const ValueKey<String>('identity-real-name'),
-                hint: '与身份证一致',
+                hint: stringsOf(context).merchantApplyMatchId,
                 maxLength: 20,
                 next: true,
               ),
             ),
             CyField(
-              label: '身份证号',
+              label: stringsOf(context).merchantApplyIdCard,
               child: _textField(
                 context,
                 controller.idCard,
                 key: const ValueKey<String>('identity-id-card'),
-                hint: '18 位',
+                hint: stringsOf(context).merchantApplyIdLength,
                 maxLength: 18,
                 next: false,
               ),
@@ -152,7 +153,7 @@ class PublisherIdentityFields extends StatelessWidget {
               ),
             ),
             if (controller.error case final String message)
-              CyInlineError(key: const Key('identity-error'), title: '实名没有登记', detail: message),
+              CyInlineError(key: const Key('identity-error'), title: stringsOf(context).merchantApplyIdentityNotRegistered, detail: message),
           ],
         ],
       ),

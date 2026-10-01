@@ -1,3 +1,8 @@
+import 'coop_invite_detail_strings.dart';
+import 'coop_strings.dart';
+import '../../l10n/strings.dart';
+import '../auth/auth_controller.dart';
+import '../../core/network/request_session_scope.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -134,6 +139,16 @@ class CoopInviteDetailPage extends ConsumerStatefulWidget {
 }
 
 class _CoopInviteDetailPageState extends ConsumerState<CoopInviteDetailPage> {
+  @override
+  void initState() {
+    super.initState();
+    _requestScope = ref.read(authControllerProvider.notifier).requestScope(
+      ref.read(authControllerProvider).user?.id ?? 0,
+    );
+  }
+
+  late final RequestSessionScope _requestScope;
+
   final TextEditingController _draft = TextEditingController();
   String _draftError = '';
   bool _submitting = false;
@@ -156,8 +171,8 @@ class _CoopInviteDetailPageState extends ConsumerState<CoopInviteDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    const String title = '协作详情';
-    const String needLogin = '登录后查看协作详情';
+    final String title = stringsOf(context).coopDetail;
+    final String needLogin = stringsOf(context).coopLoginDetail;
     final Widget? gate = coopLoginGate(
       context,
       ref,
@@ -172,8 +187,8 @@ class _CoopInviteDetailPageState extends ConsumerState<CoopInviteDetailPage> {
       // 编号缺 / 非法都是「打不开」:这时候连请求都不该发。
       body = _unopenable(
         (widget.inviteId ?? '').trim().isEmpty
-            ? '缺少邀约编号，请从协作邀请列表重新进入'
-            : '邀约编号无效，请从协作邀请列表重新进入',
+            ? stringsOf(context).coopMissingInvite
+            : stringsOf(context).coopInvalidInvite,
       );
     } else {
       final CoopInviteDetailKey key = CoopInviteDetailKey(
@@ -187,8 +202,8 @@ class _CoopInviteDetailPageState extends ConsumerState<CoopInviteDetailPage> {
                 const CySkeleton(type: CySkeletonType.card, count: 3),
             error: (Object e, _) => e is CoopInviteAbsent
                 ? _unopenable(
-                    '它可能已经被撤回，或移到了另一侧。回列表看看最新的。',
-                    title: '这条邀约不在当前列表里了',
+                    stringsOf(context).coopInviteMoved,
+                    title: stringsOf(context).coopInviteMissingFromList,
                   )
                 : isCoopUnauthorized(e)
                 ? coopLoginStatus(
@@ -199,8 +214,8 @@ class _CoopInviteDetailPageState extends ConsumerState<CoopInviteDetailPage> {
                         ref.invalidate(coopInviteDetailProvider(key)),
                   )
                 : StatusView(
-                    message: '协作详情没加载出来',
-                    sub: coopErrorSub(e),
+                    message: stringsOf(context).coopDetailLoadFailed,
+                    sub: coopErrorSub(e, context: context),
                     large: true,
                     onRetry: () =>
                         ref.invalidate(coopInviteDetailProvider(key)),
@@ -210,7 +225,7 @@ class _CoopInviteDetailPageState extends ConsumerState<CoopInviteDetailPage> {
     }
     return CupertinoPageScaffold(
       backgroundColor: palette.bgPage,
-      navigationBar: const CupertinoNavigationBar(middle: Text(title)),
+      navigationBar: CupertinoNavigationBar(middle: Text(title)),
       child: Material(
         color: Colors.transparent,
         child: SafeArea(top: false, child: body),
@@ -220,12 +235,12 @@ class _CoopInviteDetailPageState extends ConsumerState<CoopInviteDetailPage> {
 
   /// 打不开一条邀约时的出口:**回协作邀请列表**,不是「重试」——
   /// 编号缺/非法、邀约已被撤回,重试多少次结果都一样。
-  Widget _unopenable(String sub, {String title = '打不开这条邀约'}) {
+  Widget _unopenable(String sub, {String? title}) {
     return StatusView(
-      message: title,
+      message: title ?? stringsOf(context).coopCannotOpenInvite,
       sub: sub,
       large: true,
-      retryLabel: '回协作邀请',
+      retryLabel: stringsOf(context).coopBackToInvitations,
       onRetry: _backToList,
     );
   }
@@ -279,7 +294,7 @@ class _CoopInviteDetailPageState extends ConsumerState<CoopInviteDetailPage> {
         children: <Widget>[
           Expanded(
             child: Text(
-              r.statusText,
+              coopInvitationStatus(context, r.status),
               style: text.titleLarge?.copyWith(
                 fontSize: CyTokens.typePageTitle,
                 fontWeight: FontWeight.w700,
@@ -289,7 +304,7 @@ class _CoopInviteDetailPageState extends ConsumerState<CoopInviteDetailPage> {
           ),
           const SizedBox(width: CyTokens.space3),
           Text(
-            '${_sent ? '发给' : '来自'} ${peer.isEmpty ? '对方' : peer}',
+            _sent ? stringsOf(context).coopDetailSentPeer(peer.isEmpty ? stringsOf(context).coopDetailPeer : peer) : stringsOf(context).coopDetailReceivedPeer(peer.isEmpty ? stringsOf(context).coopDetailPeer : peer),
             style: text.bodySmall?.copyWith(color: palette.textTertiary),
           ),
         ],
@@ -317,7 +332,7 @@ class _CoopInviteDetailPageState extends ConsumerState<CoopInviteDetailPage> {
   Widget _meta(CoopInviteRow r) {
     final CyPalette palette = CyPalette.of(context);
     final TextTheme text = Theme.of(context).textTheme;
-    final String countdown = r.countdownText(DateTime.now());
+    final String countdown = coopDetailCountdown(context, r, DateTime.now());
     final String contact = r.partnerContact;
     final String peerPhone = r.partnerPhone ?? '';
     return Padding(
@@ -325,14 +340,14 @@ class _CoopInviteDetailPageState extends ConsumerState<CoopInviteDetailPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          if (r.topicText.isNotEmpty)
+          if (coopDetailTopic(context, r).isNotEmpty)
             Text(
-              r.topicText,
+              coopDetailTopic(context, r),
               style: text.titleMedium?.copyWith(fontWeight: FontWeight.w700),
             ),
           if (countdown.isNotEmpty)
             _metaLine(countdown, palette, text, top: CyTokens.space1),
-          _metaLine(r.typeText, palette, text, top: CyTokens.space1),
+          _metaLine(coopDetailInviteType(context, r), palette, text, top: CyTokens.space1),
           Padding(
             padding: const EdgeInsets.only(top: CyTokens.space2),
             child: Row(
@@ -340,7 +355,7 @@ class _CoopInviteDetailPageState extends ConsumerState<CoopInviteDetailPage> {
               textBaseline: TextBaseline.alphabetic,
               children: <Widget>[
                 Text(
-                  '联系方式',
+                  stringsOf(context).coopContactDetails,
                   style: text.labelMedium?.copyWith(
                     fontWeight: FontWeight.w700,
                     color: palette.textSecondary,
@@ -353,7 +368,7 @@ class _CoopInviteDetailPageState extends ConsumerState<CoopInviteDetailPage> {
                     // 没下发就**照实说明**,不留空、也不假装有。
                     contact.isNotEmpty
                         ? contact
-                        : (r.status == 0 ? '对方接受后下发(§3.8)' : '未接受，不下发'),
+                        : (r.status == 0 ? stringsOf(context).coopDetailContactPending : stringsOf(context).coopDetailContactWithheld),
                     style: text.labelMedium?.copyWith(
                       fontWeight: contact.isNotEmpty
                           ? FontWeight.w700
@@ -373,7 +388,7 @@ class _CoopInviteDetailPageState extends ConsumerState<CoopInviteDetailPage> {
                     ),
                     onPressed: () => _copyPhone(peerPhone),
                     child: Text(
-                      '复制',
+                      stringsOf(context).coopCopy,
                       style: text.bodySmall?.copyWith(
                         color: palette.textPrimary,
                       ),
@@ -406,27 +421,27 @@ class _CoopInviteDetailPageState extends ConsumerState<CoopInviteDetailPage> {
     try {
       await Clipboard.setData(ClipboardData(text: phone));
       if (!mounted) return;
-      CyNativeNotice.show(context, '已复制');
+      CyNativeNotice.show(context, stringsOf(context).coopCopied);
     } catch (_) {
       if (!mounted) return;
-      CyNativeNotice.show(context, '没能复制', isError: true);
+      CyNativeNotice.show(context, stringsOf(context).coopCopyFailed, isError: true);
     }
   }
 
   // ------------------------------------------------------------ 条款与留言
 
   Widget _termsCard(CoopInviteRow r, Map<String, dynamic>? slots) {
-    final String slot = r.slotText(slots);
+    final String slot = coopDetailSlot(context, r, slots);
     return _card(<Widget>[
-      _cardTitle('合作条款'),
-      _kv('供给条款档', r.typeText),
-      _kv('分润', r.termsText ?? '—'),
-      if (slot.isNotEmpty) _kv('席位', slot),
+      _cardTitle(stringsOf(context).coopDetailTerms),
+      _kv(stringsOf(context).coopDetailSupplyTier, coopDetailInviteType(context, r)),
+      _kv(stringsOf(context).coopDetailRevenue, coopDetailTerms(context, r) ?? '—'),
+      if (slot.isNotEmpty) _kv(stringsOf(context).coopDetailSlots, slot),
       _kv(
-        '保证金',
+        stringsOf(context).coopDetailDeposit,
         // 保证金单独给强调色:它是唯一一条要掏钱的。
-        r.depositDueText.isEmpty ? '无' : r.depositDueText,
-        strong: r.depositDueText.isNotEmpty,
+        coopDetailDeposit(context, r).isEmpty ? stringsOf(context).coopNone : coopDetailDeposit(context, r),
+        strong: coopDetailDeposit(context, r).isNotEmpty,
         strongColor: CyPalette.of(context).statusDanger,
       ),
     ]);
@@ -439,13 +454,13 @@ class _CoopInviteDetailPageState extends ConsumerState<CoopInviteDetailPage> {
     final String reason = (r.handleReason ?? '').trim();
     final String? label = _draftLabel(r);
     return _card(<Widget>[
-      _cardTitle('留言'),
-      if (message.isNotEmpty) _bubble(message, '对方 · ${r.timeText}'),
+      _cardTitle(stringsOf(context).coopMessage),
+      if (message.isNotEmpty) _bubble(message, stringsOf(context).coopPeerTime(r.timeText)),
       // 对方处理时给的理由:「已拒绝 / 已撤回」最该被看见的就是这句。
-      if (reason.isNotEmpty) _bubble(reason, '处理理由', raised: true),
+      if (reason.isNotEmpty) _bubble(reason, stringsOf(context).coopDecisionReason, raised: true),
       if (message.isEmpty && reason.isEmpty)
         Text(
-          '还没有留言。',
+          stringsOf(context).coopNoMessage,
           style: text.bodySmall?.copyWith(color: palette.textTertiary),
         ),
       if (label != null) ...<Widget>[
@@ -477,7 +492,7 @@ class _CoopInviteDetailPageState extends ConsumerState<CoopInviteDetailPage> {
                 // 小程序那份内联错误件带一个固定标题。别省成一行红字:
                 // 标题说的是**该做什么**,下面那句才说为什么。
                 Text(
-                  '撤回要写个理由',
+                  stringsOf(context).coopWithdrawReasonRequired,
                   style: text.bodySmall?.copyWith(
                     fontWeight: FontWeight.w700,
                     color: palette.statusDanger,
@@ -492,7 +507,7 @@ class _CoopInviteDetailPageState extends ConsumerState<CoopInviteDetailPage> {
           ),
       ] else if (r.status != 0 && r.status != 1)
         Text(
-          '这条邀约已失效，不能再留言。',
+          stringsOf(context).coopExpiredNoMessage,
           style: text.bodySmall?.copyWith(color: palette.textTertiary),
         ),
     ]);
@@ -506,13 +521,13 @@ class _CoopInviteDetailPageState extends ConsumerState<CoopInviteDetailPage> {
   ///   收了话却发不出去。App 不复制这个假输入:已接受后要和对方说话,走「联系合作方」。
   String? _draftLabel(CoopInviteRow r) {
     if (r.legacyReadonly) return null;
-    if (r.status == 0 && !_sent) return '回复对方(选填，随本次决定一起发出)';
-    if (r.status == 0 && _sent) return '撤回理由(必填，会发给对方)';
+    if (r.status == 0 && !_sent) return stringsOf(context).coopReplyOptional;
+    if (r.status == 0 && _sent) return stringsOf(context).coopWithdrawReason;
     return null;
   }
 
   String _draftPlaceholder(CoopInviteRow r) =>
-      (_sent && r.status == 0) ? '说明为什么撤回这条邀约…' : '写下接受或拒绝的理由…';
+      (_sent && r.status == 0) ? stringsOf(context).coopWithdrawReasonPlaceholder : stringsOf(context).coopDecisionReasonPlaceholder;
 
   Widget _bubble(String value, String footNote, {bool raised = false}) {
     final CyPalette palette = CyPalette.of(context);
@@ -551,21 +566,21 @@ class _CoopInviteDetailPageState extends ConsumerState<CoopInviteDetailPage> {
     // (俱乐部没有 memberId 语义)。
     final bool canReview = !_sent || r.toType == 'merchant';
     return _card(<Widget>[
-      _cardTitle('合作操作'),
+      _cardTitle(stringsOf(context).coopActions),
       _opRow(
         key: const Key('coop-detail-contact'),
-        label: '联系合作方',
+        label: stringsOf(context).coopContactPartner,
         onTap: _busy ? null : () => _contact(r),
       ),
       _opRow(
         key: const Key('coop-detail-perk'),
-        label: '申报供给',
+        label: stringsOf(context).coopDetailSupply,
         onTap: _busy ? null : () => _openPerkPick(r),
       ),
       if (canReview)
         _opRow(
           key: const Key('coop-detail-review'),
-          label: '评价',
+          label: stringsOf(context).coopReview,
           onTap: _busy ? null : () => _review(r),
         ),
       // 信誉与评价同一把闸:问的都是会员语义的 memberId,
@@ -573,7 +588,7 @@ class _CoopInviteDetailPageState extends ConsumerState<CoopInviteDetailPage> {
       if (canReview)
         _opRow(
           key: const Key('coop-detail-peer-credit'),
-          label: '合作方信誉',
+          label: stringsOf(context).coopPartnerReputation,
           onTap: _busy ? null : () => _openPeerCredit(r),
         ),
       // 取消合作是涉资动作(锁价前可取消并退保证金):锁价后按后端 termsFrozen
@@ -581,16 +596,16 @@ class _CoopInviteDetailPageState extends ConsumerState<CoopInviteDetailPage> {
       if (_sent && !r.termsFrozen)
         _opRow(
           key: const Key('coop-detail-cancel'),
-          label: '取消合作',
+          label: stringsOf(context).coopCancelCooperation,
           danger: true,
           onTap: _busy ? null : () => _cancelAccepted(r),
         ),
       if (_sent && r.termsFrozen)
         _opRow(
-          label: '取消合作',
-          hint: '已锁价，需联系客服',
+          label: stringsOf(context).coopCancelCooperation,
+          hint: stringsOf(context).coopDetailLockedHint,
           onTap: () => setState(() {
-            _actionError = '主题已锁价，不能单方取消合作，请联系客服协商';
+            _actionError = stringsOf(context).coopDetailLockedError;
           }),
         ),
     ]);
@@ -638,7 +653,12 @@ class _CoopInviteDetailPageState extends ConsumerState<CoopInviteDetailPage> {
     );
   }
 
-  Future<void> _contact(CoopInviteRow r) async {
+  Future<void> _contact(CoopInviteRow r) => RequestSessionScope.run(
+    _requestScope,
+    () => _contactScoped(r),
+  );
+
+  Future<void> _contactScoped(CoopInviteRow r) async {
     setState(() {
       _busy = true;
       _actionError = '';
@@ -651,7 +671,7 @@ class _CoopInviteDetailPageState extends ConsumerState<CoopInviteDetailPage> {
       // 后端的五道闸文案很具体(「仅已合作可联系」…),原样透出。
       if (!mounted) return;
       setState(
-        () => _actionError = e.toString().replaceFirst('Exception: ', ''),
+        () => _actionError = coopErrorSub(e, context: context),
       );
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -679,7 +699,7 @@ class _CoopInviteDetailPageState extends ConsumerState<CoopInviteDetailPage> {
         : r.fromId;
     final int? topicId = r.topicId;
     if (toId == null || topicId == null) {
-      CyNativeNotice.show(context, '该合作暂不可评价');
+      CyNativeNotice.show(context, stringsOf(context).coopReviewUnavailable);
       return;
     }
     await showCupertinoSheet<void>(
@@ -722,12 +742,12 @@ class _CoopInviteDetailPageState extends ConsumerState<CoopInviteDetailPage> {
   Future<void> _cancelAccepted(CoopInviteRow r) async {
     final String? reason = await showCupertinoDialog<String>(
       context: context,
-      builder: (BuildContext c) => const CoopReasonDialog(
+      builder: (BuildContext c) => CoopReasonDialog(
         action: CoopHandleAction.cancel,
         // 撤回/取消前必须把退保证金的界说清 —— 用户是据此决定要不要取消的。
-        content: '锁价开卖前可取消;锁价后需联系客服协商。',
-        placeholder: '请填写取消理由(必填)',
-        confirmText: '提交取消',
+        content: stringsOf(context).coopDetailCancelTerms,
+        placeholder: stringsOf(context).coopCancellationReason,
+        confirmText: stringsOf(context).coopSubmitCancellation,
       ),
     );
     if (reason == null || reason.trim().isEmpty) return;
@@ -738,7 +758,7 @@ class _CoopInviteDetailPageState extends ConsumerState<CoopInviteDetailPage> {
 
   Widget _actionBar(CoopInviteRow r) {
     if (r.legacyReadonly) {
-      return _deadNote('历史商家节点邀约仅供查看');
+      return _deadNote(stringsOf(context).coopLegacyReadOnly);
     }
     // 待确认:收件箱给两个(拒绝次要 / 接受实心),发件箱只能撤回(单动作不给实心)。
     if (r.status == 0 && !_sent) {
@@ -747,7 +767,7 @@ class _CoopInviteDetailPageState extends ConsumerState<CoopInviteDetailPage> {
           Expanded(
             child: CyNativeButton(
               key: const Key('coop-detail-reject'),
-              label: '拒绝',
+              label: stringsOf(context).coopReject,
               role: CyNativeButtonRole.destructive,
               onPressed: _submitting ? null : () => _reject(r),
             ),
@@ -756,7 +776,7 @@ class _CoopInviteDetailPageState extends ConsumerState<CoopInviteDetailPage> {
           Expanded(
             child: CyNativeButton(
               key: const Key('coop-detail-accept'),
-              label: '接受合作',
+              label: stringsOf(context).coopAccept,
               loading: _submitting,
               onPressed: _submitting ? null : () => _accept(r),
             ),
@@ -767,7 +787,7 @@ class _CoopInviteDetailPageState extends ConsumerState<CoopInviteDetailPage> {
     if (r.status == 0 && _sent) {
       return CyNativeButton(
         key: const Key('coop-detail-withdraw'),
-        label: '撤回邀约',
+        label: stringsOf(context).coopWithdrawInvite,
         role: CyNativeButtonRole.secondary,
         width: double.infinity,
         loading: _submitting,
@@ -779,14 +799,14 @@ class _CoopInviteDetailPageState extends ConsumerState<CoopInviteDetailPage> {
       if (r.depositOwed) {
         return CyNativeButton(
           key: const Key('coop-detail-deposit'),
-          label: '去缴纳保证金',
+          label: stringsOf(context).coopDetailPayDeposit,
           width: double.infinity,
           onPressed: _goDeposit,
         );
       }
-      return _deadNote('合作进行中，条款已冻结');
+      return _deadNote(stringsOf(context).coopDetailOngoing);
     }
-    return _deadNote('这条邀约已失效，没有可执行的操作');
+    return _deadNote(stringsOf(context).coopExpiredNoActions);
   }
 
   Widget _deadNote(String text) {
@@ -839,10 +859,10 @@ class _CoopInviteDetailPageState extends ConsumerState<CoopInviteDetailPage> {
   Future<void> _accept(CoopInviteRow r) async {
     final bool ok = await cyConfirm(
       context,
-      title: '接受合作',
-      content: '接受后条款即冻结，按这张单结算。',
-      confirmText: '接受合作',
-      cancelText: '再想想',
+      title: stringsOf(context).coopAccept,
+      content: stringsOf(context).coopDetailAcceptTerms,
+      confirmText: stringsOf(context).coopAccept,
+      cancelText: stringsOf(context).coopThinkAgain,
     );
     if (!ok) return;
     await _post(r, CoopHandleAction.accept, _draft.text.trim());
@@ -851,10 +871,10 @@ class _CoopInviteDetailPageState extends ConsumerState<CoopInviteDetailPage> {
   Future<void> _reject(CoopInviteRow r) async {
     final bool ok = await cyConfirm(
       context,
-      title: '拒绝这条邀约',
-      content: '拒绝后对方可以改条款再邀你。',
-      confirmText: '拒绝',
-      cancelText: '再想想',
+      title: stringsOf(context).coopRejectInvitation,
+      content: stringsOf(context).coopDetailRejectTerms,
+      confirmText: stringsOf(context).coopReject,
+      cancelText: stringsOf(context).coopThinkAgain,
       danger: true,
     );
     if (!ok) return;
@@ -866,17 +886,17 @@ class _CoopInviteDetailPageState extends ConsumerState<CoopInviteDetailPage> {
   Future<void> _withdraw(CoopInviteRow r) async {
     final String reason = _draft.text.trim();
     if (reason.isEmpty) {
-      setState(() => _draftError = '对方拿着这句话才知道下一步该怎么改。');
-      CyNativeNotice.show(context, '先写撤回理由', isError: true);
+      setState(() => _draftError = stringsOf(context).coopReasonHelps);
+      CyNativeNotice.show(context, stringsOf(context).coopWriteWithdrawReason, isError: true);
       return;
     }
     setState(() => _draftError = '');
     final bool ok = await cyConfirm(
       context,
-      title: '撤回邀约',
-      content: '撤回后对方不再看到这条邀约。',
-      confirmText: '撤回邀约',
-      cancelText: '再想想',
+      title: stringsOf(context).coopWithdrawInvite,
+      content: stringsOf(context).coopWithdrawInviteHint,
+      confirmText: stringsOf(context).coopWithdrawInvite,
+      cancelText: stringsOf(context).coopThinkAgain,
       danger: true,
     );
     if (!ok) return;
@@ -888,6 +908,15 @@ class _CoopInviteDetailPageState extends ConsumerState<CoopInviteDetailPage> {
   /// ★ 回执不等于状态:提交成功后**重新问服务端要一次**,拿它回的状态渲染,
   ///   不本地假设成功后的样子(小程序同此)。
   Future<void> _post(
+    CoopInviteRow r,
+    CoopHandleAction action,
+    String reason,
+  ) => RequestSessionScope.run(
+    _requestScope,
+    () => _postScoped(r, action, reason),
+  );
+
+  Future<void> _postScoped(
     CoopInviteRow r,
     CoopHandleAction action,
     String reason,
@@ -911,14 +940,14 @@ class _CoopInviteDetailPageState extends ConsumerState<CoopInviteDetailPage> {
           CoopInviteDetailKey(inviteId: r.id, sent: _sent),
         ),
       );
-      CyNativeNotice.show(context, '已提交');
+      CyNativeNotice.show(context, stringsOf(context).coopSubmitted);
     } catch (e) {
       if (!mounted) return;
       // 后端的话原样透出 —— 「历史商家节点邀约仅供查看，不能再处理」这类
       // 判据由它说,换成笼统的「提交失败」用户不知道该怎么办。
       CyNativeNotice.show(
         context,
-        e.toString().replaceFirst('Exception: ', ''),
+        coopErrorSub(e, context: context),
         isError: true,
       );
     } finally {
@@ -1041,7 +1070,7 @@ class _CoopPeerCreditSheetState extends ConsumerState<CoopPeerCreditSheet> {
         })
         .catchError((Object e) {
           if (!mounted) return;
-          setState(() => _creditError = coopErrorSub(e));
+          setState(() => _creditError = coopErrorSub(e, context: context));
         });
     final Future<void> summaryLoad = api
         .reviewSummary(widget.peerId)
@@ -1055,7 +1084,7 @@ class _CoopPeerCreditSheetState extends ConsumerState<CoopPeerCreditSheet> {
         })
         .catchError((Object e) {
           if (!mounted) return;
-          setState(() => _summaryError = coopErrorSub(e));
+          setState(() => _summaryError = coopErrorSub(e, context: context));
         });
     await Future.wait(<Future<void>>[creditLoad, summaryLoad]);
     if (!mounted) return;
@@ -1072,7 +1101,7 @@ class _CoopPeerCreditSheetState extends ConsumerState<CoopPeerCreditSheet> {
     final int reviewCount = (_summary['count'] as num?)?.toInt() ?? 0;
     return CupertinoPageScaffold(
       backgroundColor: palette.bgPage,
-      navigationBar: const CupertinoNavigationBar(middle: Text('合作方信誉')),
+      navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).coopPartnerReputation)),
       child: SafeArea(
         top: false,
         child: ListView(
@@ -1081,7 +1110,7 @@ class _CoopPeerCreditSheetState extends ConsumerState<CoopPeerCreditSheet> {
           children: <Widget>[
             const SizedBox(height: CyTokens.space1),
             Text(
-              '数据来自对方在平台上的履约与互评记录。',
+              stringsOf(context).coopReputationSource,
               style: text.bodySmall?.copyWith(color: palette.textSecondary),
             ),
             const SizedBox(height: CyTokens.space3),
@@ -1093,7 +1122,7 @@ class _CoopPeerCreditSheetState extends ConsumerState<CoopPeerCreditSheet> {
             else if (_creditError != null && _summaryError != null) ...<Widget>[
               // 两条都挂才是整块错误态;只挂一条时好的一半照常上屏。
               Text(
-                '履约与评价都没加载出来：${_creditError!}；${_summaryError!}',
+                stringsOf(context).coopDetailBothErrors(_creditError!, _summaryError!),
                 key: const Key('coop-peer-credit-error'),
                 // 错误文案在浅色语境(商家视角)下要用浅色那档红,
                 // 不能用 CyTokens 的暗色编译期常量。
@@ -1104,7 +1133,7 @@ class _CoopPeerCreditSheetState extends ConsumerState<CoopPeerCreditSheet> {
               // 文字是 hero 排版,iOS 动作按钮跟内容走。
               CyNativeButton(
                 key: const Key('coop-peer-credit-retry'),
-                label: '重试',
+                label: stringsOf(context).retry,
                 role: CyNativeButtonRole.secondary,
                 onPressed: _load,
               ),
@@ -1115,7 +1144,7 @@ class _CoopPeerCreditSheetState extends ConsumerState<CoopPeerCreditSheet> {
               // 空态要说清「查了,没有」,不能拿「—」占位充数 ——
               // 破折号分不清「没记录」和「数据坏了」。
               Text(
-                '还没有查到对方的履约与评价记录',
+                stringsOf(context).coopNoReputation,
                 key: const Key('coop-peer-credit-empty'),
                 style: text.bodySmall?.copyWith(color: palette.textSecondary),
               )
@@ -1138,15 +1167,15 @@ class _CoopPeerCreditSheetState extends ConsumerState<CoopPeerCreditSheet> {
                   children: <Widget>[
                     if (_creditError != null)
                       _failedRow(
-                        label: '履约率',
+                        label: stringsOf(context).coopPerformanceRate,
                         keyPrefix: 'coop-peer-credit-fulfill',
                         error: _creditError!,
                       )
                     else
                       _statRow(
-                        label: '履约率',
+                        label: stringsOf(context).coopPerformanceRate,
                         value: rate == null ? '—' : '$rate%',
-                        note: violations > 0 ? '$violations 次违约' : null,
+                        note: violations > 0 ? stringsOf(context).coopDetailViolations(violations) : null,
                       ),
                     Padding(
                       padding: const EdgeInsets.only(left: CyTokens.space3),
@@ -1154,19 +1183,19 @@ class _CoopPeerCreditSheetState extends ConsumerState<CoopPeerCreditSheet> {
                     ),
                     if (_summaryError != null)
                       _failedRow(
-                        label: '合作评价',
+                        label: stringsOf(context).coopReviews,
                         keyPrefix: 'coop-peer-credit-review',
                         error: _summaryError!,
                       )
                     else
                       _statRow(
-                        label: '合作评价',
+                        label: stringsOf(context).coopReviews,
                         value: reviewCount == 0
-                            ? '还没有评价'
+                            ? stringsOf(context).coopNoReviews
                             : (avg is num
-                                  ? '${avg.toDouble().toStringAsFixed(1)} 分'
+                                  ? stringsOf(context).coopDetailRating(avg.toDouble().toStringAsFixed(1))
                                   : '—'),
-                        note: reviewCount == 0 ? null : '$reviewCount 条',
+                        note: reviewCount == 0 ? null : stringsOf(context).coopDetailReviewCount(reviewCount),
                       ),
                   ],
                 ),
@@ -1211,7 +1240,7 @@ class _CoopPeerCreditSheetState extends ConsumerState<CoopPeerCreditSheet> {
           const SizedBox(width: CyTokens.space2),
           CyNativeButton(
             key: Key('$keyPrefix-retry'),
-            label: '重试',
+            label: stringsOf(context).retry,
             role: CyNativeButtonRole.secondary,
             onPressed: _load,
           ),

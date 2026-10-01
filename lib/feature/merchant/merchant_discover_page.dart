@@ -1,3 +1,5 @@
+import '../../l10n/strings.dart';
+import 'merchant_directory_strings.dart';
 // 发现商家 —— 对应小程序 pages/merchant/discover。
 //
 // ★★ 这是**玩家侧按调性找店**,与「关系页的可合作商家」(B2B,/api/club/merchants)
@@ -76,7 +78,7 @@ class _State extends ConsumerState<MerchantDiscoverPage> {
     );
     return CupertinoPageScaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      navigationBar: const CupertinoNavigationBar(middle: Text('发现商家')),
+      navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).merchantDirectoryDiscoverMerchants)),
       child: Material(
         color: Colors.transparent,
         child: SafeArea(
@@ -93,7 +95,7 @@ class _State extends ConsumerState<MerchantDiscoverPage> {
                       Padding(
                         padding: const EdgeInsets.only(right: CyTokens.space2),
                         child: _Chip(
-                          label: t.isEmpty ? '全部' : t,
+                          label: t.isEmpty ? stringsOf(context).merchantDirectoryAll : merchantDirectoryLocalText(context, t),
                           on: _tag == t,
                           onTap: () => setState(() => _tag = t),
                         ),
@@ -106,7 +108,7 @@ class _State extends ConsumerState<MerchantDiscoverPage> {
                   loading: () =>
                       const Center(child: CupertinoActivityIndicator()),
                   error: (Object e, StackTrace _) => StatusView(
-                    message: '商家列表暂时没能加载',
+                    message: stringsOf(context).merchantDirectoryListFailed,
                     sub: e.toString().replaceFirst('Exception: ', ''),
                     large: true,
                     onRetry: () =>
@@ -114,11 +116,11 @@ class _State extends ConsumerState<MerchantDiscoverPage> {
                   ),
                   data: (List<Merchant> rows) => rows.isEmpty
                       ? StatusView(
-                          message: '没有找到匹配的商家',
+                          message: stringsOf(context).merchantDirectoryNoMatches,
                           // ★ 说清判据 —— 否则用户以为这个标签下真的一家都没有。
                           sub: _tag.isEmpty
-                              ? '只有审核通过并开放合作的商家会出现在这里'
-                              : '换个标签,或看「全部」',
+                              ? stringsOf(context).merchantDirectoryOnlyApproved
+                              : stringsOf(context).merchantDirectoryTryTag,
                           large: true,
                           // ⚠️ 文案里不说「再试试」就不必给重试钮 ——
                           //   空态不是故障,给「重试」会让人以为是加载失败。
@@ -202,7 +204,7 @@ class _Card extends StatelessWidget {
     final int? memberId = m.memberId;
     final bool canOpenHome = memberId != null && memberId > 0;
     final String name = (m.name ?? '').trim().isEmpty
-        ? '未命名商家'
+        ? stringsOf(context).merchantDirectoryUnnamed
         : m.name!.trim();
     final String summary = (m.slogan ?? '').trim().isNotEmpty
         ? m.slogan!.trim()
@@ -214,7 +216,7 @@ class _Card extends StatelessWidget {
     ].join('，');
     void activate() {
       if (!canOpenHome) {
-        CyNativeNotice.show(context, '该商家暂不可查看');
+        CyNativeNotice.show(context, stringsOf(context).merchantDirectoryUnavailable);
         return;
       }
       context.push('/merchant/public-home/member/$memberId');
@@ -225,7 +227,7 @@ class _Card extends StatelessWidget {
       button: true,
       enabled: true,
       label: semanticLabel,
-      hint: canOpenHome ? null : '该商家暂不可查看',
+      hint: canOpenHome ? null : stringsOf(context).merchantDirectoryUnavailable,
       onTap: activate,
       excludeSemantics: true,
       child: CupertinoButton(

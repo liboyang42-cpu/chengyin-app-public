@@ -1,3 +1,4 @@
+import '../../l10n/strings.dart';
 import '../../core/theme/cy_palette.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -34,7 +35,7 @@ class MerchantEditPage extends ConsumerWidget {
     final async = ref.watch(merchantInfoProvider);
     return CupertinoPageScaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      navigationBar: const CupertinoNavigationBar(middle: Text('店铺资料')),
+      navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).merchantStoreProfile)),
       child: Material(
         color: Colors.transparent,
         child: SafeArea(
@@ -133,7 +134,7 @@ class _EditFormState extends ConsumerState<_EditForm> {
       if (!mounted) return;
       CyNativeNotice.show(
         context,
-        '图片没传上去:${e.toString().replaceFirst('Exception: ', '')}',
+        stringsOf(context).merchantStoreUploadFailed(e.toString().replaceFirst('Exception: ', '')),
         isError: true,
       );
     } finally {
@@ -162,9 +163,9 @@ class _EditFormState extends ConsumerState<_EditForm> {
       if (e is MerchantApiException && e.isContentRejected) {
         await cyConfirm(
           context,
-          title: '内容没能通过审核',
-          content: '${e.message}\n\n请修改文字后再保存。',
-          confirmText: '去修改',
+          title: stringsOf(context).merchantStoreRejected,
+          content: stringsOf(context).merchantStoreReviewInstructions(e.message),
+          confirmText: stringsOf(context).merchantStoreEdit,
           showCancel: false,
         );
         return;
@@ -214,20 +215,20 @@ class _EditFormState extends ConsumerState<_EditForm> {
                     CupertinoButton(
                       minimumSize: const Size(44, 44),
                       onPressed: _uploading ? null : _pickLogo,
-                      child: Text(_uploading ? '上传中…' : '换一张'),
+                      child: Text(_uploading ? stringsOf(context).merchantStoreUploading : stringsOf(context).merchantStoreChangeImage),
                     ),
                   ],
                 ),
                 // ★ logo 异步送检,保存成功不等于已过审 —— 别写「已生效」。
                 Text(
-                  'Logo 会经过内容审核,提交后不会立即生效',
+                  stringsOf(context).merchantStoreLogoReview,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: CyPalette.of(context).textSecondary,
                   ),
                 ),
                 const SizedBox(height: CyTokens.space4),
                 CyField(
-                  label: '品牌名称',
+                  label: stringsOf(context).merchantStoreBrandName,
                   child: _textField(
                     key: const Key('merchant-edit-name'),
                     controller: _nameController,
@@ -239,7 +240,7 @@ class _EditFormState extends ConsumerState<_EditForm> {
                   ),
                 ),
                 CyField(
-                  label: '介绍',
+                  label: stringsOf(context).merchantStoreIntroduction,
                   child: _textField(
                     key: const Key('merchant-edit-description'),
                     controller: _descriptionController,
@@ -249,31 +250,31 @@ class _EditFormState extends ConsumerState<_EditForm> {
                   ),
                 ),
                 CyField(
-                  label: '衍生品',
+                  label: stringsOf(context).merchantStoreMerchandise,
                   child: _textField(
                     key: const Key('merchant-edit-derivatives'),
                     controller: _derivativesController,
-                    placeholder: '选填',
+                    placeholder: stringsOf(context).merchantStoreOptional,
                     onChanged: (String v) => setState(() => _derivatives = v),
                   ),
                 ),
                 CyField(
-                  label: '品牌网址',
+                  label: stringsOf(context).merchantStoreWebsite,
                   child: _textField(
                     key: const Key('merchant-edit-website'),
                     controller: _websiteController,
-                    placeholder: '选填',
+                    placeholder: stringsOf(context).merchantStoreOptional,
                     keyboardType: TextInputType.url,
                     autofillHints: const <String>[AutofillHints.url],
                     onChanged: (String v) => setState(() => _website = v),
                   ),
                 ),
                 CyField(
-                  label: '品牌偏好',
+                  label: stringsOf(context).merchantStorePreferences,
                   child: _textField(
                     key: const Key('merchant-edit-preference'),
                     controller: _preferenceController,
-                    placeholder: '选填',
+                    placeholder: stringsOf(context).merchantStoreOptional,
                     onChanged: (String v) => setState(() => _preference = v),
                   ),
                 ),
@@ -285,7 +286,7 @@ class _EditFormState extends ConsumerState<_EditForm> {
                     color: CyPalette.of(context).bgSurfaceStrong,
                     onPressed: () =>
                         context.push('/merchant/public-home/member/$_memberId'),
-                    child: const Text('预览公开主页'),
+                    child: Text(stringsOf(context).merchantStorePreview),
                   ),
                 ],
               ],
@@ -312,7 +313,7 @@ class _EditFormState extends ConsumerState<_EditForm> {
                           height: 18,
                           child: CupertinoActivityIndicator(),
                         )
-                      : const Text('保存'),
+                      : Text(stringsOf(context).merchantStoreSave),
                 ),
               ),
             ),

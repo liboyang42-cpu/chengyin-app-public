@@ -1,3 +1,4 @@
+import 'package:chengyin_app/l10n/app_localizations.dart';
 // 竞猜待答(商家侧)行为门。判据逐条对齐小程序
 // `pages/merchant/predict/index.js`,只测「该红的必须红」:
 //   · 有期限:0 天的文案是「今天不给就作废」,不是「还剩 0 天」;
@@ -118,6 +119,7 @@ Future<void> _pump(
   required PageParityApi access,
   required MerchantPredictApi api,
   CyNativeConfirmPresenter? confirm,
+  bool english = false,
 }) async {
   final GoRouter router = GoRouter(
     initialLocation: '/merchant/predict',
@@ -141,6 +143,9 @@ Future<void> _pump(
         merchantPredictApiProvider.overrideWithValue(api),
       ],
       child: MaterialApp.router(
+        locale: english ? const Locale('en') : const Locale('zh'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
         theme: ThemeData(useMaterial3: true),
         debugShowCheckedModeBanner: false,
         routerConfig: router,
@@ -151,6 +156,22 @@ Future<void> _pump(
 }
 
 void main() {
+  testWidgets('English prediction labels preserve supplied Chinese question and node', (tester) async {
+    final api = _FakePredictApi(rows: [_round(nodeName: '未命名点位')]);
+    await _pump(tester, access: _FakeAccess(), api: api, english: true);
+    expect(find.text('Predictions awaiting answers'), findsOneWidget);
+    expect(find.text('未命名点位'), findsOneWidget);
+    expect(find.text('明天哪款会卖得最好?'), findsOneWidget);
+    expect(find.text('12 people predicted this round'), findsOneWidget);
+    expect(find.text('Days left: 1'), findsOneWidget);
+    await tester.tap(find.text('Give answer'));
+    await tester.pumpAndSettle();
+    expect(find.text('冰美式'), findsOneWidget);
+    expect(find.text('Use this answer'), findsOneWidget);
+    expect(api.settles, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('卡片文案:期限与押注人数都按小程序口径;0 天不是「还剩 0 天」', (WidgetTester tester) async {
     await _pump(
       tester,

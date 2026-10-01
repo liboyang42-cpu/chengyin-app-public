@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
+import '../../l10n/strings.dart';
+import 'merchant_operations_strings.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:go_router/go_router.dart';
@@ -213,7 +215,7 @@ class _MerchantOperatorPageState extends State<MerchantOperatorPage> {
       if (mounted) {
         CyNativeNotice.show(
           context,
-          '$successMessage，但团队名单刷新失败，请稍后重试',
+          stringsOf(context).merchantOperationsRefreshFailure(successMessage),
           isError: true,
         );
       }
@@ -255,7 +257,7 @@ class _MerchantOperatorPageState extends State<MerchantOperatorPage> {
     context: context,
     builder: (BuildContext context) => CupertinoActionSheet(
       title: Text(title),
-      message: const Text('岗位决定员工能看到和能操作的经营范围'),
+      message: Text(stringsOf(context).merchantOperationsRolesDetermineWhichBusinessInformationAndActionsEmployeesCanAcces),
       actions: _roles
           .map(
             (MerchantAssignableRole role) => CupertinoActionSheetAction(
@@ -263,10 +265,10 @@ class _MerchantOperatorPageState extends State<MerchantOperatorPage> {
               onPressed: () => Navigator.of(context).pop(role.role),
               child: Column(
                 children: <Widget>[
-                  Text(role.name),
+                  Text(localizedMerchantRoleName(context, role)),
                   const SizedBox(height: 3),
                   Text(
-                    role.permissionText,
+                    localizedMerchantPermissions(context, role),
                     style: CyType.caption1.copyWith(
                       color: CupertinoColors.secondaryLabel,
                     ),
@@ -278,14 +280,14 @@ class _MerchantOperatorPageState extends State<MerchantOperatorPage> {
           .toList(growable: false),
       cancelButton: CupertinoActionSheetAction(
         onPressed: () => Navigator.of(context).pop(),
-        child: const Text('取消'),
+        child: Text(stringsOf(context).cancel),
       ),
     ),
   );
 
   Future<void> _createInvite() async {
     if (_submitting || _roles.isEmpty) return;
-    final MerchantOperatorRole? role = await _pickRole(title: '选择邀请岗位');
+    final MerchantOperatorRole? role = await _pickRole(title: stringsOf(context).merchantOperationsChooseAnInvitationRole);
     if (role == null || !mounted) return;
     final String fingerprint = 'invite:${_access?.merchantId}:${role.wire}';
     setState(() => _submitting = true);
@@ -298,7 +300,7 @@ class _MerchantOperatorPageState extends State<MerchantOperatorPage> {
       await _clearIntent(fingerprint);
       setState(() => _createdInvite = creation);
       _applyInvite(creation.invite);
-      await _refreshTeamAfterConfirmedWrite('邀请已创建');
+      await _refreshTeamAfterConfirmedWrite(stringsOf(context).merchantOperationsInvitationCreated);
     } on Object catch (error) {
       await _clearIntentOnClientError(fingerprint, error);
       if (mounted) CyNativeNotice.show(context, _message(error), isError: true);
@@ -318,8 +320,7 @@ class _MerchantOperatorPageState extends State<MerchantOperatorPage> {
     await SharePlus.instance.share(
       ShareParams(
         text:
-            '邀请你加入${_access?.merchantName ?? '门店'}经营团队\n'
-            '${merchantOperatorInviteAppLink(creation.token)}',
+            stringsOf(context).merchantOperationsShareInvite(localizedMerchantStoreName(context, _access), merchantOperatorInviteAppLink(creation.token).toString()),
       ),
     );
   }
@@ -327,7 +328,7 @@ class _MerchantOperatorPageState extends State<MerchantOperatorPage> {
   Future<void> _updateRole(MerchantOperator operator) async {
     if (_submitting) return;
     final MerchantOperatorRole? role = await _pickRole(
-      title: '调整岗位',
+      title: stringsOf(context).merchantOperationsChangeRole,
       current: operator.role,
     );
     if (role == null || role == operator.role || !mounted) return;
@@ -345,8 +346,8 @@ class _MerchantOperatorPageState extends State<MerchantOperatorPage> {
       _applyOperatorReceipt(receipt.operator);
       await _refreshTeamAfterConfirmedWrite(
         receipt.mutationState == MerchantMutationState.exactResult
-            ? '岗位已更新'
-            : '岗位后续已变化',
+            ? stringsOf(context).merchantOperationsRoleUpdated
+            : stringsOf(context).merchantOperationsTheRoleChangedAfterward,
       );
     } on Object catch (error) {
       await _clearIntentOnClientError(fingerprint, error);
@@ -362,14 +363,14 @@ class _MerchantOperatorPageState extends State<MerchantOperatorPage> {
     context,
     title: title,
     content: content,
-    confirmText: '确认',
+    confirmText: stringsOf(context).merchantOperationsConfirm,
     danger: true,
   );
 
   Future<void> _remove(MerchantOperator operator) async {
     final bool confirmed = await _confirm(
-      '移除团队成员？',
-      '移除后，${operator.nickname} 的商家权限会立即失效。',
+      stringsOf(context).merchantOperationsRemoveTeamMember,
+      stringsOf(context).merchantOperationsRemoveHint(localizedMerchantNickname(context, operator)),
     );
     if (!confirmed || !mounted || _submitting) return;
     const String reason = '店主在经营团队页移除成员';
@@ -384,7 +385,7 @@ class _MerchantOperatorPageState extends State<MerchantOperatorPage> {
       if (!mounted) return;
       await _clearIntent(fingerprint);
       _applyOperatorReceipt(receipt.operator);
-      await _refreshTeamAfterConfirmedWrite('成员已移除');
+      await _refreshTeamAfterConfirmedWrite(stringsOf(context).merchantOperationsMemberRemoved);
     } on Object catch (error) {
       await _clearIntentOnClientError(fingerprint, error);
       if (mounted) CyNativeNotice.show(context, _message(error), isError: true);
@@ -394,7 +395,7 @@ class _MerchantOperatorPageState extends State<MerchantOperatorPage> {
   }
 
   Future<void> _revoke(MerchantOperatorInvite invite) async {
-    final bool confirmed = await _confirm('撤销这条邀请？', '撤销后，已经发出的邀请凭证会立即失效。');
+    final bool confirmed = await _confirm(stringsOf(context).merchantOperationsRevokeThisInvitation, stringsOf(context).merchantOperationsTheInvitationTokenWillBecomeInvalidImmediatelyAfterRevocation);
     if (!confirmed || !mounted || _submitting) return;
     const String reason = '店主在经营团队页撤销邀请';
     final String fingerprint = 'revoke:${invite.id}:${invite.version}';
@@ -409,7 +410,7 @@ class _MerchantOperatorPageState extends State<MerchantOperatorPage> {
       await _clearIntent(fingerprint);
       if (_createdInvite?.invite.id == invite.id) _createdInvite = null;
       _applyInvite(receipt.invite);
-      await _refreshTeamAfterConfirmedWrite('邀请已撤销');
+      await _refreshTeamAfterConfirmedWrite(stringsOf(context).merchantOperationsInvitationRevoked);
     } on Object catch (error) {
       await _clearIntentOnClientError(fingerprint, error);
       if (mounted) CyNativeNotice.show(context, _message(error), isError: true);
@@ -432,7 +433,7 @@ class _MerchantOperatorPageState extends State<MerchantOperatorPage> {
       await _clearIntent(fingerprint);
       if (!mounted) return;
       _incomingInviteConsumed = true;
-      CyNativeNotice.show(context, '已加入团队');
+      CyNativeNotice.show(context, stringsOf(context).merchantOperationsJoinedTheTeam);
       await _load();
     } on Object catch (error) {
       await _clearIntentOnClientError(fingerprint, error);
@@ -446,7 +447,7 @@ class _MerchantOperatorPageState extends State<MerchantOperatorPage> {
   }
 
   String _message(Object error) =>
-      error is MerchantOperatorApiException ? error.message : '网络连接失败，请稍后重试';
+      error is MerchantOperatorApiException ? error.message : stringsOf(context).merchantOperationsConnectionFailedTryAgainLater;
 
   String get _incomingInviteToken =>
       _incomingInviteConsumed ? '' : (widget.incomingInviteToken?.trim() ?? '');
@@ -462,7 +463,7 @@ class _MerchantOperatorPageState extends State<MerchantOperatorPage> {
 
   @override
   Widget build(BuildContext context) => CupertinoPageScaffold(
-    navigationBar: const CupertinoNavigationBar(middle: Text('经营团队')),
+    navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).merchantOperationsStoreTeam)),
     child: SafeArea(top: false, child: _body()),
   );
 
@@ -472,11 +473,11 @@ class _MerchantOperatorPageState extends State<MerchantOperatorPage> {
     ),
     _OperatorPageState.error => StatusView(
       icon: CupertinoIcons.exclamationmark_triangle,
-      message: '经营团队没能加载出来',
-      sub: _message(_error ?? const MerchantOperatorApiException('加载失败')),
+      message: stringsOf(context).merchantOperationsCouldNotLoadTheStoreTeam,
+      sub: _error == null ? stringsOf(context).merchantOperationsLoadFailed : _message(_error!),
       large: true,
       onRetry: _load,
-      retryLabel: '重新加载',
+      retryLabel: stringsOf(context).merchantOperationsReload,
     ),
     _OperatorPageState.noIdentity => _noIdentity(),
     _OperatorPageState.ready => _content(),
@@ -486,13 +487,13 @@ class _MerchantOperatorPageState extends State<MerchantOperatorPage> {
     final bool hasInvite = _incomingInviteToken.isNotEmpty;
     return StatusView(
       icon: hasInvite ? CupertinoIcons.person_add : CupertinoIcons.person_2,
-      message: hasInvite ? '加入经营团队' : '还没有经营团队身份',
+      message: hasInvite ? stringsOf(context).merchantOperationsJoinStoreTeam : stringsOf(context).merchantOperationsYouDoNotHaveAStoreTeamRoleYet,
       sub: hasInvite
-          ? '接受后会获得店主分配的固定岗位；每个账号同一时间只能加入一个商家团队。'
-          : '请让店主从经营团队页向你发出邀请',
+          ? stringsOf(context).merchantOperationsAcceptToReceiveTheRoleAssignedByTheStoreOwnerAnAccountCanBelongTo
+          : stringsOf(context).merchantOperationsAskTheStoreOwnerToInviteYouFromTheStoreTeamPage,
       large: true,
       onRetry: hasInvite ? _acceptIncomingInvite : null,
-      retryLabel: '接受邀请',
+      retryLabel: stringsOf(context).merchantOperationsAcceptInvitation,
     );
   }
 
@@ -526,14 +527,14 @@ class _MerchantOperatorPageState extends State<MerchantOperatorPage> {
               access.merchantLogo,
               fallback: CupertinoIcons.building_2_fill,
             ),
-            title: Text(access.merchantName ?? '门店'),
-            subtitle: Text('当前岗位 · ${access.roleLabel}'),
+            title: Text(localizedMerchantStoreName(context, access)),
+            subtitle: Text(stringsOf(context).merchantOperationsCurrentRole(merchantOperationModelText(context, access.roleLabel))),
           ),
           CupertinoListTile(
             title: Text(
               access.canManageOperators
-                  ? '岗位决定员工能看到和能操作的经营范围；离职后权限立即失效。'
-                  : '你的工作台入口会按当前岗位自动收起；需要调整时请联系店主。',
+                  ? stringsOf(context).merchantOperationsRolesDetermineEmployeesBusinessAccessAccessEndsImmediatelyWhenThe
+                  : stringsOf(context).merchantOperationsWorkbenchEntriesReflectYourCurrentRoleContactTheOwnerToRequestCha,
               style: CyType.footnote.copyWith(
                 color: CupertinoColors.secondaryLabel,
               ),
@@ -546,11 +547,11 @@ class _MerchantOperatorPageState extends State<MerchantOperatorPage> {
     children: <Widget>[
       CupertinoListTile(
         leading: const Icon(CupertinoIcons.person_add),
-        title: const Text('你还有一条团队邀请'),
-        subtitle: const Text('接受前会再次校验门店、岗位与账号状态'),
+        title: Text(stringsOf(context).merchantOperationsYouHaveATeamInvitation),
+        subtitle: Text(stringsOf(context).merchantOperationsStoreRoleAndAccountStatusWillBeCheckedAgainBeforeAcceptance),
         trailing: CupertinoButton(
           onPressed: _submitting ? null : _acceptIncomingInvite,
-          child: const Text('接受'),
+          child: Text(stringsOf(context).merchantOperationsAccept),
         ),
       ),
     ],
@@ -560,11 +561,11 @@ class _MerchantOperatorPageState extends State<MerchantOperatorPage> {
     children: <Widget>[
       CupertinoListTile(
         leading: const Icon(CupertinoIcons.exclamationmark_triangle),
-        title: const Text('岗位列表暂未更新'),
+        title: Text(stringsOf(context).merchantOperationsRoleListHasNotUpdated),
         subtitle: Text(_message(_rolesError!)),
         trailing: CupertinoButton(
           onPressed: _reloadRoles,
-          child: const Text('重试'),
+          child: Text(stringsOf(context).retry),
         ),
       ),
     ],
@@ -572,17 +573,17 @@ class _MerchantOperatorPageState extends State<MerchantOperatorPage> {
 
   Widget _selfCard(MerchantOperatorAccess access) =>
       CupertinoListSection.insetGrouped(
-        header: const Text('你的岗位权限'),
-        footer: const Text('岗位调整或离职由店主操作，并在下一次请求时立即生效。'),
+        header: Text(stringsOf(context).merchantOperationsYourRolePermissions),
+        footer: Text(stringsOf(context).merchantOperationsTheOwnerManagesRoleChangesAndRemovalChangesApplyOnTheNextRequest),
         children: <Widget>[
           CupertinoListTile(
             title: Text(
-              access.roleLabel,
+              merchantOperationModelText(context, access.roleLabel),
               style: CyType.title2.copyWith(fontWeight: FontWeight.w600),
             ),
             trailing: CupertinoButton(
               onPressed: _openWorkbench,
-              child: const Text('进入工作台'),
+              child: Text(stringsOf(context).merchantOperationsOpenWorkbench),
             ),
           ),
         ],
@@ -592,14 +593,14 @@ class _MerchantOperatorPageState extends State<MerchantOperatorPage> {
       CupertinoListSection.insetGrouped(
         children: <Widget>[
           CupertinoListTile(
-            title: Text('${creation.invite.role.label}邀请已创建'),
+            title: Text(stringsOf(context).merchantOperationsRoleInviteCreated(merchantOperationModelText(context, creation.invite.role.label))),
             subtitle: Text(
-              '${_date(creation.invite.expiresAt)} 前有效；分享凭证只在本次页面停留期间可用。',
+              stringsOf(context).merchantOperationsInviteExpiryHint(_date(creation.invite.expiresAt)),
             ),
             trailing: CupertinoButton.filled(
               onPressed: _shareInvite,
               sizeStyle: CupertinoButtonSize.small,
-              child: const Text('立即分享'),
+              child: Text(stringsOf(context).merchantOperationsShareNow),
             ),
           ),
         ],
@@ -614,20 +615,20 @@ class _MerchantOperatorPageState extends State<MerchantOperatorPage> {
         children: <Widget>[
           Row(
             children: <Widget>[
-              const Text('团队成员'),
+              Text(stringsOf(context).merchantOperationsTeamMembers),
               const SizedBox(width: 6),
-              Text('${operators.length} 人'),
+              Text(stringsOf(context).merchantOperationsMemberCount(operators.length)),
             ],
           ),
           CupertinoButton(
             onPressed: _submitting || _roles.isEmpty ? null : _createInvite,
             padding: EdgeInsets.zero,
-            child: const Text('邀请员工'),
+            child: Text(stringsOf(context).merchantOperationsInviteEmployee),
           ),
         ],
       ),
       footer: operators.isEmpty
-          ? const Text('还没有员工，先按岗位创建邀请，再通过微信发给员工。')
+          ? Text(stringsOf(context).merchantOperationsNoEmployeesYetCreateAnInvitationForARoleThenSendItViaWechat)
           : null,
       children: operators
           .map(
@@ -636,9 +637,9 @@ class _MerchantOperatorPageState extends State<MerchantOperatorPage> {
                 operator.avatar,
                 fallback: CupertinoIcons.person_crop_circle,
               ),
-              title: Text(operator.nickname),
+              title: Text(localizedMerchantNickname(context, operator)),
               subtitle: Text(
-                '${operator.role.label} · ${_date(operator.acceptedAt)} 加入',
+                stringsOf(context).merchantOperationsMemberRoleDate(merchantOperationModelText(context, operator.role.label), _date(operator.acceptedAt)),
               ),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -647,14 +648,14 @@ class _MerchantOperatorPageState extends State<MerchantOperatorPage> {
                     key: Key('operator-role-${operator.id}'),
                     onPressed: _submitting ? null : () => _updateRole(operator),
                     padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: const Text('改岗'),
+                    child: Text(stringsOf(context).merchantOperationsChangeRoleAlt),
                   ),
                   CupertinoButton(
                     key: Key('operator-remove-${operator.id}'),
                     onPressed: _submitting ? null : () => _remove(operator),
                     padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: const Text(
-                      '移除',
+                    child: Text(
+                      stringsOf(context).merchantOperationsRemove,
                       style: TextStyle(color: CupertinoColors.systemRed),
                     ),
                   ),
@@ -671,22 +672,22 @@ class _MerchantOperatorPageState extends State<MerchantOperatorPage> {
     return CupertinoListSection.insetGrouped(
       header: Row(
         children: <Widget>[
-          const Text('待接受邀请'),
+          Text(stringsOf(context).merchantOperationsPendingInvitations),
           const SizedBox(width: 6),
-          Text('${invites.length} 条'),
+          Text(stringsOf(context).merchantOperationsInviteCount(invites.length)),
         ],
       ),
       children: invites
           .map(
             (MerchantOperatorInvite invite) => CupertinoListTile(
               leading: const Icon(CupertinoIcons.person_crop_circle_badge_plus),
-              title: Text('${invite.role.label}邀请'),
-              subtitle: Text('${_date(invite.expiresAt)} 失效'),
+              title: Text(stringsOf(context).merchantOperationsRoleInvite(merchantOperationModelText(context, invite.role.label))),
+              subtitle: Text(stringsOf(context).merchantOperationsExpires(_date(invite.expiresAt))),
               trailing: CupertinoButton(
                 key: Key('operator-revoke-invite-${invite.id}'),
                 onPressed: _submitting ? null : () => _revoke(invite),
-                child: const Text(
-                  '撤销',
+                child: Text(
+                  stringsOf(context).merchantOperationsRevoke,
                   style: TextStyle(color: CupertinoColors.systemRed),
                 ),
               ),
@@ -739,15 +740,15 @@ class MerchantTeamRoutePage extends ConsumerWidget {
     final bool loggedIn = ref.watch(authControllerProvider).isLoggedIn;
     if (!loggedIn) {
       return CupertinoPageScaffold(
-        navigationBar: const CupertinoNavigationBar(middle: Text('经营团队')),
+        navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).merchantOperationsStoreTeam)),
         child: SafeArea(
           top: false,
           child: StatusView(
             icon: CupertinoIcons.person_add,
-            message: '登录后处理团队邀请',
-            sub: '登录后才能查看岗位或加入门店',
+            message: stringsOf(context).merchantOperationsSignInToManageTeamInvitations,
+            sub: stringsOf(context).merchantOperationsSignInToViewRolesOrJoinAStore,
             large: true,
-            retryLabel: '去登录',
+            retryLabel: stringsOf(context).merchantOperationsSignIn,
             onRetry: () => showLoginSheet(context),
           ),
         ),

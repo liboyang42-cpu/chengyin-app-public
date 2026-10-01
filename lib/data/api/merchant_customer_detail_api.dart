@@ -44,10 +44,12 @@ class MerchantCustomerMutationReceipt {
   const MerchantCustomerMutationReceipt({
     required this.message,
     required this.data,
+    this.isLocalFallback = false,
   });
 
   final String message;
   final Object data;
+  final bool isLocalFallback;
 }
 
 /// 当前账号在商家域的 CRM 访问上下文。
@@ -113,7 +115,7 @@ class MerchantCustomerDetailApi implements MerchantCustomerDetailGateway {
   Future<MerchantCustomerAccess> access() async {
     final dynamic data = await _postData('/api/merchant/access/me');
     if (data is! Map<String, dynamic>) {
-      throw const MerchantCustomerDetailApiException('经营身份数据不完整，请稍后重试');
+      throw const MerchantCustomerDetailApiException('经营身份数据不完整，请稍后重试', isLocalFallback: true);
     }
     return MerchantCustomerAccess.fromJson(data);
   }
@@ -125,7 +127,7 @@ class MerchantCustomerDetailApi implements MerchantCustomerDetailGateway {
       '/api/merchant/crm/customers/$customerMemberId/detail',
     );
     if (data is! Map<String, dynamic>) {
-      throw const MerchantCustomerDetailApiException('客户详情数据不完整，请稍后重试');
+      throw const MerchantCustomerDetailApiException('客户详情数据不完整，请稍后重试', isLocalFallback: true);
     }
     try {
       return MerchantCustomerDetail.fromJson(
@@ -133,7 +135,7 @@ class MerchantCustomerDetailApi implements MerchantCustomerDetailGateway {
         expectedCustomerMemberId: customerMemberId,
       );
     } on FormatException {
-      throw const MerchantCustomerDetailApiException('客户详情数据不完整，请稍后重试');
+      throw const MerchantCustomerDetailApiException('客户详情数据不完整，请稍后重试', isLocalFallback: true);
     }
   }
 
@@ -147,10 +149,10 @@ class MerchantCustomerDetailApi implements MerchantCustomerDetailGateway {
     _requirePositiveId(customerMemberId, '客户ID无效');
     final String normalizedContent = content.trim();
     if (normalizedContent.isEmpty) {
-      throw const MerchantCustomerDetailApiException('请填写跟进备注', code: 400);
+      throw const MerchantCustomerDetailApiException('请填写跟进备注', code: 400, isLocalFallback: true);
     }
     if (normalizedContent.length > 500) {
-      throw const MerchantCustomerDetailApiException('跟进备注最多500字', code: 400);
+      throw const MerchantCustomerDetailApiException('跟进备注最多500字', code: 400, isLocalFallback: true);
     }
     _requireRequestId(requestId);
     if (correctsNoteId != null) {
@@ -177,7 +179,7 @@ class MerchantCustomerDetailApi implements MerchantCustomerDetailGateway {
     _requirePositiveId(customerMemberId, '客户ID无效');
     _requirePositiveId(noteId, '备注ID无效');
     if (expectedVersion < 0) {
-      throw const MerchantCustomerDetailApiException('备注版本无效', code: 400);
+      throw const MerchantCustomerDetailApiException('备注版本无效', code: 400, isLocalFallback: true);
     }
     _requireRequestId(requestId);
     return _postReceipt(
@@ -202,13 +204,13 @@ class MerchantCustomerDetailApi implements MerchantCustomerDetailGateway {
     final String normalizedName = tagName.trim();
     final String normalizedColor = tagColor.trim().toUpperCase();
     if (normalizedName.isEmpty) {
-      throw const MerchantCustomerDetailApiException('请填写标签名称', code: 400);
+      throw const MerchantCustomerDetailApiException('请填写标签名称', code: 400, isLocalFallback: true);
     }
     if (normalizedName.length > 16) {
-      throw const MerchantCustomerDetailApiException('标签最多16字', code: 400);
+      throw const MerchantCustomerDetailApiException('标签最多16字', code: 400, isLocalFallback: true);
     }
     if (!_tagColorPattern.hasMatch(normalizedColor)) {
-      throw const MerchantCustomerDetailApiException('标签颜色无效', code: 400);
+      throw const MerchantCustomerDetailApiException('标签颜色无效', code: 400, isLocalFallback: true);
     }
     _requireRequestId(requestId);
     return _postReceipt(
@@ -256,6 +258,7 @@ class MerchantCustomerDetailApi implements MerchantCustomerDetailGateway {
           : dataMessage.isNotEmpty
           ? dataMessage
           : fallbackMessage,
+      isLocalFallback: envelope.message.isEmpty && dataMessage.isEmpty,
       data: envelope.data,
     );
   }
@@ -274,10 +277,11 @@ class MerchantCustomerDetailApi implements MerchantCustomerDetailGateway {
         throw MerchantCustomerDetailApiException(
           _text(body['msg']).isEmpty ? '请求失败' : _text(body['msg']),
           code: code,
+          isLocalFallback: _text(body['msg']).isEmpty,
         );
       }
       if (!body.containsKey('data') || body['data'] == null) {
-        throw const MerchantCustomerDetailApiException('服务端未返回可确认的结果');
+        throw const MerchantCustomerDetailApiException('服务端未返回可确认的结果', isLocalFallback: true);
       }
       return _MerchantCustomerEnvelope(
         data: body['data'] as Object,
@@ -296,7 +300,7 @@ class MerchantCustomerDetailApi implements MerchantCustomerDetailGateway {
           );
         }
       }
-      throw const MerchantCustomerDetailApiException('网络连接失败，请稍后重试');
+      throw const MerchantCustomerDetailApiException('网络连接失败，请稍后重试', isLocalFallback: true);
     }
   }
 }
@@ -309,10 +313,11 @@ class _MerchantCustomerEnvelope {
 }
 
 class MerchantCustomerDetailApiException implements Exception {
-  const MerchantCustomerDetailApiException(this.message, {this.code});
+  const MerchantCustomerDetailApiException(this.message, {this.code, this.isLocalFallback = false});
 
   final String message;
   final int? code;
+  final bool isLocalFallback;
 
   bool get isPermissionDenied =>
       code == 401 ||
@@ -367,7 +372,7 @@ int? _positiveIntOrNull(dynamic value) {
 }
 
 void _requirePositiveId(int value, String message) {
-  if (value <= 0) throw MerchantCustomerDetailApiException(message, code: 400);
+  if (value <= 0) throw MerchantCustomerDetailApiException(message, code: 400, isLocalFallback: true);
 }
 
 final RegExp _requestIdPattern = RegExp(r'^[A-Za-z0-9._:-]{6,64}$');
@@ -375,7 +380,7 @@ final RegExp _tagColorPattern = RegExp(r'^#[0-9A-F]{6}$');
 
 void _requireRequestId(String value) {
   if (!_requestIdPattern.hasMatch(value)) {
-    throw const MerchantCustomerDetailApiException('请求标识无效', code: 400);
+    throw const MerchantCustomerDetailApiException('请求标识无效', code: 400, isLocalFallback: true);
   }
 }
 

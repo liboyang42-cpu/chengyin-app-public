@@ -1,3 +1,4 @@
+import '../../l10n/strings.dart';
 import 'dart:async';
 import 'dart:io';
 
@@ -155,7 +156,7 @@ class _MerchantNpcVoicePageState extends ConsumerState<MerchantNpcVoicePage> {
     //   进页面就弹权限框,用户还不知道要它干什么。
     if (!await _recorder.hasPermission()) {
       if (mounted) {
-        CyNativeNotice.show(context, '需要麦克风权限才能录音', isError: true);
+        CyNativeNotice.show(context, stringsOf(context).merchantNodeMicrophoneNeeded, isError: true);
       }
       return;
     }
@@ -178,7 +179,7 @@ class _MerchantNpcVoicePageState extends ConsumerState<MerchantNpcVoicePage> {
       if (path != null) _localPaths[index] = path;
     });
     if (path == null) {
-      CyNativeNotice.show(context, '这次没录上,再试一次', isError: true);
+      CyNativeNotice.show(context, stringsOf(context).merchantNodeRecordingFailed, isError: true);
     }
   }
 
@@ -198,7 +199,7 @@ class _MerchantNpcVoicePageState extends ConsumerState<MerchantNpcVoicePage> {
         path,
         tag: MediaItem(
           id: 'npc-voice-enroll-$index-$path',
-          title: '第 ${index + 1} 句 · ${_script.lines[index]}',
+          title: stringsOf(context).merchantVoicePlaybackTitle(index + 1, _script.lines[index]),
           // 1ms 防炸兜底:just_audio_background 锁屏拖动对 duration! 强解包。
           duration: const Duration(milliseconds: 1),
         ),
@@ -217,7 +218,7 @@ class _MerchantNpcVoicePageState extends ConsumerState<MerchantNpcVoicePage> {
   Future<void> _submit() async {
     final int? missing = _firstMissing;
     if (missing != null) {
-      CyNativeNotice.show(context, '还差第 $missing 句', isError: true);
+      CyNativeNotice.show(context, stringsOf(context).merchantVoiceMissing(missing), isError: true);
       return;
     }
     setState(() => _submitting = true);
@@ -257,8 +258,8 @@ class _MerchantNpcVoicePageState extends ConsumerState<MerchantNpcVoicePage> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const CupertinoPageScaffold(
-        navigationBar: CupertinoNavigationBar(middle: Text('录一段你的声音')),
+      return CupertinoPageScaffold(
+        navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).merchantVoiceTitle)),
         child: Material(
           color: Colors.transparent,
           child: SafeArea(bottom: false, child: CySkeleton()),
@@ -272,7 +273,7 @@ class _MerchantNpcVoicePageState extends ConsumerState<MerchantNpcVoicePage> {
     if (_submitted) {
       return CupertinoPageScaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        navigationBar: const CupertinoNavigationBar(middle: Text('录一段你的声音')),
+        navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).merchantVoiceTitle)),
         child: Material(
           color: Colors.transparent,
           child: SafeArea(bottom: false, child: _submittedBody(p, t)),
@@ -282,7 +283,7 @@ class _MerchantNpcVoicePageState extends ConsumerState<MerchantNpcVoicePage> {
 
     return CupertinoPageScaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      navigationBar: const CupertinoNavigationBar(middle: Text('录一段你的声音')),
+      navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).merchantVoiceTitle)),
       child: Material(
         color: Colors.transparent,
         child: SafeArea(
@@ -290,15 +291,15 @@ class _MerchantNpcVoicePageState extends ConsumerState<MerchantNpcVoicePage> {
           child: _loadFailed
               ? merchantErrorView(
                   context,
-                  '没能读到录音脚本',
+                  stringsOf(context).merchantVoiceScriptFailed,
                   onRetry: _load,
-                  what: '录音脚本',
+                  what: stringsOf(context).merchantVoiceScript,
                 )
               // ★ ② 供应商没接就直说,并且不给录音入口。
               : !_script.available
-              ? const StatusView(
-                  message: '声音克隆还没开放',
-                  sub: '开放后你可以录五句话,让店铺形象用你自己的声音说话。',
+              ? StatusView(
+                  message: stringsOf(context).merchantVoiceUnavailable,
+                  sub: stringsOf(context).merchantVoiceUnavailableHint,
                   icon: CupertinoIcons.mic_slash,
                   large: true,
                 )
@@ -306,8 +307,7 @@ class _MerchantNpcVoicePageState extends ConsumerState<MerchantNpcVoicePage> {
                   padding: const EdgeInsets.all(CyTokens.space4),
                   children: <Widget>[
                     Text(
-                      '按顺序念这五句话,每句录完可以听一下、不满意就重录。'
-                      '录好的声音会跟形象一起审核,通过后玩家就能听到你说话。',
+                      stringsOf(context).merchantVoiceIntro,
                       style: t.bodySmall?.copyWith(color: p.textSecondary),
                     ),
                     const SizedBox(height: CyTokens.space4),
@@ -322,13 +322,13 @@ class _MerchantNpcVoicePageState extends ConsumerState<MerchantNpcVoicePage> {
                     CyNativeButton(
                       key: const Key('merchant-npc-voice-submit'),
                       onPressed: _submitting || !_allRecorded ? null : _submit,
-                      label: _submitting ? '提交中…' : '提交这五句',
+                      label: _submitting ? stringsOf(context).merchantNodeSubmitting : stringsOf(context).merchantVoiceSubmitFive,
                       loading: _submitting,
                     ),
                     if (!_allRecorded && _firstMissing != null) ...<Widget>[
                       const SizedBox(height: CyTokens.space2),
                       Text(
-                        '还差第 $_firstMissing 句',
+                        stringsOf(context).merchantVoiceMissing(_firstMissing!),
                         style: t.bodySmall?.copyWith(color: p.textSecondary),
                       ),
                     ],
@@ -357,10 +357,10 @@ class _MerchantNpcVoicePageState extends ConsumerState<MerchantNpcVoicePage> {
       children: <Widget>[
         Text(
           status.isReady
-              ? '角色的声音已准备好。玩家很快就能听到它用你的声音说话。'
+              ? stringsOf(context).merchantVoiceReady
               : status.isFailed
-              ? '声音生成失败，请重新选择清晰的录音。也可以直接在这里重录一遍。'
-              : '声音正在生成，可以先返回继续装修店铺。通常要几分钟。',
+              ? stringsOf(context).merchantVoiceFailed
+              : stringsOf(context).merchantVoiceGenerating,
           style: t.bodyMedium,
         ),
         const SizedBox(height: CyTokens.space2),
@@ -375,7 +375,7 @@ class _MerchantNpcVoicePageState extends ConsumerState<MerchantNpcVoicePage> {
         if (generating)
           CyNativeButton(
             key: const Key('merchant-npc-voice-later'),
-            label: '稍后再说',
+            label: stringsOf(context).merchantVoiceLater,
             role: CyNativeButtonRole.secondary,
             onPressed: () => Navigator.of(context).maybePop(true),
           ),
@@ -386,19 +386,19 @@ class _MerchantNpcVoicePageState extends ConsumerState<MerchantNpcVoicePage> {
             padding: EdgeInsets.zero,
             minimumSize: const Size(88, 44),
             onPressed: _refreshStatus,
-            child: const Text('查询生成状态'),
+            child: Text(stringsOf(context).merchantVoiceCheckStatus),
           ),
         ],
         if (status.isReady)
           CyNativeButton(
             key: const Key('merchant-npc-voice-done'),
-            label: '完成',
+            label: stringsOf(context).merchantVoiceDone,
             onPressed: () => Navigator.of(context).maybePop(true),
           ),
         if (status.isFailed)
           CyNativeButton(
             key: const Key('merchant-npc-voice-retry-record'),
-            label: '重新录一遍',
+            label: stringsOf(context).merchantVoiceRecordAgain,
             onPressed: () => setState(() {
               _submitted = false;
               _status = null;
@@ -445,7 +445,7 @@ class _MerchantNpcVoicePageState extends ConsumerState<MerchantNpcVoicePage> {
         children: <Widget>[
           Row(
             children: <Widget>[
-              Text('第 ${index + 1} 句', style: t.labelLarge),
+              Text(stringsOf(context).merchantVoiceSentence(index + 1), style: t.labelLarge),
               if (isConsent) ...<Widget>[
                 const SizedBox(width: CyTokens.space2),
                 // ★ ① 授权声明必须单独标出来 —— 那段录音本身就是同意的证据。
@@ -458,7 +458,7 @@ class _MerchantNpcVoicePageState extends ConsumerState<MerchantNpcVoicePage> {
                     color: p.bgSurfaceSubtle,
                     borderRadius: BorderRadius.circular(CyTokens.radiusSm),
                   ),
-                  child: Text('授权声明', style: t.bodySmall),
+                  child: Text(stringsOf(context).merchantVoiceAuthorizationLabel, style: t.bodySmall),
                 ),
               ],
               const Spacer(),
@@ -493,10 +493,10 @@ class _MerchantNpcVoicePageState extends ConsumerState<MerchantNpcVoicePage> {
                     : () => _toggleRecord(index),
                 child: Text(
                   recording
-                      ? '停止'
+                      ? stringsOf(context).merchantVoiceStop
                       : recorded
-                      ? '重录'
-                      : '录音',
+                      ? stringsOf(context).merchantNodeRerecord
+                      : stringsOf(context).merchantVoiceRecord,
                 ),
               ),
               if (recorded && !recording)
@@ -505,12 +505,12 @@ class _MerchantNpcVoicePageState extends ConsumerState<MerchantNpcVoicePage> {
                   padding: EdgeInsets.zero,
                   minimumSize: const Size(88, 44),
                   onPressed: () => _play(index),
-                  child: Text(playing ? '停止播放' : '听一下'),
+                  child: Text(playing ? stringsOf(context).merchantNodeStopPlaying : stringsOf(context).merchantVoiceListen),
                 ),
               if (recording) ...<Widget>[
                 const SizedBox(width: CyTokens.space2),
                 Text(
-                  '录音中…',
+                  stringsOf(context).merchantVoiceRecording,
                   style: t.bodySmall?.copyWith(color: p.textSecondary),
                 ),
               ],

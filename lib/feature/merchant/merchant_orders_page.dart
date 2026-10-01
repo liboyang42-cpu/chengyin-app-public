@@ -1,5 +1,7 @@
 import '../../core/theme/cy_palette.dart';
 import 'package:flutter/cupertino.dart';
+import '../../l10n/strings.dart';
+import 'merchant_operations_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -66,14 +68,14 @@ class MerchantOrdersPage extends ConsumerWidget {
       error: (Object e, _) => merchantErrorView(
         context,
         e,
-        what: '订单',
+        what: stringsOf(context).merchantOperationsOrders,
         onRetry: () => ref.invalidate(merchantOrdersProvider),
       ),
       data: (List<Map<String, dynamic>> rows) {
         if (rows.isEmpty) {
           return StatusView(
-            message: '还没有订单',
-            sub: '有顾客下单后,会出现在这里',
+            message: stringsOf(context).merchantOperationsNoOrdersYet,
+            sub: stringsOf(context).merchantOperationsOrdersWillAppearHereWhenCustomersPlaceThem,
             large: true,
             scrollable: true,
             icon: Icons.receipt_long_outlined,
@@ -92,7 +94,7 @@ class MerchantOrdersPage extends ConsumerWidget {
     );
     return CupertinoPageScaffold(
       backgroundColor: CyPalette.of(context).bgPage,
-      navigationBar: const CupertinoNavigationBar(middle: Text('订单')),
+      navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).merchantOperationsOrders)),
       child: Material(
         color: Colors.transparent,
         child: SafeArea(bottom: false, child: body),
@@ -130,14 +132,16 @@ class _OrderTile extends StatelessWidget {
             children: <Widget>[
               Expanded(
                 child: Text(
-                  orderSn.isEmpty ? '订单' : orderSn,
+                  orderSn.isEmpty ? stringsOf(context).merchantOperationsOrders : orderSn,
                   style: textTheme.titleSmall,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
               const SizedBox(width: CyTokens.space2),
-              CyTag(label: orderStatusText(status)),
+              CyTag(label: status != null && (status < 0 || status > 6)
+                  ? stringsOf(context).merchantOperationsUnknownOrderStatus(status)
+                  : merchantOperationModelText(context, orderStatusText(status))),
             ],
           ),
           const SizedBox(height: CyTokens.space1_5),
@@ -157,7 +161,7 @@ class _OrderTile extends StatelessWidget {
           if (aftersaleLabel != null) ...<Widget>[
             const SizedBox(height: CyTokens.space1_5),
             Text(
-              aftersaleLabel,
+              merchantOperationModelText(context, aftersaleLabel),
               style: textTheme.bodySmall?.copyWith(
                 color: CyPalette.of(context).statusWarning,
               ),

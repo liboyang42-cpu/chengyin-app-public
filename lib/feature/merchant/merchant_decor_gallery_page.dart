@@ -1,3 +1,4 @@
+import '../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -61,7 +62,7 @@ class _MerchantDecorGalleryPageState
 
   Future<void> _add() async {
     if (_gallery.length >= 9) {
-      CyNativeNotice.show(context, '最多 9 张', isError: true);
+      CyNativeNotice.show(context, stringsOf(context).merchantStoreMaxImages, isError: true);
       return;
     }
     final XFile? file = await ImagePicker().pickImage(
@@ -96,7 +97,7 @@ class _MerchantDecorGalleryPageState
       await ref.read(merchantApiProvider).saveDecorGallery(_gallery);
       if (!mounted) return;
       setState(() => _dirty = false);
-      CyNativeNotice.show(context, '相册已保存');
+      CyNativeNotice.show(context, stringsOf(context).merchantStoreGallerySaved);
       _goBack();
     } catch (error) {
       if (mounted) {
@@ -125,14 +126,14 @@ class _MerchantDecorGalleryPageState
   Widget build(BuildContext context) => UnsavedGuard(
     isDirty: () => _dirty,
     // 小程序 `decor/gallery` 的原话,与俱乐部编辑那套不同。
-    title: '还没有保存',
-    content: '离开后，本次相册修改不会保留。',
-    confirmText: '放弃修改',
-    cancelText: '继续编辑',
+    title: stringsOf(context).merchantStoreUnsaved,
+    content: stringsOf(context).merchantStoreGalleryDiscard,
+    confirmText: stringsOf(context).merchantStoreDiscard,
+    cancelText: stringsOf(context).merchantStoreKeepEditing,
     child: CupertinoPageScaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       navigationBar: CupertinoNavigationBar(
-        middle: const Text('门店相册'),
+        middle: Text(stringsOf(context).merchantStoreGallery),
         leading: CupertinoButton(
           key: const Key('merchant-gallery-back'),
           minimumSize: const Size(44, 44),
@@ -151,15 +152,15 @@ class _MerchantDecorGalleryPageState
   Widget _body() => switch (_loadState) {
     _GalleryLoadState.loading => const CySkeleton(count: 6),
     _GalleryLoadState.error => StatusView(
-      message: '相册加载失败',
-      sub: '检查网络后重试',
+      message: stringsOf(context).merchantStoreGalleryFailed,
+      sub: stringsOf(context).merchantStoreNetworkRetry,
       onRetry: _load,
-      retryLabel: '重新载入',
+      retryLabel: stringsOf(context).merchantStoreReload,
       large: true,
     ),
     _GalleryLoadState.empty => StatusView(
-      message: '暂时无法上传门店相册',
-      sub: '这个账号还没有店铺，完成商家入驻后再上传门店相册。',
+      message: stringsOf(context).merchantStoreGalleryUnavailable,
+      sub: stringsOf(context).merchantStoreGalleryNoStore,
       large: true,
     ),
     _GalleryLoadState.ready => Column(
@@ -175,12 +176,12 @@ class _MerchantDecorGalleryPageState
                     color: CyPalette.of(context).bgSurface,
                     borderRadius: BorderRadius.circular(CyTokens.radiusLg),
                   ),
-                  child: const Column(
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
-                      Text('16:9 横图'),
+                      Text(stringsOf(context).merchantStoreLandscape),
                       SizedBox(height: CyTokens.space1),
-                      Text('最多 9 张 · 保存后同步到公开主页'),
+                      Text(stringsOf(context).merchantStoreGalleryHint),
                     ],
                   ),
                 ),
@@ -234,11 +235,11 @@ class _MerchantDecorGalleryPageState
                         minimumSize: const Size(44, 44),
                         color: CyPalette.of(context).bgSurface,
                         onPressed: _uploading ? null : _add,
-                        child: const Column(
+                        child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: <Widget>[
                             Icon(CupertinoIcons.add),
-                            Text('添加图片'),
+                            Text(stringsOf(context).merchantStoreAddImage),
                           ],
                         ),
                       ),
@@ -264,7 +265,7 @@ class _MerchantDecorGalleryPageState
                 onPressed: (!_dirty || _saving) ? null : _save,
                 child: _saving
                     ? const CupertinoActivityIndicator()
-                    : const Text('保存相册'),
+                    : Text(stringsOf(context).merchantStoreSaveGallery),
               ),
             ),
           ),

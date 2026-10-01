@@ -1,3 +1,5 @@
+import '../../l10n/strings.dart';
+import 'merchant_directory_strings.dart';
 import '../../core/theme/cy_palette.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -35,7 +37,7 @@ class _MerchantRelationPageState extends ConsumerState<MerchantRelationPage> {
     final async = ref.watch(merchantRelationProvider);
     return CupertinoPageScaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      navigationBar: const CupertinoNavigationBar(middle: Text('伙伴')),
+      navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).merchantDirectoryPartners)),
       child: Material(
         color: Colors.transparent,
         child: SafeArea(
@@ -51,9 +53,9 @@ class _MerchantRelationPageState extends ConsumerState<MerchantRelationPage> {
                 ),
                 child: CyTabs(
                   variant: CyTabsVariant.segmented,
-                  tabs: const <CyTab>[
-                    CyTab(key: 'relations', label: '已建立'),
-                    CyTab(key: 'discover', label: '发现'),
+                  tabs: <CyTab>[
+                    CyTab(key: 'relations', label: stringsOf(context).merchantDirectoryEstablished),
+                    CyTab(key: 'discover', label: stringsOf(context).merchantDirectoryDiscover),
                   ],
                   active: _active,
                   onChanged: (String value) => setState(() => _active = value),
@@ -74,15 +76,15 @@ class _MerchantRelationPageState extends ConsumerState<MerchantRelationPage> {
                       _RelationList(
                         rows: home.relations,
                         stats: home.stats,
-                        emptyTitle: '还没有合作伙伴',
-                        emptySub: '在「发现」里找找同城的商家和俱乐部',
+                        emptyTitle: stringsOf(context).merchantDirectoryNoPartners,
+                        emptySub: stringsOf(context).merchantDirectoryNoPartnersHint,
                         onRefresh: () =>
                             ref.invalidate(merchantRelationProvider),
                       ),
                       _RelationList(
                         rows: home.discoveryMerchants,
-                        emptyTitle: '附近暂时没有可发现的伙伴',
-                        emptySub: '换个时间再来看看',
+                        emptyTitle: stringsOf(context).merchantDirectoryNoNearby,
+                        emptySub: stringsOf(context).merchantDirectoryCheckLater,
                         onRefresh: () =>
                             ref.invalidate(merchantRelationProvider),
                       ),
@@ -125,14 +127,14 @@ class _RelationList extends StatelessWidget {
             Row(
               children: <Widget>[
                 Text(
-                  '商家 ${stats!.merchantCount}',
+                  stringsOf(context).merchantDirectoryMerchantCount(stats!.merchantCount),
                   style: textTheme.bodySmall?.copyWith(
                     color: CyPalette.of(context).textSecondary,
                   ),
                 ),
                 const SizedBox(width: CyTokens.space3),
                 Text(
-                  '俱乐部 ${stats!.clubCount}',
+                  stringsOf(context).merchantDirectoryClubCount(stats!.clubCount),
                   style: textTheme.bodySmall?.copyWith(
                     color: CyPalette.of(context).textSecondary,
                   ),
@@ -141,7 +143,7 @@ class _RelationList extends StatelessWidget {
                 if (stats!.pendingCoopCount > 0) ...<Widget>[
                   const SizedBox(width: CyTokens.space3),
                   Text(
-                    '待处理 ${stats!.pendingCoopCount}',
+                    stringsOf(context).merchantDirectoryPendingCount(stats!.pendingCoopCount),
                     style: textTheme.bodySmall?.copyWith(
                       color: CyPalette.of(context).statusWarning,
                     ),
@@ -157,7 +159,7 @@ class _RelationList extends StatelessWidget {
             // 没名字的行在解析阶段已被丢掉,这里不会出现只有「—」的卡片。
             ...rows.map(
               (MerchantRelation r) =>
-                  CyCell(title: r.name, subtitle: r.displayDescription),
+                  CyCell(title: r.name, subtitle: merchantDirectoryRelationDescription(context, r)),
             ),
         ],
       ),

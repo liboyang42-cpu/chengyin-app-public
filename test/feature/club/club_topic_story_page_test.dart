@@ -9,6 +9,7 @@
 //   - 步行段只有章内第二站起才画,拿不到坐标整行不画。
 
 import 'package:flutter/cupertino.dart';
+import 'package:chengyin_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -24,10 +25,13 @@ import 'package:chengyin_app/data/api/club_topic_ops_api.dart';
 import 'package:chengyin_app/data/models/club_topic_ops.dart';
 import 'package:chengyin_app/feature/club/club_topic_story_page.dart';
 
-Widget _app(Widget home, List<dynamic> overrides) {
+Widget _app(Widget home, List<dynamic> overrides, {Locale locale = const Locale('zh')}) {
   return ProviderScope(
     overrides: overrides.cast(),
     child: MaterialApp(
+      locale: locale,
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
       theme: ThemeData(useMaterial3: true),
       debugShowCheckedModeBanner: false,
       home: home,
@@ -210,12 +214,14 @@ Future<void> _pumpPage(
   WidgetTester tester, {
   required _FakeClubTopicOpsApi fake,
   int? clubId = 1,
+  Locale locale = const Locale('zh'),
 }) async {
   await tester.binding.setSurfaceSize(const Size(390, 1100));
   await tester.pumpWidget(
     _app(
       ClubTopicStoryPage(key: ObjectKey(fake), topicId: 12, clubId: clubId),
       <dynamic>[clubTopicOpsApiProvider.overrideWithValue(fake)],
+      locale: locale,
     ),
   );
   await tester.pumpAndSettle();
@@ -227,6 +233,25 @@ Future<void> _switchToPlayTab(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets('English story labels preserve authored names and answer access', (tester) async {
+    final fake = _FakeClubTopicOpsApi()
+      ..overviewValue = ClubTopicOverview.tryFromJson(_overviewJson(chapters: _twoChapterChapters()))!;
+    await _pumpPage(tester, fake: fake, clubId: null, locale: const Locale('en'));
+    expect(find.text('Story and gameplay'), findsOneWidget);
+    expect(find.text('Chapter 1 · 古城'), findsOneWidget);
+    expect(find.text('钟楼'), findsOneWidget);
+    await tester.tap(find.text('Gameplay'));
+    await tester.pumpAndSettle();
+    expect(find.text('Chapter story'), findsOneWidget);
+    expect(find.text('沿着城墙走一圈，把故事一段段捡回来。'), findsOneWidget);
+    await _reveal(tester, const Key('topic-story-answer-11'));
+    await tester.tap(find.byKey(const Key('topic-story-answer-11')));
+    await tester.pumpAndSettle();
+    expect(find.text('Open this page from the club to view answers'), findsOneWidget);
+    expect(fake.answerCalls, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
   group('topic-story:路线 tab', () {
     testWidgets('章节标题/时长/站点序号与地名,第二站起画步行段', (WidgetTester tester) async {
       final fake = _FakeClubTopicOpsApi()

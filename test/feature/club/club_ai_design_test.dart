@@ -16,12 +16,14 @@ import 'package:chengyin_app/core/network/provider_retry.dart';
 import 'package:chengyin_app/core/providers.dart';
 import 'package:chengyin_app/data/api/ai_creator_api.dart';
 import 'package:chengyin_app/feature/club/club_ai_design_sheet.dart';
+import 'package:chengyin_app/l10n/app_localizations.dart';
 
 class _FakeAi implements AiCreatorApi {
   _FakeAi({this.data, this.err});
   final Map<String, dynamic>? data;
   final Object? err;
   int calls = 0;
+  String? submittedIdea;
 
   @override
   Future<Map<String, dynamic>> clubDesign({
@@ -30,6 +32,7 @@ class _FakeAi implements AiCreatorApi {
     int? targetDurationMin,
   }) async {
     calls++;
+    submittedIdea = idea;
     if (err != null) throw err!;
     return data ?? <String, dynamic>{};
   }
@@ -38,13 +41,18 @@ class _FakeAi implements AiCreatorApi {
   dynamic noSuchMethod(Invocation i) => super.noSuchMethod(i);
 }
 
-Future<void> _open(WidgetTester t, _FakeAi api, {String idea = '周六夜骑'}) async {
+Future<void> _open(WidgetTester t, _FakeAi api, {
+  String idea = '周六夜骑', Locale locale = const Locale('zh'),
+}) async {
   await t.binding.setSurfaceSize(const Size(390, 900));
   await t.pumpWidget(
     ProviderScope(
       retry: chengyinRetry,
       overrides: <dynamic>[aiCreatorApiProvider.overrideWithValue(api)].cast(),
       child: MaterialApp(
+        locale: locale,
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
         home: Scaffold(
           body: Builder(
             builder: (BuildContext c) => TextButton(
@@ -65,6 +73,25 @@ Future<void> _open(WidgetTester t, _FakeAi api, {String idea = '周六夜骑'}) 
 }
 
 void main() {
+  testWidgets('English AI result labels preserve generated content and input', (tester) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final api = _FakeAi(data: {
+      'plan': {
+        'storyline': '服务端生成的故事原文',
+        'nodes': [{'address': '上海市静安区'}],
+      },
+      'promoCopy': '服务端生成的宣传原文',
+    });
+    await _open(tester, api, locale: const Locale('en'), idea: 'My original idea');
+    expect(api.submittedIdea, 'My original idea');
+    expect(find.text('Unnamed plan'), findsOneWidget);
+    expect(find.text('Location 1'), findsOneWidget);
+    expect(find.text('服务端生成的故事原文'), findsOneWidget);
+    expect(find.text('服务端生成的宣传原文'), findsOneWidget);
+    expect(find.text('上海市静安区'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   test('★★ 解析:plan 为空即不合法,不编内容', () {
     expect(ClubAiDesign.tryParse(<String, dynamic>{}), isNull);
     expect(ClubAiDesign.tryParse(<String, dynamic>{'plan': '   '}), isNull);

@@ -1,3 +1,4 @@
+import '../../l10n/strings.dart';
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
@@ -5,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../core/network/dio_client.dart';
 import '../../core/providers.dart';
 import '../../core/theme/cy_tokens.dart';
 import '../../core/widgets/cy_native_button.dart';
@@ -31,22 +31,44 @@ class CouponCodePage extends ConsumerStatefulWidget {
   ConsumerState<CouponCodePage> createState() => _CouponCodePageState();
 }
 
+enum _CouponFailure { generate, poll, unavailable, login, network }
+
+_CouponFailure _friendlyCouponFailure(Object error, _CouponFailure fallback) {
+  final text = '$error';
+  if (RegExp(r'登录|认证|401|token', caseSensitive: false).hasMatch(text)) {
+    return _CouponFailure.login;
+  }
+  if (RegExp(r'网络|timeout|fail|502|503', caseSensitive: false).hasMatch(text)) {
+    return _CouponFailure.network;
+  }
+  return fallback;
+}
+
 class _CouponCodePageState extends ConsumerState<CouponCodePage> {
   String _qrState = 'loading'; // loading | ready | error
   String _qrUrl = '';
   String _errMsg = '';
-  String _couponName = '优惠券';
+  String _couponName = '';
+  _CouponFailure? _failure;
   String _description = '';
   String _endTimeText = '';
   int _countdown = 60;
   int _useStatus = 0; // 0 待使用 / 1 已核销 / 2 已过期 / 3 已失效
   String _useTimeText = '';
   String _startTime = '';
-  String _pollError = '';
+  _CouponFailure? _pollFailure;
   bool _refreshing = false;
   bool _sessionStarted = false;
   Timer? _countTimer;
   Timer? _pollTimer;
+
+  String _failureText(_CouponFailure failure) => switch (failure) {
+    _CouponFailure.generate => stringsOf(context).couponCodeGenerateError,
+    _CouponFailure.poll => stringsOf(context).couponCodePollError,
+    _CouponFailure.unavailable => stringsOf(context).couponCodeUnavailable,
+    _CouponFailure.login => stringsOf(context).benefitsLoginExpired,
+    _CouponFailure.network => stringsOf(context).benefitsNetwork,
+  };
 
   @override
   void initState() {
@@ -115,6 +137,8 @@ class _CouponCodePageState extends ConsumerState<CouponCodePage> {
       final wasUnused = _useStatus == 0;
       setState(() {
         _qrUrl = qr.qrcodeUrl;
+        _failure = null;
+        _errMsg = '';
         _qrState = qr.qrcodeUrl.isNotEmpty ? 'ready' : 'error';
         _countdown = qr.expiresIn > 0 ? qr.expiresIn : 60;
         if (wasUnused || qr.useStatus == 1) _useStatus = qr.useStatus;
@@ -128,9 +152,10 @@ class _CouponCodePageState extends ConsumerState<CouponCodePage> {
         if (et.isNotEmpty) _endTimeText = et;
         if (qr.startTime != null) _startTime = qr.startTime!;
         // 码换新了 = 核销状态那条链路也通了,旧的横条提示该撤掉。
-        _pollError = '';
+        _pollFailure = null;
         if (_qrState == 'error') {
-          _errMsg = '二维码暂时没能生成，请稍后重试';
+          _errMsg = '';
+          _failure = _CouponFailure.generate;
         }
       });
       if (_useStatus != 0) _clearTimers();
@@ -144,7 +169,7 @@ class _CouponCodePageState extends ConsumerState<CouponCodePage> {
       if (!mounted) return;
       // 异常原文只进日志 —— 上屏的永远是 friendlyErrorMessage 的三档人话。
       debugPrint('[coupon-qr] refreshToken 失败: $e');
-      _onRefreshFail(friendlyErrorMessage(e, fallback: '二维码暂时没能生成，请稍后重试'));
+      _onRefreshFail(_friendlyCouponFailure(e, _CouponFailure.generate));
     } finally {
       _refreshing = false;
     }
@@ -157,21 +182,23 @@ class _CouponCodePageState extends ConsumerState<CouponCodePage> {
       _qrUrl = '';
       _qrState = 'error';
       _countdown = 0;
-      _pollError = '';
-      _errMsg = message.isEmpty ? '优惠券已撤销或不存在' : message;
+      _pollFailure = null;
+      _errMsg = message;
+      _failure = message.isEmpty ? _CouponFailure.unavailable : null;
     });
   }
 
   /// 刷新失败分级:屏上还有码(TTL 内)就保持 ready 只提示;真无码才切 error。
-  /// [text] 已由 [friendlyErrorMessage] 归一到人话,这里只决定怎么摆。
-  void _onRefreshFail(String text) {
+  /// Error classification preserves the existing login/network/fallback branches.
+  void _onRefreshFail(_CouponFailure failure) {
     if (_qrUrl.isNotEmpty && _qrState == 'ready' && _countdown > 1) {
-      _toast('刷新失败，当前码仍可用');
+      _toast(stringsOf(context).couponCodeRefreshFailed);
       return;
     }
     setState(() {
       _qrState = 'error';
-      _errMsg = text;
+      _errMsg = '';
+      _failure = failure;
     });
   }
 
@@ -222,7 +249,7 @@ class _CouponCodePageState extends ConsumerState<CouponCodePage> {
       } catch (e) {
         if (!mounted) return;
         debugPrint('[coupon-qr] 轮询核销状态失败: $e');
-        _onPollFail(friendlyErrorMessage(e, fallback: '核销状态暂不可用，请稍后重试'));
+        _onPollFail(_friendlyCouponFailure(e, _CouponFailure.poll));
       }
     });
   }
@@ -230,15 +257,16 @@ class _CouponCodePageState extends ConsumerState<CouponCodePage> {
   /// 轮询失败分级(真源 `onPollFail`):核销状态与二维码可用性是**两条链路**。
   /// 屏上还有 TTL 内的码就只横一条"状态暂未更新",码不能就这么撤下去 ——
   /// 一次轮询抖动把还能扫的码变成整屏报错,用户会以为券废了。
-  void _onPollFail(String text) {
+  void _onPollFail(_CouponFailure failure) {
     if (_useStatus == 0 && _qrState == 'ready' && _qrUrl.isNotEmpty) {
-      setState(() => _pollError = text);
+      setState(() => _pollFailure = failure);
       return;
     }
     setState(() {
       _qrState = 'error';
-      _errMsg = text;
-      _pollError = '';
+      _errMsg = '';
+      _failure = failure;
+      _pollFailure = null;
     });
   }
 
@@ -282,11 +310,11 @@ class _CouponCodePageState extends ConsumerState<CouponCodePage> {
           child: SafeArea(
             bottom: false,
             child: StatusView(
-              message: '缺少券信息',
-              sub: '请返回我的券包重新进入',
+              message: stringsOf(context).couponCodeMissing,
+              sub: stringsOf(context).couponCodeMissingDetail,
               large: true,
               onRetry: _backToWallet,
-              retryLabel: '返回',
+              retryLabel: stringsOf(context).couponCodeBack,
             ),
           ),
         ),
@@ -305,11 +333,11 @@ class _CouponCodePageState extends ConsumerState<CouponCodePage> {
             bottom: false,
             child: StatusView(
               key: const Key('coupon-code-login-gate'),
-              message: '登录后查看核销码',
-              sub: '登录完成后这张码就在这里。',
+              message: stringsOf(context).couponCodeLogin,
+              sub: stringsOf(context).couponCodeLoginDetail,
               icon: CupertinoIcons.lock,
               large: true,
-              retryLabel: '去登录',
+              retryLabel: stringsOf(context).couponCodeSignIn,
               onRetry: () async {
                 if (!await requireLogin(context, ref)) return;
                 if (!mounted) return;
@@ -333,13 +361,13 @@ class _CouponCodePageState extends ConsumerState<CouponCodePage> {
               // 使用期承诺:start 前不出码,只展示可用时间与等待(真源同此)。
               : (_notStarted
                     ? StatusView(
-                        message: '还没到可用时间',
+                        message: stringsOf(context).couponCodeNotStarted,
                         sub: _startTime.isEmpty
-                            ? '该券尚未到可使用时间'
-                            : '该券 ${_fmt(_startTime)} 起可使用',
+                            ? stringsOf(context).couponCodeNotStartedDetail
+                            : stringsOf(context).couponCodeAvailableFrom(_fmt(_startTime)),
                         large: true,
                         onRetry: _refreshToken,
-                        retryLabel: '重新获取',
+                        retryLabel: stringsOf(context).couponCodeReload,
                       )
                     : _buildShowcase()),
         ),
@@ -363,7 +391,7 @@ class _CouponCodePageState extends ConsumerState<CouponCodePage> {
       children: <Widget>[
         // 真源 cy-qr-voucher 的 title:亮码态也要说清这是哪张券的码(b1-sim S5)。
         Text(
-          _couponName,
+          _couponName.isEmpty ? stringsOf(context).couponWalletDefaultName : _couponName,
           textAlign: TextAlign.center,
           style: textTheme.titleMedium?.copyWith(
             fontSize: CyTokens.typeCardTitle,
@@ -376,7 +404,8 @@ class _CouponCodePageState extends ConsumerState<CouponCodePage> {
           // 白卡(.qr__card)只为承载可扫的码而存在,无码可扫时错误正文直接落在
           // 页面底上吃主题色(真源 scrim 上恒浅)。占住码区那块高度,换屏不跳版。
           _QrErrorState(
-            errorText: _errMsg.isEmpty ? '二维码未加载' : _errMsg,
+            errorText: _failure != null ? _failureText(_failure!)
+                : _errMsg.isEmpty ? stringsOf(context).couponCodeNotLoaded : _errMsg,
             onRetry: _refreshToken,
           )
         else
@@ -395,7 +424,7 @@ class _CouponCodePageState extends ConsumerState<CouponCodePage> {
         // 记过一次两者同屏的实拍事故),错误态只留错误块那一条出路。
         if (!error) ...<Widget>[
           Text(
-            '出示给商家扫码核销',
+            stringsOf(context).couponCodeShowMerchant,
             textAlign: TextAlign.center,
             style: textTheme.bodyMedium?.copyWith(
               fontSize: CyTokens.typeBody,
@@ -411,12 +440,12 @@ class _CouponCodePageState extends ConsumerState<CouponCodePage> {
                 padding: const EdgeInsets.symmetric(
                   horizontal: CyTokens.space3,
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: <Widget>[
-                    Icon(CupertinoIcons.refresh, size: 18),
-                    SizedBox(width: CyTokens.space1),
-                    Text('刷新二维码'),
+                    const Icon(CupertinoIcons.refresh, size: 18),
+                    const SizedBox(width: CyTokens.space1),
+                    Text(stringsOf(context).couponCodeRefresh),
                   ],
                 ),
               ),
@@ -424,10 +453,10 @@ class _CouponCodePageState extends ConsumerState<CouponCodePage> {
           ],
           // 轮询抖动的**非阻断**提示:码还在,只是核销状态这会儿读不到。
           // 不给重试按钮 —— 5s 一次的轮询自己会重试,再摆一个按钮是假选择。
-          if (_pollError.isNotEmpty) ...<Widget>[
+          if (_pollFailure != null) ...<Widget>[
             SizedBox(height: CyTokens.space3),
             Text(
-              '核销状态暂未更新',
+              stringsOf(context).couponCodePollDelayed,
               textAlign: TextAlign.center,
               style: textTheme.bodyMedium?.copyWith(
                 fontSize: CyTokens.typeBody,
@@ -436,7 +465,7 @@ class _CouponCodePageState extends ConsumerState<CouponCodePage> {
             ),
             SizedBox(height: CyTokens.space1),
             Text(
-              _pollError,
+              _failureText(_pollFailure!),
               textAlign: TextAlign.center,
               style: textTheme.bodySmall?.copyWith(
                 fontSize: CyTokens.typeCaption,
@@ -469,7 +498,7 @@ class _CouponCodePageState extends ConsumerState<CouponCodePage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Text(
-                  _couponName,
+                  _couponName.isEmpty ? stringsOf(context).couponWalletDefaultName : _couponName,
                   style: textTheme.titleMedium?.copyWith(
                     fontSize: CyTokens.typeCardTitle,
                     // 真源 `.cq-name` 是 600,不是 700。
@@ -492,7 +521,7 @@ class _CouponCodePageState extends ConsumerState<CouponCodePage> {
                 if (_endTimeText.isNotEmpty && _useStatus == 2) ...<Widget>[
                   SizedBox(height: CyTokens.space3),
                   Text(
-                    '有效期至 $_endTimeText',
+                    stringsOf(context).couponCodeValidUntil(_endTimeText),
                     // 真源 `.cq-valid`:text-tertiary @ caption。
                     style: textTheme.bodySmall?.copyWith(
                       fontSize: CyTokens.typeCaption,
@@ -526,7 +555,7 @@ class _CouponCodePageState extends ConsumerState<CouponCodePage> {
           ),
           SizedBox(height: CyTokens.space4),
           Text(
-            '已核销',
+            stringsOf(context).couponCodeVerified,
             textAlign: TextAlign.center,
             style: textTheme.titleMedium?.copyWith(
               fontSize: CyTokens.typeSectionTitle,
@@ -552,9 +581,9 @@ class _CouponCodePageState extends ConsumerState<CouponCodePage> {
           // danger 色留给券面上的状态胶囊,结果标题不刷红。
           Text(
             switch (_useStatus) {
-              2 => '该券已过期',
-              3 => '该券已失效',
-              _ => '券状态待确认',
+              2 => stringsOf(context).couponCodeExpired,
+              3 => stringsOf(context).couponCodeInvalid,
+              _ => stringsOf(context).couponCodeUnknown,
             },
             textAlign: TextAlign.center,
             style: textTheme.titleMedium?.copyWith(
@@ -627,7 +656,7 @@ class _CodeCard extends StatelessWidget {
           if (ready && countdown != null) ...<Widget>[
             SizedBox(height: CyTokens.space3),
             Text(
-              '二维码 $countdown s 后自动刷新',
+              stringsOf(context).couponCodeCountdown(countdown!),
               textAlign: TextAlign.center,
               // 白色码卡内用深色字。
               style: const TextStyle(
@@ -685,7 +714,7 @@ class _QrErrorState extends StatelessWidget {
               ),
             ),
             SizedBox(height: CyTokens.space2),
-            CyNativeButton(label: '重试', onPressed: onRetry),
+            CyNativeButton(label: stringsOf(context).couponCodeRetry, onPressed: onRetry),
           ],
         ),
       ),

@@ -1,3 +1,5 @@
+import 'coop_strings.dart';
+import '../../l10n/strings.dart';
 // 邀约对象选择器 —— 对应小程序 pages/coop/invite 里那段 targets 加载。
 //
 // App 的邀约页此前**没有「选谁」这一步**:必须从「附近商家」或「伙伴」
@@ -104,14 +106,14 @@ class _PickerState extends ConsumerState<_Picker> {
       backgroundColor: p.bgPage,
       navigationBar: CupertinoNavigationBar(
         middle: Text(
-          '选择要邀请的${widget.type == CoopInviteType.merchant ? '商家' : '俱乐部'}',
+          stringsOf(context).coopChooseTargets(coopInviteTypeLabel(context, widget.type)),
         ),
         leading: CupertinoButton(
           key: const Key('coop-target-cancel'),
           minimumSize: const Size(44, 44),
           padding: EdgeInsets.zero,
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('取消'),
+          child: Text(stringsOf(context).cancel),
         ),
         trailing: CupertinoButton(
           key: const Key('coop-target-done'),
@@ -126,7 +128,7 @@ class _PickerState extends ConsumerState<_Picker> {
                   .toList(),
             );
           },
-          child: Text('确定(${_picked.length})'),
+          child: Text(stringsOf(context).coopConfirmCount(_picked.length)),
         ),
       ),
       child: SafeArea(
@@ -134,20 +136,20 @@ class _PickerState extends ConsumerState<_Picker> {
         child: v.when(
           loading: () => const Center(child: CupertinoActivityIndicator()),
           error: (Object e, StackTrace _) => StatusView(
-            message: '候选名单没加载出来',
-            sub: '网络可能不稳定,稍后再试',
+            message: stringsOf(context).coopCandidateListLoadFailed,
+            sub: stringsOf(context).coopUnstableNetwork,
             large: true,
             onRetry: () => ref.invalidate(coopTargetsProvider(widget.type)),
           ),
           data: (List<CoopInviteTarget> rows) => rows.isEmpty
               ? StatusView(
                   message: widget.type == CoopInviteType.merchant
-                      ? '暂时没有可对接的商家'
-                      : '暂时没有可邀请的俱乐部',
+                      ? stringsOf(context).coopNoBusinesses
+                      : stringsOf(context).coopNoClubs,
                   // ★ 说清判据 —— 否则用户以为是自己搜错了。
                   sub: widget.type == CoopInviteType.merchant
-                      ? '只有开放合作、且已通过审核的商家会出现在这里'
-                      : '只有已开放的俱乐部会出现在这里',
+                      ? stringsOf(context).coopEligibleBusinesses
+                      : stringsOf(context).coopEligibleClubs,
                   large: true,
                 )
               : ListView.builder(
@@ -168,7 +170,7 @@ class _PickerState extends ConsumerState<_Picker> {
                       enabled: !dup,
                       button: true,
                       label: t.name,
-                      value: dup ? '已在本次邀约里' : (selected ? '已选择' : '未选择'),
+                      value: dup ? stringsOf(context).coopAlreadyInvited : (selected ? stringsOf(context).coopSelected : stringsOf(context).coopNotSelected),
                       child: CupertinoButton(
                         key: Key('coop-target-${t.toId}'),
                         minimumSize: const Size.fromHeight(52),
@@ -194,7 +196,7 @@ class _PickerState extends ConsumerState<_Picker> {
                                   Text(t.name),
                                   if (dup)
                                     Text(
-                                      '已在本次邀约里',
+                                      stringsOf(context).coopAlreadyInvited,
                                       style: Theme.of(context)
                                           .textTheme
                                           .bodySmall

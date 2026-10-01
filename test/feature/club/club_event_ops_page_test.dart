@@ -9,6 +9,7 @@
 //   - 出勤更正 requestId 幂等:网络失败复用同一键,4xx 明确失败才丢。
 
 import 'package:flutter/cupertino.dart';
+import 'package:chengyin_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -29,10 +30,13 @@ import 'package:chengyin_app/feature/club/club_ops_access.dart';
 /// 原生输入弹窗在测试里退成 Cupertino Alert,输入框固定这个 key。
 const Key _reasonFieldKey = Key('cy-system-input-alert-field');
 
-Widget _app(Widget home, List<dynamic> overrides) {
+Widget _app(Widget home, List<dynamic> overrides, {Locale locale = const Locale('zh')}) {
   return ProviderScope(
     overrides: overrides.cast(),
     child: MaterialApp(
+      locale: locale,
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
       theme: ThemeData(useMaterial3: true),
       debugShowCheckedModeBanner: false,
       home: home,
@@ -335,6 +339,7 @@ Future<void> _pumpPage(
   ClubOpsAccess? access,
   ClubOpsApi? opsApi,
   ClubApi? clubApi,
+  Locale locale = const Locale('zh'),
 }) async {
   final _FakeClubOpsApi fake = opsApi is _FakeClubOpsApi
       ? opsApi
@@ -347,12 +352,37 @@ Future<void> _pumpPage(
         clubOpsApiProvider.overrideWithValue(fake),
         clubApiProvider.overrideWithValue(clubApi ?? _FakeClubApi()),
       ],
+      locale: locale,
     ),
   );
   await tester.pumpAndSettle();
 }
 
 void main() {
+  testWidgets('English operations denies check-in without a session', (tester) async {
+    final fake = _FakeClubOpsApi();
+    await _pumpPage(tester, activityId: null, opsApi: fake,
+      access: _access(manage: false, checkin: true), locale: const Locale('en'));
+    expect(find.text('You cannot manage event operations'), findsOneWidget);
+    expect(find.byKey(const Key('event-ops-submit')), findsNothing);
+    expect(fake.creates, isEmpty);
+    expect(fake.cancels, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('English series editor keeps the original topic name', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final fake = _FakeClubOpsApi();
+    await _pumpPage(tester, activityId: null, opsApi: fake, locale: const Locale('en'));
+    expect(find.text('No session series yet'), findsOneWidget);
+    expect(find.text('静安夜跑'), findsOneWidget);
+    expect(find.text('Weekly'), findsOneWidget);
+    expect(find.byKey(const Key('event-ops-recurrence-WEEKLY')), findsOneWidget);
+    expect(fake.creates, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
   group('event-ops:E-07 主题预选', () {
     testWidgets('带 topicId 进来 → 主题下拉预选到它;找不到维持第一个', (
       WidgetTester tester,

@@ -1,3 +1,5 @@
+import 'club_api_messages.dart';
+import '../../l10n/strings.dart';
 import 'dart:async';
 import 'dart:typed_data';
 
@@ -53,12 +55,15 @@ class ClubGroupCodePage extends ConsumerStatefulWidget {
 /// 重试必然再失败,出路只有「进入俱乐部管理」 —— 对齐小程序 E-12 之后的四态。
 /// 别把它们并进 `error`:那正是小程序修掉的老毛病(通用失败 + 重试,
 /// 用户点一辈子也出不来)。
+enum _GcLocalFailure { activities, issue }
+
 enum _GcState { loading, ready, error, selecting, empty, invalid, noPermission }
 
 class _ClubGroupCodePageState extends ConsumerState<ClubGroupCodePage> {
   _GcState _state = _GcState.loading;
   String _errMsg = '';
-  String _title = '';
+  _GcLocalFailure _localFailure = _GcLocalFailure.issue;
+  String? _title;
   GroupCodeIssue? _issue;
   List<GroupCodeActivity> _options = const <GroupCodeActivity>[];
   int? _selectedActivityId;
@@ -70,7 +75,7 @@ class _ClubGroupCodePageState extends ConsumerState<ClubGroupCodePage> {
     super.initState();
     _title = widget.activityName?.isNotEmpty ?? false
         ? widget.activityName!
-        : (widget.topicName?.isNotEmpty ?? false ? widget.topicName! : '本团');
+        : (widget.topicName?.isNotEmpty ?? false ? widget.topicName! : null);
     if (widget.activityId != null && widget.activityId! > 0) {
       _issueWithActivity();
     } else if (widget.topicId != null && widget.topicId! > 0) {
@@ -118,13 +123,13 @@ class _ClubGroupCodePageState extends ConsumerState<ClubGroupCodePage> {
       if (!mounted) return;
       setState(() {
         _state = _GcState.noPermission;
-        _errMsg = e.message;
+        _errMsg = clubApiErrorMessage(context, e);
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _state = _GcState.error;
-        _errMsg = '场次加载失败';
+        _localFailure = _GcLocalFailure.activities;
       });
     }
   }
@@ -153,13 +158,13 @@ class _ClubGroupCodePageState extends ConsumerState<ClubGroupCodePage> {
       if (!mounted) return;
       setState(() {
         _state = _GcState.noPermission;
-        _errMsg = e.message;
+        _errMsg = clubApiErrorMessage(context, e);
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _state = _GcState.error;
-        _errMsg = '出码失败';
+        _localFailure = _GcLocalFailure.issue;
       });
     }
   }
@@ -212,11 +217,11 @@ class _ClubGroupCodePageState extends ConsumerState<ClubGroupCodePage> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
               CyPageTitle(
-                _selecting ? '选择场次' : '团核销码',
+                _selecting ? stringsOf(context).clubGroupCodeSelect : stringsOf(context).clubGroupCodeTitle,
                 subtitle: switch (_state) {
-                  _GcState.selecting || _GcState.empty => '选择本次带队场次',
-                  _GcState.invalid => '请从俱乐部管理进入具体场次',
-                  _GcState.noPermission => '当前账号不能出示这一场的团码',
+                  _GcState.selecting || _GcState.empty => stringsOf(context).clubGroupCodeSelectBody,
+                  _GcState.invalid => stringsOf(context).clubGroupCodeOpenSession,
+                  _GcState.noPermission => stringsOf(context).clubGroupCodeAccountDenied,
                   _ => null,
                 },
               ),
@@ -224,14 +229,14 @@ class _ClubGroupCodePageState extends ConsumerState<ClubGroupCodePage> {
                 child: switch (_state) {
                   _GcState.selecting || _GcState.empty => _buildSelector(),
                   _GcState.invalid => _buildTerminal(
-                    title: '缺少路线或场次信息',
-                    sub: '返回俱乐部，选择具体场次后再出示团码',
+                    title: stringsOf(context).clubGroupCodeMissing,
+                    sub: stringsOf(context).clubGroupCodeMissingBody,
                     icon: CupertinoIcons.exclamationmark_triangle,
                   ),
                   _GcState.noPermission => _buildTerminal(
-                    title: '当前账号没有出码权限',
+                    title: stringsOf(context).clubGroupCodeDenied,
                     sub: _errMsg.isEmpty
-                        ? '出码按下单归属只给主理人、管理员或本场领队，回俱乐部管理可以查看自己名下的场次。'
+                        ? stringsOf(context).clubGroupCodeDeniedBody
                         : _errMsg,
                     icon: CupertinoIcons.lock,
                   ),
@@ -264,12 +269,12 @@ class _ClubGroupCodePageState extends ConsumerState<ClubGroupCodePage> {
           child: CupertinoButton(
             key: const Key('group-code-manage'),
             onPressed: () => context.go(kClubsRoute),
-            child: const Row(
+            child: Row(
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
-                Text('进入俱乐部管理'),
-                SizedBox(width: CyTokens.space1),
-                Icon(CupertinoIcons.chevron_forward, size: 16),
+                Text(stringsOf(context).clubGroupCodeManage),
+                const SizedBox(width: CyTokens.space1),
+                const Icon(CupertinoIcons.chevron_forward, size: 16),
               ],
             ),
           ),
@@ -283,22 +288,22 @@ class _ClubGroupCodePageState extends ConsumerState<ClubGroupCodePage> {
     return ListView(
       padding: const EdgeInsets.all(CyTokens.space4),
       children: <Widget>[
-        const CySectionTitle('选择场次'),
+        CySectionTitle(stringsOf(context).clubGroupCodeSelect),
         const SizedBox(height: CyTokens.space1),
         Text(
-          '选择本次带队场次',
+          stringsOf(context).clubGroupCodeSelectBody,
           style: textTheme.labelSmall?.copyWith(color: CyTokens.textTertiary),
         ),
         const SizedBox(height: CyTokens.space1),
         Text(
-          '团码只登记当前场次，不能跨场次使用。商家扫码后按人数核销。',
+          stringsOf(context).clubGroupCodeScope,
           style: textTheme.labelSmall?.copyWith(color: CyTokens.textTertiary),
         ),
         const SizedBox(height: CyTokens.space4),
         if (_state == _GcState.empty)
-          const StatusView(
-            message: '暂无可带队的场次',
-            sub: '当前路线还没有开放报名的场次，开放后会显示在这里',
+          StatusView(
+            message: stringsOf(context).clubGroupCodeNoSessions,
+            sub: stringsOf(context).clubGroupCodeNoSessionsBody,
             icon: Icons.event_busy_outlined,
           )
         else
@@ -343,12 +348,14 @@ class _ClubGroupCodePageState extends ConsumerState<ClubGroupCodePage> {
         child: switch (_state) {
           _GcState.loading => const CupertinoActivityIndicator(),
           _GcState.error => StatusView(
-            message: _errMsg.isEmpty ? '出码失败' : _errMsg,
-            sub: '请重试',
+            message: _localFailure == _GcLocalFailure.activities
+                ? stringsOf(context).clubGroupCodeActivitiesFailed
+                : stringsOf(context).clubGroupCodeIssueFailed,
+            sub: stringsOf(context).clubGroupCodeRetry,
             icon: CupertinoIcons.exclamationmark_triangle,
             onRetry: _onRetry,
           ),
-          _ => _QrCard(title: '$_title · 团核销码', issue: _issue),
+          _ => _QrCard(title: stringsOf(context).clubGroupCodeNamedTitle(_title ?? stringsOf(context).clubGroupCodeFallbackTitle), issue: _issue),
         },
       ),
     );
@@ -373,7 +380,7 @@ class _QrCardState extends ConsumerState<_QrCard> {
   Future<void> _saveToAlbum() async {
     final String url = widget.issue?.qrcodeUrl ?? '';
     if (url.isEmpty) {
-      CyNativeNotice.show(context, '团码还没生成', isError: true);
+      CyNativeNotice.show(context, stringsOf(context).clubGroupCodeNotReady, isError: true);
       return;
     }
     setState(() => _saving = true);
@@ -387,18 +394,18 @@ class _QrCardState extends ConsumerState<_QrCard> {
       setState(() => _saving = false);
       CyNativeNotice.show(
         context,
-        e.toString().replaceFirst('Exception: ', ''),
+        clubApiErrorMessage(context, e),
         isError: true,
       );
       return;
     }
     try {
-      await saveGroupCodeToAlbum(bytes, '团核销码');
+      await saveGroupCodeToAlbum(bytes, _groupCodeAlbumAssetName);
       if (!mounted) return;
-      CyNativeNotice.show(context, '已存到相册，可打印后贴在站点');
+      CyNativeNotice.show(context, stringsOf(context).clubGroupCodeSaved);
     } catch (_) {
       if (!mounted) return;
-      CyNativeNotice.show(context, '没能存进相册，检查存储空间后再试', isError: true);
+      CyNativeNotice.show(context, stringsOf(context).clubGroupCodeSaveFailed, isError: true);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -416,7 +423,7 @@ class _QrCardState extends ConsumerState<_QrCard> {
         Text(widget.title, style: textTheme.titleMedium),
         const SizedBox(height: CyTokens.space2),
         Text(
-          '仅限本场次合作商家扫码，登记本团接待',
+          stringsOf(context).clubGroupCodeMerchantOnly,
           style: textTheme.labelSmall?.copyWith(color: CyTokens.textTertiary),
         ),
         const SizedBox(height: CyTokens.space4),
@@ -445,7 +452,7 @@ class _QrCardState extends ConsumerState<_QrCard> {
           const SizedBox(height: CyTokens.space4),
           CyNativeButton(
             key: const Key('group-code-save'),
-            label: _saving ? '保存中…' : '保存到相册',
+            label: _saving ? stringsOf(context).clubGroupCodeSaving : stringsOf(context).clubGroupCodeSave,
             role: CyNativeButtonRole.secondary,
             loading: _saving,
             onPressed: _saving ? null : _saveToAlbum,
@@ -478,3 +485,5 @@ class _CodeFallback extends StatelessWidget {
     );
   }
 }
+
+const _groupCodeAlbumAssetName = '团核销码';

@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:mjn_liquid_ui/mjn_liquid_ui.dart';
 
 import '../../core/providers.dart';
+import '../../l10n/strings.dart';
+import '../../l10n/app_localizations.dart';
 import '../../core/theme/cy_tokens.dart';
 import '../../data/models/scan_result.dart';
 
@@ -11,6 +13,17 @@ import '../../data/models/scan_result.dart';
 /// 在整个核销第二步上复用同一 Future，既避免把该 `true`
 /// 误解成“用户关闭且未选”，也避免同票并发提交两次。
 Future<String>? _activeScanChoiceResolution;
+
+String localizedScanMessage(ScanResult result, AppLocalizations strings) =>
+    switch (result.messageFallback) {
+      ScanMessageFallback.chapterChoice => strings.merchantRedemptionChooseChapter,
+      ScanMessageFallback.stationChoice => strings.merchantRedemptionChooseStation,
+      ScanMessageFallback.redeemed => strings.merchantRedemptionSuccess,
+      ScanMessageFallback.failed => strings.merchantRedemptionFailed,
+      null => result.message,
+    };
+
+
 
 /// 处理三态结果。★ **needsChoice 不是失败** ——
 /// 它带着候选列表,要让商家选一个再提交第二步。
@@ -22,12 +35,13 @@ Future<String> resolveScanChoice({
   required String code,
 }) async {
   final ScanResult r = result;
-  if (r.outcome == ScanOutcome.redeemed) return r.message;
-  if (!r.needsChoice) throw Exception(r.message);
+  final message = localizedScanMessage(r, stringsOf(context));
+  if (r.outcome == ScanOutcome.redeemed) return message;
+  if (!r.needsChoice) throw Exception(message);
 
   if (r.choices.isEmpty) {
     // 后端说要选,却没给候选 —— 说实话,别摆一个空面板让人干瞪眼。
-    throw Exception('${r.message}(这次没有拿到可选项,请联系平台)');
+    throw Exception(stringsOf(context).merchantRedemptionNoChoices(message));
   }
 
   final Future<String>? active = _activeScanChoiceResolution;
@@ -55,13 +69,15 @@ Future<String> _resolvePendingScanChoice({
   required ScanResult result,
   required String code,
 }) async {
+  final strings = stringsOf(context);
+  final cancelledMessage = strings.merchantRedemptionCancelled;
   final ScanChoice? picked = await _showScanChoice(
     context: context,
-    message: result.message,
+    message: localizedScanMessage(result, strings),
     choices: result.choices,
   );
   // 商家关掉面板 = 没选 = 这次核销没做,如实说,不要伪装成失败。
-  if (picked == null) throw Exception('已取消,这张票还没核销');
+  if (picked == null) throw Exception(cancelledMessage);
 
   final ScanResult second = result.choiceKind == 'station'
       // ⚠️ 站点这一步传的是**中标记录 ID**,不是站点 id(见 API 注释)。
@@ -71,8 +87,9 @@ Future<String> _resolvePendingScanChoice({
       : await ref
             .read(registrationApiProvider)
             .scanChapter(code: code, chapterId: picked.id);
-  if (second.outcome == ScanOutcome.redeemed) return second.message;
-  throw Exception(second.message);
+  final message = localizedScanMessage(second, strings);
+  if (second.outcome == ScanOutcome.redeemed) return message;
+  throw Exception(message);
 }
 
 Future<ScanChoice?> _showScanChoice({
@@ -89,7 +106,7 @@ Future<ScanChoice?> _showScanChoice({
       backgroundZoomScale: 1,
       content: AppleLiquidSheetContent(
         title: message,
-        doneSemanticLabel: '关闭',
+        doneSemanticLabel: stringsOf(context).merchantRedemptionClose,
         sections: <AppleLiquidSheetSection>[
           AppleLiquidSheetSection(
             rows: choices
@@ -134,7 +151,7 @@ Future<ScanChoice?> _showScanChoice({
       cancelButton: CupertinoActionSheetAction(
         isDefaultAction: true,
         onPressed: () => Navigator.of(sheetContext).pop(),
-        child: const Text('取消'),
+        child: Text(stringsOf(context).cancel),
       ),
     ),
   );
