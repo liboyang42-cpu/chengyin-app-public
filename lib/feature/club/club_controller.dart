@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/providers.dart';
+import '../../core/network/request_session_scope.dart';
+import '../auth/auth_controller.dart';
 import '../../data/api/my_project_api.dart';
 import '../../data/models/club.dart';
 import '../../data/models/club_access.dart';
@@ -98,9 +100,21 @@ final clubDissolutionBlockersProvider = FutureProvider.autoDispose
 /// 一个团的报名明细(票种 + 报名者)。
 final clubTeamDetailProvider = FutureProvider.autoDispose
     .family<TeamDetail, ({int clubId, int topicId})>((ref, key) {
-      return ref
+      final session = ref.read(authControllerProvider.notifier).requestScope(
+        ref.read(authControllerProvider).user?.id ?? -1,
+      );
+      bool active = true;
+      ref.onDispose(() => active = false);
+      return RequestSessionScope.run(
+        RequestSessionScope(() => active && session.isCurrent()),
+        () async {
+          final result = await ref
           .watch(clubApiProvider)
           .topicRegistrations(clubId: key.clubId, topicId: key.topicId);
+          if (!active || !session.isCurrent()) throw StateError('Session changed');
+          return result;
+        },
+      );
     });
 
 /// 探店日候选期次(执行俱乐部真源)。
@@ -149,12 +163,24 @@ final clubCustomerDetailProvider = FutureProvider.autoDispose
 /// 核销详情(按俱乐部 + 报名单)。
 final clubCheckinDetailProvider = FutureProvider.autoDispose
     .family<ClubCheckinDetail, ({int clubId, int registrationId})>((ref, key) {
-      return ref
+      final session = ref.read(authControllerProvider.notifier).requestScope(
+        ref.read(authControllerProvider).user?.id ?? -1,
+      );
+      bool active = true;
+      ref.onDispose(() => active = false);
+      return RequestSessionScope.run(
+        RequestSessionScope(() => active && session.isCurrent()),
+        () async {
+          final result = await ref
           .watch(clubCrmApiProvider)
           .checkinDetail(
             clubId: key.clubId,
             registrationId: key.registrationId,
           );
+          if (!active || !session.isCurrent()) throw StateError('Session changed');
+          return result;
+        },
+      );
     });
 
 /// 俱乐部分润汇总(仅主理人/管理员)。

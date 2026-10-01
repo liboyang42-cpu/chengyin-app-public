@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../../core/network/dio_client.dart';
+import '../../core/network/request_session_scope.dart';
 import '../models/club_access.dart';
 import '../models/club_crm.dart';
 import '../models/club_settlement.dart';
@@ -147,7 +148,7 @@ class ClubCrmApi {
           .post<Map<String, dynamic>>(
             path,
             data: body,
-            options: Options(contentType: Headers.jsonContentType),
+            options: RequestSessionScope.options(Options(contentType: Headers.jsonContentType)),
           );
       return resp.data ?? <String, dynamic>{};
     } on DioException catch (error) {

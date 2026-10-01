@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
 import '../../core/network/dio_client.dart';
+import '../../core/network/request_session_scope.dart';
+import '../models/registration_cancellation_outcome.dart';
 import '../models/club.dart';
 import '../models/club_comment.dart';
 import '../models/club_post.dart';
@@ -7,7 +9,8 @@ import '../models/club_manage.dart';
 
 /// 后端业务错误(AjaxResult.code != 200),携带后端原文 msg。
 class ClubApiException implements Exception {
-  ClubApiException(this.message, {this.data});
+  ClubApiException(this.message, {this.data, this.isLocal = false});
+  final bool isLocal;
   final String message;
 
   /// 后端回的错误明细(如解散阻断的 actionItems)。
@@ -112,6 +115,7 @@ class ClubApi {
       final data = body['data'];
       throw ClubApiException(
         (body['msg'] as String?) ?? '请求失败',
+        isLocal: body['msg'] == null,
         data: data is Map<String, dynamic> ? data : null,
       );
     }
@@ -125,7 +129,7 @@ class ClubApi {
     final resp = await _client.dio.post<Map<String, dynamic>>(
       path,
       data: body,
-      options: Options(contentType: Headers.jsonContentType),
+      options: RequestSessionScope.options(Options(contentType: Headers.jsonContentType)),
     );
     return resp.data ?? <String, dynamic>{};
   }
@@ -270,14 +274,17 @@ class ClubApi {
   }
 
   /// 主理人清退某条报名并退款:`POST /api/registration/cancel-by-owner`。
-  Future<void> cancelRegistrationByOwner(int registrationId) async {
+  Future<RegistrationCancellationOutcome> cancelRegistrationByOwner(int registrationId) async {
     final resp = await _client.dio.post<Map<String, dynamic>>(
       '/api/registration/cancel-by-owner',
+      options: RequestSessionScope.options(),
       data: FormData.fromMap(<String, dynamic>{
         'id': registrationId.toString(),
       }),
     );
-    _ensureOk(resp.data ?? <String, dynamic>{});
+    final body = resp.data ?? <String, dynamic>{};
+    _ensureOk(body);
+    return RegistrationCancellationOutcome.fromResponse(body);
   }
 
   /// 俱乐部帖文流:`POST /api/club/post/feed`(JSON body)。

@@ -1,3 +1,7 @@
+import '../../l10n/strings.dart';
+import '../../core/network/request_session_scope.dart';
+import 'registration_cancellation_display.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
@@ -40,13 +44,21 @@ class ClubEnrollPage extends ConsumerStatefulWidget {
 }
 
 class _ClubEnrollPageState extends ConsumerState<ClubEnrollPage> {
+  late final RequestSessionScope _refundScope;
+  late final int? _refundOwnerId;
+  bool get _ownsRefund => mounted && _refundScope.isCurrent();
   int? _resolvedClubId;
   String _resolvedName = '';
   int? _refundingRegId;
+  final Set<int> _submittedRefunds = <int>{};
 
   @override
   void initState() {
     super.initState();
+    _refundOwnerId = ref.read(authControllerProvider).user?.id;
+    _refundScope = ref.read(authControllerProvider.notifier).requestScope(
+      _refundOwnerId ?? -1,
+    );
     _resolvedClubId = widget.clubId;
     _resolvedName = widget.clubName ?? '';
     if (widget.clubId == null) _resolveClub();
@@ -75,54 +87,72 @@ class _ClubEnrollPageState extends ConsumerState<ClubEnrollPage> {
     int clubId,
     int topicId,
   ) async {
-    if (_refundingRegId != null) return;
-    final name = (reg.nickname?.isNotEmpty ?? false) ? reg.nickname! : '该玩家';
+    if (!_ownsRefund || _refundingRegId != null) return;
+    if (_submittedRefunds.contains(reg.id)) {
+      CyNativeNotice.show(context, stringsOf(context).clubCancellationSubmitted);
+      ref.invalidate(clubTeamDetailProvider((clubId: clubId, topicId: topicId)));
+      return;
+    }
+    final name = (reg.nickname?.isNotEmpty ?? false) ? reg.nickname! : stringsOf(context).clubEnrollPlayerTarget;
     final bool confirmed = await cyConfirm(
       context,
-      title: '清退并退款',
-      content: '确认为「$name」退款并移出本团?退款将退至其余额/积分,不可撤销。',
-      confirmText: '退款',
+      title: stringsOf(context).clubEnrollRefundTitle,
+      content: stringsOf(context).clubEnrollRefundBody(name),
+      confirmText: stringsOf(context).clubEnrollRefund,
       danger: true,
     );
-    if (!confirmed || !mounted) return;
+    if (!confirmed || !_ownsRefund || _refundingRegId != null || _submittedRefunds.contains(reg.id)) return;
 
     setState(() => _refundingRegId = reg.id);
     try {
-      await ref.read(clubApiProvider).cancelRegistrationByOwner(reg.id);
-      if (!mounted) return;
-      CyNativeNotice.show(context, '已退款');
+      final outcome = await RequestSessionScope.run(_refundScope,
+          () => ref.read(clubApiProvider).cancelRegistrationByOwner(reg.id));
+      if (!_ownsRefund) return;
+      _submittedRefunds.add(reg.id);
+      CyNativeNotice.show(context, registrationCancellationNotice(context, outcome));
       // 重新拉该团报名详情(清退后名单/人数变化)。
       ref.invalidate(
         clubTeamDetailProvider((clubId: clubId, topicId: topicId)),
       );
     } catch (e) {
-      if (!mounted) return;
-      CyNativeNotice.show(context, e.toString(), isError: true);
+      if (!_ownsRefund) return;
+      if (e is DioException && (e.response == null || (e.response?.statusCode ?? 0) >= 500)) {
+        _submittedRefunds.add(reg.id);
+        ref.invalidate(clubTeamDetailProvider((clubId: clubId, topicId: topicId)));
+        CyNativeNotice.show(context, stringsOf(context).clubCheckinRefundUnknownBody, isError: true);
+        return;
+      }
+      CyNativeNotice.show(context, registrationCancellationError(context, e), isError: true);
     } finally {
-      if (mounted) setState(() => _refundingRegId = null);
+      if (_ownsRefund) setState(() => _refundingRegId = null);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(authControllerProvider);
+    if (ref.read(authControllerProvider).user?.id != _refundOwnerId ||
+        (_refundOwnerId != null && !_refundScope.isCurrent())) {
+      return CupertinoPageScaffold(child: StatusView(message: stringsOf(context).loginExpired));
+    }
     final int? clubId = _resolvedClubId;
     if (clubId == null) {
       // 未传 clubId 且取不到我拥有的俱乐部:提示无权限。
       return CupertinoPageScaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         navigationBar: const CupertinoNavigationBar(),
-        child: const Material(
+        child: Material(
           color: Colors.transparent,
           child: SafeArea(
             bottom: false,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
-                CyPageTitle('报名名册'),
+                CyPageTitle(stringsOf(context).clubEnrollTitle),
                 Expanded(
                   child: StatusView(
-                    message: '没有权限查看报名名册',
-                    sub: '仅俱乐部主理人或管理员可查看报名名册',
+                    message: stringsOf(context).clubEnrollDenied,
+                    sub: stringsOf(context).clubEnrollDeniedBody,
                     icon: CupertinoIcons.lock,
                     large: true,
                   ),
@@ -182,16 +212,16 @@ class _EnrollBody extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              const CyPageTitle('报名名册'),
+              CyPageTitle(stringsOf(context).clubEnrollTitle),
               Expanded(
                 child: detail.when(
-                  loading: () => const CySkeleton(label: '正在确认报名名册查看权限'),
+                  loading: () => CySkeleton(label: stringsOf(context).clubEnrollCheckingAccess),
                   error: (Object err, StackTrace st) {
                     // 401 排在网络/业务两态之前(#258 同型):游客从没登录过,
                     // 「暂时无法确认查看权限」+「重新检查」是死路。
                     if (clubLoginRequired(err)) {
                       return ClubLoginGate(
-                        message: '登录后查看报名名册',
+                        message: stringsOf(context).clubEnrollLogin,
                         onSignedIn: () =>
                             ref.invalidate(clubDetailProvider(clubId)),
                       );
@@ -202,10 +232,10 @@ class _EnrollBody extends ConsumerWidget {
                         clubOpsFailureState(err) ==
                         ClubOpsLoadState.networkError;
                     return StatusView(
-                      message: network ? '网络连接失败' : '暂时无法确认查看权限',
-                      sub: clubOpsErrorMessage(err, '俱乐部数据暂时不可用'),
+                      message: network ? stringsOf(context).clubEnrollNetworkFailed : stringsOf(context).clubEnrollAccessUnknown,
+                      sub: clubOpsErrorMessage(err, stringsOf(context).clubEnrollDataUnavailable),
                       icon: CupertinoIcons.exclamationmark_triangle,
-                      retryLabel: '重新检查',
+                      retryLabel: stringsOf(context).clubEnrollRecheck,
                       onRetry: () => ref.invalidate(clubDetailProvider(clubId)),
                     );
                   },
@@ -220,20 +250,20 @@ class _EnrollBody extends ConsumerWidget {
                         false;
                     final hasPermission = club.isOwner || isAdmin;
                     if (!hasPermission) {
-                      return const StatusView(
-                        message: '没有权限查看报名名册',
-                        sub: '仅俱乐部主理人或管理员可查看报名名册',
+                      return StatusView(
+                        message: stringsOf(context).clubEnrollDenied,
+                        sub: stringsOf(context).clubEnrollDeniedBody,
                         icon: CupertinoIcons.lock,
                         large: true,
                       );
                     }
                     return teams.when(
-                      loading: () => const CySkeleton(label: '正在加载报名名册'),
+                      loading: () => CySkeleton(label: stringsOf(context).clubEnrollLoading),
                       error: (Object err, StackTrace st) {
                         // 名册层同口径:401(token 中途过期)不冒充「加载失败」。
                         if (clubLoginRequired(err)) {
                           return ClubLoginGate(
-                            message: '登录后查看报名名册',
+                            message: stringsOf(context).clubEnrollLogin,
                             onSignedIn: () =>
                                 ref.invalidate(clubTopicsProvider(clubId)),
                           );
@@ -242,19 +272,19 @@ class _EnrollBody extends ConsumerWidget {
                             clubOpsFailureState(err) ==
                             ClubOpsLoadState.networkError;
                         return StatusView(
-                          message: network ? '网络连接失败' : '报名名册加载失败',
-                          sub: network ? '检查网络后重新加载报名名册' : '俱乐部数据暂时不可用',
+                          message: network ? stringsOf(context).clubEnrollNetworkFailed : stringsOf(context).clubEnrollLoadFailed,
+                          sub: network ? stringsOf(context).clubEnrollNetworkRetry : stringsOf(context).clubEnrollDataUnavailable,
                           icon: CupertinoIcons.exclamationmark_triangle,
-                          retryLabel: '重新加载',
+                          retryLabel: stringsOf(context).clubEnrollReload,
                           onRetry: () =>
                               ref.invalidate(clubTopicsProvider(clubId)),
                         );
                       },
                       data: (List<ClubTopic> list) {
                         if (list.isEmpty) {
-                          return const StatusView(
-                            message: '还没有城市定向团',
-                            sub: '在发布器选择「城市定向」票种并归属本俱乐部,即可在此查看报名名册。',
+                          return StatusView(
+                            message: stringsOf(context).clubEnrollNoGroups,
+                            sub: stringsOf(context).clubEnrollNoGroupsBody,
                             icon: CupertinoIcons.calendar,
                             large: true,
                           );
@@ -264,14 +294,14 @@ class _EnrollBody extends ConsumerWidget {
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: <Widget>[
                             Padding(
-                              padding: EdgeInsets.fromLTRB(
+                              padding: const EdgeInsets.fromLTRB(
                                 CyTokens.pageX,
                                 0,
                                 CyTokens.pageX,
                                 CyTokens.space2,
                               ),
                               child: Text(
-                                '${clubName.isEmpty ? '我的俱乐部' : clubName} · 共 ${list.length} 个团',
+                                stringsOf(context).clubEnrollGroupCount(clubName.isEmpty ? stringsOf(context).clubEnrollMyClub : clubName, list.length),
                                 style: Theme.of(context).textTheme.labelMedium
                                     ?.copyWith(color: AppColors.textSecondary),
                               ),
@@ -308,7 +338,7 @@ class _EnrollBody extends ConsumerWidget {
                                 right: CyTokens.pageX,
                               ),
                               child: Text(
-                                '报名费由平台担保托管。主理人可对未核销的报名主动清退退款。',
+                                stringsOf(context).clubEnrollEscrow,
                                 textAlign: TextAlign.center,
                                 style: Theme.of(context).textTheme.labelSmall
                                     ?.copyWith(color: CyTokens.textTertiary),
@@ -408,14 +438,14 @@ class _TeamCardState extends ConsumerState<_TeamCard> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
                         Text(
-                          widget.team.name.isEmpty ? '未命名团' : widget.team.name,
+                          widget.team.name.isEmpty ? stringsOf(context).clubEnrollUnnamedGroup : widget.team.name,
                           style: textTheme.bodyMedium,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: CyTokens.space1),
                         Text(
-                          '${widget.team.dateText.isEmpty ? '时间待定' : widget.team.dateText} · 已报名 ${widget.team.signupCount} 人',
+                          stringsOf(context).clubEnrollDateCount(widget.team.dateText.isEmpty ? stringsOf(context).clubEnrollTimePending : widget.team.dateText, widget.team.signupCount),
                           style: textTheme.labelSmall?.copyWith(
                             color: AppColors.textSecondary,
                           ),
@@ -434,7 +464,7 @@ class _TeamCardState extends ConsumerState<_TeamCard> {
                                 container: true,
                                 excludeSemantics: true,
                                 button: true,
-                                label: '出示团码',
+                                label: stringsOf(context).clubEnrollShowCode,
                                 onTap: showGroupCode,
                                 child: CupertinoButton(
                                   onPressed: showGroupCode,
@@ -453,7 +483,7 @@ class _TeamCardState extends ConsumerState<_TeamCard> {
                                       ),
                                     ),
                                     child: Text(
-                                      '出示团码',
+                                      stringsOf(context).clubEnrollShowCode,
                                       style: textTheme.labelSmall?.copyWith(
                                         color: CyTokens.textSecondary,
                                       ),
@@ -522,7 +552,7 @@ class _TeamDetailSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     return Padding(
-      padding: EdgeInsets.fromLTRB(
+      padding: const EdgeInsets.fromLTRB(
         CyTokens.space3,
         0,
         CyTokens.space3,
@@ -534,7 +564,7 @@ class _TeamDetailSection extends StatelessWidget {
           child: Center(
             child: Semantics(
               liveRegion: true,
-              label: '正在加载报名详情',
+              label: stringsOf(context).clubEnrollDetailsLoading,
               child: const SizedBox(
                 width: 20,
                 height: 20,
@@ -549,7 +579,7 @@ class _TeamDetailSection extends StatelessWidget {
             children: <Widget>[
               Expanded(
                 child: Text(
-                  '报名详情加载失败',
+                  stringsOf(context).clubEnrollDetailsFailed,
                   style: textTheme.labelMedium?.copyWith(
                     color: AppColors.textSecondary,
                   ),
@@ -561,7 +591,7 @@ class _TeamDetailSection extends StatelessWidget {
                   horizontal: CyTokens.space2,
                 ),
                 minimumSize: const Size(44, 44),
-                child: const Text('重试'),
+                child: Text(stringsOf(context).clubEnrollRetry),
               ),
             ],
           ),
@@ -571,7 +601,7 @@ class _TeamDetailSection extends StatelessWidget {
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: CyTokens.space3),
               child: Text(
-                '该团暂无票种',
+                stringsOf(context).clubEnrollNoTickets,
                 style: textTheme.labelMedium?.copyWith(
                   color: AppColors.textSecondary,
                 ),
@@ -583,8 +613,7 @@ class _TeamDetailSection extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               Text(
-                '${d.teamStatusText} · 已支付 ${d.paidCount} 人 · 可退款 ${d.refundableCount} 人'
-                '${deadline.isNotEmpty ? ' · 截止 $deadline' : ''}',
+                '${stringsOf(context).clubEnrollPaymentCounts(_teamStatusLabel(context, d.teamStatusText), d.paidCount, d.refundableCount)}${deadline.isNotEmpty ? stringsOf(context).clubEnrollDeadline(deadline) : ''}',
                 style: textTheme.labelMedium?.copyWith(
                   color: AppColors.textSecondary,
                 ),
@@ -637,14 +666,13 @@ class _TicketBlock extends StatelessWidget {
           ),
           const SizedBox(height: CyTokens.space1),
           Text(
-            '已报名 ${ticket.signups} 人'
-            '${ticket.totalInventory > 0 ? ' · 上限 ${ticket.totalInventory}' : ''}',
+            '${stringsOf(context).clubEnrollSignups(ticket.signups)}${ticket.totalInventory > 0 ? stringsOf(context).clubEnrollCapacity(ticket.totalInventory) : ''}',
             style: textTheme.labelSmall?.copyWith(color: CyTokens.textTertiary),
           ),
           const SizedBox(height: CyTokens.space2),
           if (ticket.regs.isEmpty)
             Text(
-              '还没有人报名',
+              stringsOf(context).clubEnrollEmpty,
               style: textTheme.labelSmall?.copyWith(
                 color: AppColors.textSecondary,
               ),
@@ -695,14 +723,14 @@ class _RegistrantRow extends StatelessWidget {
               padding: EdgeInsets.zero,
               minimumSize: const Size(28, 28),
               onPressed: () => context.push('/user/${reg.memberId}'),
-              child: CyAvatar(url: reg.avatar, fallback: '玩', size: 28),
+              child: CyAvatar(url: reg.avatar, fallback: stringsOf(context).clubEnrollAvatarFallback, size: 28),
             )
           else
-            CyAvatar(url: reg.avatar, fallback: '玩', size: 28),
+            CyAvatar(url: reg.avatar, fallback: stringsOf(context).clubEnrollAvatarFallback, size: 28),
           const SizedBox(width: CyTokens.space2_5),
           Expanded(
             child: Text(
-              (reg.nickname?.isNotEmpty ?? false) ? reg.nickname! : '玩家',
+              (reg.nickname?.isNotEmpty ?? false) ? reg.nickname! : stringsOf(context).clubEnrollPlayer,
               style: textTheme.labelMedium,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -716,7 +744,7 @@ class _RegistrantRow extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: CyTokens.space2),
             minimumSize: const Size(44, 44),
             child: Text(
-              reg.verificationStatus == 1 ? '已核销' : '待核销',
+              reg.verificationStatus == 1 ? stringsOf(context).clubEnrollVerified : stringsOf(context).clubEnrollPending,
               style: textTheme.labelSmall,
             ),
           ),
@@ -728,7 +756,7 @@ class _RegistrantRow extends StatelessWidget {
               color: null,
               child: busy
                   ? const CupertinoActivityIndicator(radius: 7)
-                  : const Text('退款', style: TextStyle(color: AppColors.danger)),
+                  : Text(stringsOf(context).clubEnrollRefund, style: const TextStyle(color: AppColors.danger)),
             ),
         ],
       ),
@@ -768,3 +796,10 @@ class _Cover extends StatelessWidget {
     );
   }
 }
+
+String _teamStatusLabel(BuildContext context, String status) => switch (status) {
+  '已成团' => stringsOf(context).clubEnrollFormed,
+  '已散团' => stringsOf(context).clubEnrollDisbanded,
+  '募集中' => stringsOf(context).clubEnrollRecruiting,
+  _ => status,
+};
