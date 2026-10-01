@@ -58,38 +58,41 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(390, 1100));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final semantics = tester.ensureSemantics();
-    addTearDown(semantics.dispose);
-    final destinations = <ProfileDestination>[];
-    await tester.pumpWidget(MaterialApp(
-      locale: const Locale('en'),
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
-      supportedLocales: AppLocalizations.supportedLocales,
-      builder: (context, child) => MediaQuery(
-        data: MediaQuery.of(context).copyWith(textScaler: const TextScaler.linear(2)),
-        child: child!,
-      ),
-      home: _profile(destinations.add),
-    ));
-    await tester.pumpAndSettle();
-    expect(find.text('原文名字'), findsOneWidget);
-    expect(find.text('原文介绍'), findsOneWidget);
-    expect(find.text('My orders'), findsOneWidget);
-    expect(find.bySemanticsLabel('Settings'), findsOneWidget);
-    expect(tester.takeException(), isNull);
-    for (final tab in ['posts', 'achievements', 'about', 'mine']) {
-      final target = find.byKey(ValueKey('profile-tab-$tab'));
-      await tester.ensureVisible(target);
+    try {
+      final destinations = <ProfileDestination>[];
+      await tester.pumpWidget(MaterialApp(
+        locale: const Locale('en'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(textScaler: const TextScaler.linear(2)),
+          child: child!,
+        ),
+        home: _profile(destinations.add),
+      ));
       await tester.pumpAndSettle();
-      await tester.tap(target);
-      await tester.pumpAndSettle();
+      expect(find.text('原文名字'), findsOneWidget);
+      expect(find.text('原文介绍'), findsOneWidget);
+      expect(find.text('My orders'), findsOneWidget);
+      expect(find.bySemanticsLabel('Settings'), findsOneWidget);
       expect(tester.takeException(), isNull);
-      if (tab == 'posts') expect(find.text('No posts yet'), findsOneWidget);
-      if (tab == 'about') expect(find.text('Introduction'), findsOneWidget);
+      for (final tab in ['posts', 'achievements', 'about', 'mine']) {
+        final target = find.byKey(ValueKey('profile-tab-$tab'));
+        await tester.ensureVisible(target);
+        await tester.pumpAndSettle();
+        await tester.tap(target);
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        if (tab == 'posts') expect(find.text('No posts yet'), findsOneWidget);
+        if (tab == 'about') expect(find.text('Introduction'), findsOneWidget);
+      }
+      final orders = find.byKey(const ValueKey('profile-orders'));
+      await tester.ensureVisible(orders);
+      await tester.tap(orders);
+      expect(destinations, [ProfileDestination.orders]);
+    } finally {
+      semantics.dispose();
     }
-    final orders = find.byKey(const ValueKey('profile-orders'));
-    await tester.ensureVisible(orders);
-    await tester.tap(orders);
-    expect(destinations, [ProfileDestination.orders]);
   });
 
   testWidgets('Collection profile entry navigates to object cards and calls list', (tester) async {
