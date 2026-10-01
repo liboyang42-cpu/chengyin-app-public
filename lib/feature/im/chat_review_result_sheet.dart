@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/cy_palette.dart';
 import '../../core/theme/cy_tokens.dart';
 import 'chat_card.dart';
+import '../../l10n/strings.dart';
 
 /// 系统卡的「处理结果」面板 —— 小程序 im/chat 的 `cy-sheet title="处理结果"`
 /// (`reviewResult`),承载审核回执的 taskId / bizId / outcome / reason / followUp。
@@ -37,8 +38,8 @@ class _ReviewSheet extends StatelessWidget {
     // 半截的「审核任务 # · 业务 #22」看起来像出错 —— 只拼拿得到的部分
     // (空字段在小程序那边就是一行空白,空白不是信息)。
     final List<String> ids = <String>[
-      if (result.taskId.isNotEmpty) '审核任务 #${result.taskId}',
-      if (result.bizId.isNotEmpty) '业务 #${result.bizId}',
+      if (result.taskId.isNotEmpty) stringsOf(context).imRemainingTask(result.taskId),
+      if (result.bizId.isNotEmpty) stringsOf(context).imRemainingBusiness(result.bizId),
     ];
     return CupertinoPageScaffold(
       backgroundColor: palette.bgPage,
@@ -57,7 +58,7 @@ class _ReviewSheet extends StatelessWidget {
               children: <Widget>[
                 Expanded(
                   child: Text(
-                    '处理结果',
+                    stringsOf(context).imRemainingReviewTitle,
                     style: textTheme.titleLarge?.copyWith(
                       color: palette.textPrimary,
                       fontWeight: FontWeight.w700,
@@ -65,7 +66,7 @@ class _ReviewSheet extends StatelessWidget {
                   ),
                 ),
                 Semantics(
-                  label: '关闭处理结果',
+                  label: stringsOf(context).imRemainingCloseReview,
                   button: true,
                   child: CupertinoButton(
                     key: const Key('review-result-close'),
@@ -101,7 +102,7 @@ class _ReviewSheet extends StatelessWidget {
             if (result.reason.isNotEmpty) ...<Widget>[
               const SizedBox(height: CyTokens.space2_5),
               Text(
-                '原因：${result.reason}',
+                stringsOf(context).imRemainingReason(result.reason),
                 style: textTheme.bodyMedium?.copyWith(
                   color: palette.textPrimary,
                 ),

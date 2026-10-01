@@ -27,10 +27,19 @@ class FakeImApi implements ImApi {
   }
 
   @override
+  Future<ImReceipt> deleteConversationReceipt(int conversationId) async =>
+      ImReceipt(ImReceiptKind.deleted, serverMessage: await deleteConversation(conversationId));
+
+  @override
   Future<String> deleteConversation(int conversationId) async {
     deletedIds.add(conversationId);
     return '已删除会话';
   }
+
+  @override
+  Future<ImReceipt> muteReceipt(int conversationId, {required bool muted}) async =>
+      ImReceipt(muted ? ImReceiptKind.muted : ImReceiptKind.unmuted,
+        serverMessage: await mute(conversationId, muted: muted));
 
   @override
   Future<String> mute(int conversationId, {required bool muted}) async {

@@ -7,12 +7,45 @@
 // ★ 此前 App 只在「进页 / 下拉刷新 / 发完一条」时拉:对方在我盯着页面时
 //   发来的消息,要等我自己手动刷一下才出现。
 
+import 'dart:async';
+
 import 'package:chengyin_app/data/models/im.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'im_chat_test_support.dart';
 
 void main() {
+  testWidgets('slow poll remains single flight across multiple timer ticks', (tester) async {
+    final FakeImChatApi api = FakeImChatApi();
+    final Completer<ChatPage> poll = Completer<ChatPage>();
+    api.onMessages = (_, size) => size == 15
+        ? poll.future
+        : Future<ChatPage>.value(ChatPage(list: <ChatMessage>[]));
+    await pumpChat(tester, api: api);
+    await tester.pump(const Duration(seconds: 8));
+    await tester.pump(const Duration(seconds: 16));
+    expect(api.calls.where((call) => call.size == 15), hasLength(1));
+    poll.complete(ChatPage(list: <ChatMessage>[msg(1, content: 'arrived')]));
+    await tester.pumpAndSettle();
+    expect(find.text('arrived'), findsOneWidget);
+  });
+
+  testWidgets('failed read acknowledgement retries without a new message', (tester) async {
+    final FakeImChatApi api = FakeImChatApi();
+    api.onRead = (_) async {
+      if (api.readCalls.length == 1) throw Exception('offline');
+    };
+    api.onMessages = (_, _) async => ChatPage(list: <ChatMessage>[msg(1)]);
+    await pumpChat(tester, api: api);
+    expect(api.readCalls, <int>[9]);
+    await tester.pump(const Duration(seconds: 8));
+    await tester.pumpAndSettle();
+    expect(api.readCalls, <int>[9, 9]);
+    await tester.pump(const Duration(seconds: 8));
+    await tester.pumpAndSettle();
+    expect(api.readCalls, <int>[9, 9]);
+  });
+
   testWidgets('停在页面上 8 秒,对方的新消息自己出现', (tester) async {
     final FakeImChatApi api = FakeImChatApi();
     List<ChatMessage> server = <ChatMessage>[msg(1, content: '我先到了')];

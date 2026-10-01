@@ -7,6 +7,7 @@ import '../../core/theme/cy_palette.dart';
 import '../../core/theme/cy_tokens.dart';
 import '../../core/widgets/cy_native_button.dart';
 import 'payment_verifier.dart';
+import '../../l10n/strings.dart';
 
 /// SDK 回来之后、页面之上的结果面板 —— 1:1 `components/cy/result-sheet`
 /// (baoming.js `showPaymentResult`):loading 核对中不可关;success 停 2s
@@ -25,9 +26,9 @@ class PaymentSheetOutcome {
 
 const Duration paymentSuccessHold = Duration(milliseconds: 2000);
 
-/// [reconcile] 跑终态轮询(真源只在 SDK success 后核对;客户端 failed/unknown
-/// 也走它 —— 回读服务端永远比猜准)。[presetFailMessage]/[presetSuccess]
-/// 让面板直接落在 fail/success 态(零元单、SDK 明确失败)。
+/// [reconcile] reads authoritative server status after every SDK outcome.
+/// Presets remain available for existing callers and isolated previews; the
+/// registration and orders payment flows always use server reconciliation.
 Future<PaymentSheetOutcome?> showPaymentResultSheet(
   BuildContext context, {
   Future<PaymentVerifyOutcome> Function()? reconcile,
@@ -121,7 +122,9 @@ class _PaymentResultSheetState extends State<_PaymentResultSheet> {
       case 'failed':
         setState(() {
           _phase = _Phase.fail;
-          _why = outcome.errMsg;
+          _why = outcome.hasLocalFailureMessage
+              ? stringsOf(context).registrationOrdersPaymentNotCompleted
+              : outcome.errMsg;
         });
       default:
         _close(PaymentSheetOutcome(PaymentSheetResult.unknown));
@@ -155,12 +158,12 @@ class _PaymentResultSheetState extends State<_PaymentResultSheet> {
   @override
   Widget build(BuildContext context) {
     final (String title, String sub) = switch (_phase) {
-      _Phase.loading => ('确认支付结果', '正在和微信核对这笔付款。'),
+      _Phase.loading => (stringsOf(context).registrationOrdersVerifyPayment, stringsOf(context).registrationOrdersVerifyPaymentHint),
       _Phase.success =>
         widget.freeSignup
-            ? ('报名成功', '票已放入票夹，出发前 30 分钟到集合点核验')
-            : ('支付成功', '票已放入票夹，可随时出示入场码'),
-      _Phase.fail => ('这笔没有付成功', '钱没有扣,可以直接重试。'),
+            ? (stringsOf(context).registrationOrdersRegistrationSuccessful, stringsOf(context).registrationOrdersFreeTicketHint)
+            : (stringsOf(context).registrationOrdersPaymentSuccessful, stringsOf(context).registrationOrdersPaidTicketHint),
+      _Phase.fail => (stringsOf(context).registrationOrdersThisPaymentWasNotCompleted, stringsOf(context).registrationOrdersFailedPaymentHint),
     };
     final CyPalette palette = CyPalette.of(context);
     final Widget? consent = _phase == _Phase.success
@@ -239,7 +242,7 @@ class _PaymentResultSheetState extends State<_PaymentResultSheet> {
                   const SizedBox(height: CyTokens.space4),
                   CyNativeButton(
                     key: const Key('payment-result-close'),
-                    label: '知道了',
+                    label: stringsOf(context).registrationOrdersGotIt,
                     onPressed: () => _close(
                       PaymentSheetOutcome(PaymentSheetResult.failed, why: _why),
                     ),

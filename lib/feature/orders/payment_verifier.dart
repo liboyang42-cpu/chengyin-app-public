@@ -33,12 +33,16 @@ class PaymentVerifyOutcome {
     required this.status,
     this.data,
     this.errMsg = '',
+    this.hasLocalFailureMessage = false,
   });
 
   /// 'success' | 'failed' | 'unknown'。
   final String status;
   final Map<String, dynamic>? data;
   final String errMsg;
+
+  /// True only when this verifier supplied the missing failure message.
+  final bool hasLocalFailureMessage;
 }
 
 /// 与真源逐字同源(payment-verifier.js finish('unknown'))。
@@ -107,6 +111,7 @@ class RegistrationPaymentVerifier {
           status: 'failed',
           data: res,
           errMsg: raw.isEmpty ? '支付未完成' : raw,
+          hasLocalFailureMessage: raw.isEmpty,
         );
       }
       if (remaining() <= Duration.zero) {

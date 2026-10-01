@@ -1,4 +1,9 @@
+import '../../l10n/im_api_display.dart';
+import '../../core/network/request_session_scope.dart';
+import '../auth/auth_controller.dart';
+import '../../l10n/strings.dart';
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -92,6 +97,9 @@ enum _ChatState { loading, ready, error, missing, closed }
 
 class _ImChatPageState extends ConsumerState<ImChatPage>
     with WidgetsBindingObserver {
+  late final RequestSessionScope _requestScope;
+  bool _sessionEnded = false;
+
   final TextEditingController _input = TextEditingController();
   final ScrollController _scroll = ScrollController();
 
@@ -113,13 +121,44 @@ class _ImChatPageState extends ConsumerState<ImChatPage>
 
   /// 进页之外的新消息:页面可见时 8 秒一轮(小程序 `onShow` 的 setInterval)。
   Timer? _poll;
+  bool _polling = false;
+  bool _reading = false;
+  bool _readPending = false;
 
   @override
   void initState() {
     super.initState();
+    _requestScope = ref.read(authControllerProvider.notifier).requestScope(
+      ref.read(authControllerProvider).user?.id ?? 0,
+    );
+    ref.listenManual(currentMemberIdProvider, (previous, next) {
+      if (previous != next) _endConversationSession();
+    });
+    ref.listenManual(authControllerProvider, (previous, next) {
+      if (previous != null && previous.isLoggedIn &&
+          (next.user?.id != previous.user?.id || next.loading)) {
+        _endConversationSession();
+      }
+    });
     WidgetsBinding.instance.addObserver(this);
     _startPoll();
     _load();
+  }
+
+  void _endConversationSession() {
+    if (!mounted || _sessionEnded) return;
+    _stopPoll();
+    _input.clear();
+    setState(() {
+      _sessionEnded = true;
+      _msgs = <ChatMessage>[];
+      _failed.clear();
+      _hasMore = false;
+      _loadingMore = false;
+      _loadMoreError = null;
+      _readPending = false;
+      _sending = false;
+    });
   }
 
   @override
@@ -145,7 +184,7 @@ class _ImChatPageState extends ConsumerState<ImChatPage>
     _stopPoll();
     // 坏链接(拿不到会话 id)不许每 8 秒拿 conversation_id:0 打后端;
     // 已结束的组局是终态,也不会再变。
-    if (widget.conversationId <= 0) return;
+    if (_sessionEnded || widget.conversationId <= 0) return;
     if (_state == _ChatState.closed) return;
     _poll = Timer.periodic(const Duration(seconds: 8), (_) => _pollNew());
   }
@@ -166,23 +205,32 @@ class _ImChatPageState extends ConsumerState<ImChatPage>
   /// 轮询增量:`cursor_id:0, size:15`(小程序同参),只留 id 比本地最大 id 新的。
   /// ★ 失败**静默** —— 轮询是锦上添花,弹错会把用户正在看的页面搅乱;
   ///   失败态由下拉刷新 / 重试兜底。
-  Future<void> _pollNew() async {
-    if (_state == _ChatState.closed || widget.conversationId <= 0) return;
+  Future<void> _pollNew() => RequestSessionScope.run(
+    _requestScope, () => _pollNewScoped(),
+  );
+
+  Future<void> _pollNewScoped() async {
+    if (_sessionEnded) return;
+    if (_polling || _state == _ChatState.closed || widget.conversationId <= 0) {
+      return;
+    }
     // 页面被压在栈下(点开卡片详情、或处理结果面板盖着)时不打后端 ——
     // 小程序 `onHide` 会停表;App 没有 onHide,用「是不是当前路由」等效。
     if (!(ModalRoute.of(context)?.isCurrent ?? false)) return;
+    _polling = true;
     final int maxId = _maxLocalId();
     try {
       final ChatPage page = await ref
           .read(imApiProvider)
           .messages(widget.conversationId, cursorId: 0, size: 15);
-      if (!mounted) return;
+      if (!mounted || _sessionEnded) return;
       // 轮询读到了就是恢复了:一次瞬时失败不该把错误态钉在屏幕上,
       // 让输入栏一直禁用、只能靠用户手点「重试」才活过来。
       final List<ChatMessage> fresh = page.list
           .where((ChatMessage m) => m.id > maxId)
           .toList();
       if (fresh.isEmpty) {
+        if (_readPending) _markRead();
         if (_state != _ChatState.ready) {
           setState(() => _state = _ChatState.ready);
         }
@@ -196,6 +244,8 @@ class _ImChatPageState extends ConsumerState<ImChatPage>
       _markRead();
     } catch (_) {
       // 静默:下层已给出的错误态/重试入口不受影响。
+    } finally {
+      _polling = false;
     }
   }
 
@@ -217,7 +267,12 @@ class _ImChatPageState extends ConsumerState<ImChatPage>
     _msgs = list;
   }
 
-  Future<void> _load() async {
+  Future<void> _load() => RequestSessionScope.run(
+    _requestScope, () => _loadScoped(),
+  );
+
+  Future<void> _loadScoped() async {
+    if (_sessionEnded) return;
     // ★ 坏链接(没有会话 id)= missing,不打后端、也不给可用输入栏 ——
     //   它不是「空对话」。小程序同判据(`if (!conversationId) return`)。
     if (widget.conversationId <= 0) {
@@ -234,7 +289,7 @@ class _ImChatPageState extends ConsumerState<ImChatPage>
       final page = await ref
           .read(imApiProvider)
           .messages(widget.conversationId);
-      if (!mounted) return;
+      if (!mounted || _sessionEnded) return;
       setState(() {
         _state = _ChatState.ready;
         _msgs = page.list;
@@ -245,7 +300,7 @@ class _ImChatPageState extends ConsumerState<ImChatPage>
       _markRead();
       _scrollToBottom();
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || _sessionEnded) return;
       final bool closed =
           e is ImApiException && e.errorCode == 'HANGOUT_CLOSED';
       setState(() {
@@ -256,7 +311,12 @@ class _ImChatPageState extends ConsumerState<ImChatPage>
   }
 
   /// 加载更早消息(单飞:进行中或没有更多时直接返回)。
-  Future<void> _loadMore() async {
+  Future<void> _loadMore() => RequestSessionScope.run(
+    _requestScope, () => _loadMoreScoped(),
+  );
+
+  Future<void> _loadMoreScoped() async {
+    if (_sessionEnded) return;
     if (_loadingMore || !_hasMore || _state != _ChatState.ready) return;
     final double beforeMax = _scroll.hasClients
         ? _scroll.position.maxScrollExtent
@@ -269,7 +329,7 @@ class _ImChatPageState extends ConsumerState<ImChatPage>
       final ChatPage page = await ref
           .read(imApiProvider)
           .messages(widget.conversationId, cursorId: _nextCursor);
-      if (!mounted) return;
+      if (!mounted || _sessionEnded) return;
       setState(() {
         _loadingMore = false;
         _mergeMessages(page.list, prepend: true);
@@ -278,12 +338,12 @@ class _ImChatPageState extends ConsumerState<ImChatPage>
       });
       _keepScrollAfterPrepend(beforeMax);
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || _sessionEnded) return;
       // ★ 失败不动已有消息、不动游标 —— 重试必须还是同一个 cursor,
       //   否则跳着丢一段历史(小程序 `_setLoadMoreError` 同款)。
       setState(() {
         _loadingMore = false;
-        _loadMoreError = e.toString().replaceFirst('Exception: ', '');
+        _loadMoreError = imErrorText(e, stringsOf(context));
       });
     }
   }
@@ -299,12 +359,28 @@ class _ImChatPageState extends ConsumerState<ImChatPage>
     });
   }
 
-  Future<void> _markRead() async {
+  Future<void> _markRead() => RequestSessionScope.run(
+    _requestScope,
+    () => _markReadScoped(),
+  );
+
+  Future<void> _markReadScoped() async {
+    if (_sessionEnded) return;
+    _readPending = true;
+    if (_reading) return;
+    _reading = true;
     try {
-      await ref.read(imApiProvider).read(widget.conversationId);
-      ref.invalidate(imConversationsProvider);
+      while (mounted && !_sessionEnded && _readPending) {
+        _readPending = false;
+        await ref.read(imApiProvider).read(widget.conversationId);
+        if (!mounted || _sessionEnded) return;
+        ref.invalidate(imConversationsProvider);
+      }
     } catch (_) {
-      // 已读失败不打扰用户。
+      // Retry on the next successful poll, even when no new messages arrived.
+      if (!_sessionEnded) _readPending = true;
+    } finally {
+      _reading = false;
     }
   }
 
@@ -352,8 +428,13 @@ class _ImChatPageState extends ConsumerState<ImChatPage>
   /// ★ 与小程序同一条链:`app.chooseImage` → `/api/common/uploadOSS`
   ///   → `_sendMessage({msg_type:2, content:url})`。
   ///   [anchor] 是「+」的矩形 —— S4:来源选择 sheet 从触发元素弹。
-  Future<void> _sendImage(Rect? anchor) async {
-    if (_sending) return;
+  Future<void> _sendImage(Rect? anchor) => RequestSessionScope.run(
+    _requestScope, () => _sendImageScoped(anchor),
+  );
+
+  Future<void> _sendImageScoped(Rect? anchor) async {
+    if (_sessionEnded) return;
+    if (_sessionEnded || _sending) return;
     final CyImagePickSource? source = await cyChooseImageSource(
       context,
       sourceRect: anchor,
@@ -363,8 +444,8 @@ class _ImChatPageState extends ConsumerState<ImChatPage>
     try {
       file = await ref.read(imImagePickerProvider)(source);
     } catch (_) {
-      if (!mounted) return;
-      CyNativeNotice.show(context, '没能打开相册或相机，请重试', isError: true);
+      if (!mounted || _sessionEnded) return;
+      CyNativeNotice.show(context, stringsOf(context).imPhotoOpenFailed, isError: true);
       return;
     }
     if (file == null || !mounted) return;
@@ -372,30 +453,30 @@ class _ImChatPageState extends ConsumerState<ImChatPage>
     try {
       url = await ref.read(imApiProvider).uploadImage(file.path);
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || _sessionEnded) return;
       CyNativeNotice.show(
         context,
-        e.toString().replaceFirst('Exception: ', ''),
+        imErrorText(e, stringsOf(context)),
         isError: true,
       );
       return;
     }
-    if (!mounted) return;
+    if (!mounted || _sessionEnded) return;
     await _dispatch(_Outgoing.image(url));
   }
 
   /// 「+」= 动作菜单(图片 / 位置 / 路线),对齐小程序 im/chat 的 plus 面板
-  /// (`plusSheetItems: ['图片','位置','路线']`)。
+  /// (`plusSheetItems: [stringsOf(context).imPhoto,stringsOf(context).imLocation,stringsOf(context).imRoute]`)。
   /// 用共用层原生 presenter(iOS 26 玻璃 sheet,测试/旧系统回退 Cupertino)。
   Future<void> _openPlusMenu(Rect? anchor) async {
-    if (_sending) return;
+    if (_sessionEnded || _sending) return;
     final _PlusAction? action = await showCyNativeActionSheet<_PlusAction>(
       context: context,
-      title: '发送',
-      actions: const <CyNativeAction<_PlusAction>>[
-        CyNativeAction(value: _PlusAction.image, label: '图片'),
-        CyNativeAction(value: _PlusAction.location, label: '位置'),
-        CyNativeAction(value: _PlusAction.route, label: '路线'),
+      title: stringsOf(context).imSend,
+      actions: <CyNativeAction<_PlusAction>>[
+        CyNativeAction(value: _PlusAction.image, label: stringsOf(context).imPhoto),
+        CyNativeAction(value: _PlusAction.location, label: stringsOf(context).imLocation),
+        CyNativeAction(value: _PlusAction.route, label: stringsOf(context).imRoute),
       ],
     );
     if (action == null || !mounted) return;
@@ -425,9 +506,15 @@ class _ImChatPageState extends ConsumerState<ImChatPage>
   /// ★ 失败**不再只弹一个 toast**:toast 2.4 秒后消失,用户手上只剩一句
   ///   不知道发没发出去的话(输入框里那份还会被下次输入覆盖掉)。
   ///   失败的消息留在列表里带重试,才是能回答"发出去了没有"的状态。
-  Future<void> _dispatch(_Outgoing out) async {
-    if (_sending) return;
+  Future<void> _dispatch(_Outgoing out) => RequestSessionScope.run(
+    _requestScope,
+    () => _dispatchScoped(out),
+  );
+
+  Future<void> _dispatchScoped(_Outgoing out) async {
+    if (_sessionEnded || _sending) return;
     if (_state != _ChatState.ready) return;
+    final int senderId = ref.read(currentMemberIdProvider);
     setState(() {
       _sending = true;
       _failed.remove(out);
@@ -443,10 +530,15 @@ class _ImChatPageState extends ConsumerState<ImChatPage>
             content: out.content,
             msgType: out.msgType,
             extraJson: out.extraJson,
+            clientMessageId: out.clientMessageId,
           );
-      if (!mounted) return;
+      if (!mounted || _sessionEnded) return;
+      if (ref.read(currentMemberIdProvider) != senderId) {
+        setState(() => _sending = false);
+        return;
+      }
       setState(() {
-        _msgs = <ChatMessage>[..._msgs, msg];
+        _mergeMessages(<ChatMessage>[msg]);
         _sending = false;
       });
       _scrollToBottom();
@@ -457,7 +549,11 @@ class _ImChatPageState extends ConsumerState<ImChatPage>
       HapticFeedback.selectionClick();
       ref.invalidate(imConversationsProvider);
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || _sessionEnded) return;
+      if (ref.read(currentMemberIdProvider) != senderId) {
+        setState(() => _sending = false);
+        return;
+      }
       setState(() {
         _sending = false;
         if (!_failed.contains(out)) _failed.add(out);
@@ -465,7 +561,7 @@ class _ImChatPageState extends ConsumerState<ImChatPage>
       // ★ 失败的消息也滚到底 —— 用户往上翻着看历史时发消息失败,
       //   不滚的话失败气泡停在屏幕外,"发出去了没有"照样没人回答。
       _scrollToBottom();
-      CyNativeNotice.show(context, '发送失败，点消息上的「重试」再发一次', isError: true);
+      CyNativeNotice.show(context, stringsOf(context).imSendFailedHint, isError: true);
     }
   }
 
@@ -474,44 +570,56 @@ class _ImChatPageState extends ConsumerState<ImChatPage>
   ///
   /// ⚠️ 提示文案与广场举报同一条纪律:后端只入审核队列、**不立即删消息**,
   ///   所以不能说「已删除」。
-  Future<void> _reportMessage(ChatMessage m) async {
-    final String? reason = await showReportSheet(context, targetLabel: '这条消息');
+  Future<void> _reportMessage(ChatMessage m) => RequestSessionScope.run(
+    _requestScope,
+    () => _reportMessageScoped(m),
+  );
+
+  Future<void> _reportMessageScoped(ChatMessage m) async {
+    if (_sessionEnded) return;
+    final String? reason = await showReportSheet(context, targetLabel: stringsOf(context).imReportTarget);
     if (reason == null || !mounted) return;
     try {
-      final String msg = await ref
+      final ImReceipt msg = await ref
           .read(imApiProvider)
-          .reportMessage(m.id, reason);
-      if (!mounted) return;
-      CyNativeNotice.show(context, msg);
+          .reportMessageReceipt(m.id, reason);
+      if (!mounted || _sessionEnded) return;
+      CyNativeNotice.show(context, imReceiptText(msg, stringsOf(context)));
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || _sessionEnded) return;
       CyNativeNotice.show(
         context,
-        e.toString().replaceFirst('Exception: ', ''),
+        imErrorText(e, stringsOf(context)),
         isError: true,
       );
     }
   }
 
-  Future<void> _blockPeer() async {
-    final name = widget.peerName.isNotEmpty ? widget.peerName : '这个用户';
+  Future<void> _blockPeer() => RequestSessionScope.run(
+    _requestScope,
+    () => _blockPeerScoped(),
+  );
+
+  Future<void> _blockPeerScoped() async {
+    if (_sessionEnded) return;
+    final name = widget.peerName.isNotEmpty ? widget.peerName : stringsOf(context).imUserFallback;
     final bool ok = await cyConfirm(
       context,
-      title: '拉黑 $name?',
-      content: '拉黑后你将不再收到对方的消息。',
-      confirmText: '拉黑',
+      title: stringsOf(context).imBlockTitle(name),
+      content: stringsOf(context).imBlockHint,
+      confirmText: stringsOf(context).imBlock,
       danger: true,
     );
     if (ok != true || !mounted) return;
     try {
-      final msg = await ref.read(imApiProvider).block(widget.peerMemberId);
-      if (!mounted) return;
-      CyNativeNotice.show(context, msg);
+      final msg = await ref.read(imApiProvider).blockReceipt(widget.peerMemberId);
+      if (!mounted || _sessionEnded) return;
+      CyNativeNotice.show(context, imReceiptText(msg, stringsOf(context)));
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || _sessionEnded) return;
       CyNativeNotice.show(
         context,
-        e.toString().replaceFirst('Exception: ', ''),
+        imErrorText(e, stringsOf(context)),
         isError: true,
       );
     }
@@ -524,11 +632,11 @@ class _ImChatPageState extends ConsumerState<ImChatPage>
   Future<void> _openMoreMenu() async {
     final String? action = await showCyNativeActionSheet<String>(
       context: context,
-      title: '更多',
-      actions: const <CyNativeAction<String>>[
+      title: stringsOf(context).imMore,
+      actions: <CyNativeAction<String>>[
         CyNativeAction<String>(
           value: 'clear',
-          label: '清空聊天',
+          label: stringsOf(context).imClearChat,
           destructive: true,
         ),
       ],
@@ -543,18 +651,24 @@ class _ImChatPageState extends ConsumerState<ImChatPage>
   ///   与消息列表的滑动删除**同一句**(`im_list_page.dart:492`,只把那边的
   ///   「删除」换成这边的动作名)—— 同一个接口同一件事,不能一处说「清空」
   ///   一处说「撤回」。后端**不**清除对方的记录。
-  Future<void> _clearChat() async {
+  Future<void> _clearChat() => RequestSessionScope.run(
+    _requestScope,
+    () => _clearChatScoped(),
+  );
+
+  Future<void> _clearChatScoped() async {
+    if (_sessionEnded) return;
     final bool ok = await cyConfirm(
       context,
-      title: '清空聊天',
-      content: '删除后不会清除对方消息记录，确定清空这条会话吗？',
-      confirmText: '清空',
+      title: stringsOf(context).imClearChat,
+      content: stringsOf(context).imClearConfirm,
+      confirmText: stringsOf(context).imClear,
       danger: true,
     );
     if (ok != true || !mounted) return;
     try {
       await ref.read(imApiProvider).deleteConversation(widget.conversationId);
-      if (!mounted) return;
+      if (!mounted || _sessionEnded) return;
       ref.invalidate(imConversationsProvider);
       // 回消息列表:清空的会话不该还留在栈里(返回又看到它,像没删掉)。
       if (context.canPop()) {
@@ -563,10 +677,10 @@ class _ImChatPageState extends ConsumerState<ImChatPage>
         context.go('/im');
       }
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || _sessionEnded) return;
       CyNativeNotice.show(
         context,
-        e.toString().replaceFirst('Exception: ', ''),
+        imErrorText(e, stringsOf(context)),
         isError: true,
       );
     }
@@ -574,8 +688,17 @@ class _ImChatPageState extends ConsumerState<ImChatPage>
 
   @override
   Widget build(BuildContext context) {
+    if (_sessionEnded) {
+      return CupertinoPageScaffold(
+        navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).imChat)),
+        child: Center(child: StatusView(
+          key: const Key('im-session-changed'),
+          message: stringsOf(context).imSessionChanged,
+        )),
+      );
+    }
     final myId = ref.watch(currentMemberIdProvider);
-    final title = widget.peerName.isNotEmpty ? widget.peerName : '聊天';
+    final title = widget.peerName.isNotEmpty ? widget.peerName : stringsOf(context).imChat;
     return CupertinoPageScaffold(
       resizeToAvoidBottomInset: true,
       navigationBar: CupertinoNavigationBar(
@@ -588,12 +711,12 @@ class _ImChatPageState extends ConsumerState<ImChatPage>
           children: <Widget>[
             if (widget.peerMemberId > 0)
               _navAction(
-                label: '拉黑此人',
+                label: stringsOf(context).imBlockPerson,
                 icon: CupertinoIcons.nosign,
                 onPressed: _blockPeer,
               ),
             _navAction(
-              label: '更多',
+              label: stringsOf(context).imMore,
               icon: CupertinoIcons.ellipsis_circle,
               onPressed: _openMoreMenu,
             ),
@@ -630,10 +753,10 @@ class _ImChatPageState extends ConsumerState<ImChatPage>
   /// 非 ready 时输入栏为什么点不动 —— 按**真实原因**给一句话,不写「不可用」。
   /// 小程序 `sendBlockedMap` 的同款口径。
   String get _sendBlockedText => switch (_state) {
-    _ChatState.loading => '消息加载中…',
-    _ChatState.missing => '链接已失效，回消息列表重新进入',
-    _ChatState.closed => '组局已结束，不能继续聊天',
-    _ChatState.error => '消息没加载出来，点上方「重试」再试',
+    _ChatState.loading => stringsOf(context).imLoading,
+    _ChatState.missing => stringsOf(context).imLinkExpired,
+    _ChatState.closed => stringsOf(context).imClosedInput,
+    _ChatState.error => stringsOf(context).imLoadRetry,
     _ChatState.ready => '',
   };
 
@@ -679,26 +802,26 @@ class _ImChatPageState extends ConsumerState<ImChatPage>
       case _ChatState.missing:
         // 坏链接:不是「空对话」,也不打后端。
         return StatusView(
-          message: '这个会话打不开',
-          sub: '链接可能已失效，回消息列表重新进入',
+          message: stringsOf(context).imCannotOpen,
+          sub: stringsOf(context).imCannotOpenHint,
           icon: CupertinoIcons.exclamationmark_circle,
           scrollable: true,
         );
       case _ChatState.closed:
         // 组局已结束(后端回执 errorCode=HANGOUT_CLOSED)→ 终态,不是网络错误。
         return StatusView(
-          message: '这个组局已结束',
-          sub: '聊天已关闭。如有平台处置，可在消息列表的系统通知中查看处理结果。',
+          message: stringsOf(context).imMeetupEnded,
+          sub: stringsOf(context).imMeetupEndedHint,
           icon: CupertinoIcons.lock,
           large: true,
           scrollable: true,
           onRetry: _backToMessageList,
-          retryLabel: '返回消息列表',
+          retryLabel: stringsOf(context).imBackToList,
         );
       case _ChatState.error:
         return StatusView(
-          message: '消息没加载出来',
-          sub: '网络或服务暂时不可用,已发出的消息不会丢',
+          message: stringsOf(context).imLoadFailed,
+          sub: stringsOf(context).imLoadFailedHint,
           icon: CupertinoIcons.wifi_slash,
           onRetry: _load,
         );
@@ -707,8 +830,8 @@ class _ImChatPageState extends ConsumerState<ImChatPage>
     }
     if (_msgs.isEmpty && _failed.isEmpty) {
       return StatusView(
-        message: '还没有消息',
-        sub: '发送第一条消息,和对方确认路线、集合点或合作细节',
+        message: stringsOf(context).imEmpty,
+        sub: stringsOf(context).imEmptyHint,
         icon: CupertinoIcons.hand_raised,
         scrollable: true,
       );
@@ -821,7 +944,14 @@ enum _PlusAction { image, location, route }
 /// 一条要发出去的消息:文本 / 图片 / 路线卡 / 位置卡共用。
 /// 失败后**原样**重发 —— 重发不能退化成另一种类型。
 class _Outgoing {
-  const _Outgoing.text(String text)
+  // One identifier per intent, retained by the failed outgoing on retry.
+  static final Random _random = Random.secure();
+  final String clientMessageId = List<String>.generate(
+    16,
+    (_) => _random.nextInt(256).toRadixString(16).padLeft(2, '0'),
+  ).join();
+
+  _Outgoing.text(String text)
     : content = text,
       msgType = kMsgText,
       extraJson = null,
@@ -829,7 +959,7 @@ class _Outgoing {
 
   /// 图片消息:content 就是 OSS URL(小程序 `{msg_type:2, content:url}` 同形)。
   /// [label] 是给失败行看的 —— 不能把一串 URL 摆给用户。
-  const _Outgoing.image(String url)
+  _Outgoing.image(String url)
     : content = url,
       msgType = kMsgImage,
       extraJson = null,
@@ -934,13 +1064,13 @@ class _MultiImageRow extends StatelessWidget {
                   isMine: isMine,
                   name: senderName,
                   time: showTime
-                      ? fmtMessageTime(messages.first.createTime)
+                      ? fmtMessageTime(messages.first.createTime, context: context)
                       : '',
                 ),
                 Semantics(
                   container: true,
                   // 一屏图 VoiceOver 读不出"有几张",这里补上。
-                  label: '图片消息，共 ${messages.length} 张',
+                  label: stringsOf(context).imImageCount(messages.length),
                   child: ExcludeSemantics(
                     child: SizedBox(
                       width: _cellSize * 2 + 4,
@@ -1016,14 +1146,14 @@ class _LoadMoreRow extends StatelessWidget {
       return Semantics(
         container: true,
         liveRegion: true,
-        label: '更早消息没有加载。$failure',
+        label: stringsOf(context).imEarlierFailureSemantics(failure),
         child: ExcludeSemantics(
           child: Padding(
             padding: const EdgeInsets.only(bottom: CyTokens.space3),
             child: Column(
               children: <Widget>[
                 Text(
-                  '更早消息没有加载',
+                  stringsOf(context).imEarlierFailed,
                   textAlign: TextAlign.center,
                   style: textTheme.labelMedium?.copyWith(
                     color: CyPalette.of(context).textPrimary,
@@ -1044,7 +1174,7 @@ class _LoadMoreRow extends StatelessWidget {
                     horizontal: CyTokens.space3,
                   ),
                   onPressed: onLoadMore,
-                  child: const Text('重试'),
+                  child: Text(stringsOf(context).retry),
                 ),
               ],
             ),
@@ -1058,7 +1188,7 @@ class _LoadMoreRow extends StatelessWidget {
         child: Center(
           child: Semantics(
             liveRegion: true,
-            label: '正在加载更早消息',
+            label: stringsOf(context).imEarlierLoading,
             child: const ExcludeSemantics(child: CupertinoActivityIndicator()),
           ),
         ),
@@ -1067,7 +1197,7 @@ class _LoadMoreRow extends StatelessWidget {
     return Semantics(
       container: true,
       button: true,
-      label: '加载更早消息',
+      label: stringsOf(context).imEarlierLoad,
       onTap: onLoadMore,
       child: ExcludeSemantics(
         child: CupertinoButton(
@@ -1076,7 +1206,7 @@ class _LoadMoreRow extends StatelessWidget {
           padding: EdgeInsets.zero,
           onPressed: onLoadMore,
           child: Text(
-            '加载更早消息',
+            stringsOf(context).imEarlierLoad,
             style: TextStyle(
               fontSize: CyTokens.typeLabel,
               color: CyPalette.of(context).statusInfo,
@@ -1103,7 +1233,7 @@ class _FailedRow extends StatelessWidget {
     return Semantics(
       container: true,
       button: true,
-      label: '发送失败，点按重试',
+      label: stringsOf(context).imRetrySemantics,
       enabled: onRetry != null,
       onTap: onRetry,
       child: ExcludeSemantics(
@@ -1144,7 +1274,13 @@ class _FailedRow extends StatelessWidget {
                           border: Border.all(color: CyTokens.statusDanger),
                         ),
                         child: Text(
-                          outgoing.label,
+                          outgoing.msgType == kMsgText
+                              ? outgoing.label
+                              : outgoing.msgType == kMsgImage
+                              ? stringsOf(context).imPhoto
+                              : outgoing.label == '[位置]'
+                              ? stringsOf(context).imLocation
+                              : stringsOf(context).imRoute,
                           style: Theme.of(context).textTheme.bodyMedium
                               ?.copyWith(color: p.textSecondary),
                         ),
@@ -1154,7 +1290,7 @@ class _FailedRow extends StatelessWidget {
                 ),
                 const SizedBox(height: CyTokens.space1),
                 Text(
-                  '未发送，点按重试',
+                  stringsOf(context).imRetry,
                   style: TextStyle(
                     fontSize: CyTokens.typeCaption,
                     color: CyTokens.statusDanger,
@@ -1192,12 +1328,12 @@ class _MessageRow extends StatelessWidget {
   Widget build(BuildContext context) {
     // 卡片消息(msgType=3):extra_json 解析一次,布局与气泡都按它分流。
     final ChatCardData? card = message.msgType == kMsgCard
-        ? parseChatCard(message.extraJson, fallbackTitle: message.content)
+        ? parseChatCard(message.extraJson, fallbackTitle: message.content, notificationTitle: stringsOf(context).imRemainingNotification)
         : null;
     // 系统卡(generic):整宽居左、**不带头像** ——
     // 小程序里它不在 `.row` 里渲染(wxml 通用卡分支),没有发送方概念。
     final bool isSystemCard = card?.type == 'generic';
-    final String time = showTime ? fmtMessageTime(message.createTime) : '';
+    final String time = showTime ? fmtMessageTime(message.createTime, context: context) : '';
     // 群聊要分清谁在说话:后端 `ImServiceImpl#listMessages` 按 senderId 回填
     // senderName/senderAvatar(单聊回填的就是对端,值不变)。缺失(系统消息
     // senderId=0、成员查不到、真源无群聊页故无回退先例)回退会话级
@@ -1225,7 +1361,7 @@ class _MessageRow extends StatelessWidget {
               bottom: CyTokens.space1_5,
             ),
             child: Text(
-              fmtMessageTime(message.createTime),
+              fmtMessageTime(message.createTime, context: context),
               // .time-div:label 字阶(24rpx→12pt,不是 sender-name 的 caption 11)
               // + --cy-text-secondary。落 CyType.caption1 同档(T5 字距 0)。
               style: CyType.caption1.copyWith(
@@ -1376,7 +1512,7 @@ class _SystemCardBubble extends ConsumerWidget {
       context.push(action);
       return;
     }
-    CyNativeNotice.show(context, '已处理');
+    CyNativeNotice.show(context, stringsOf(context).imHandled);
   }
 
   @override
@@ -1480,7 +1616,7 @@ class _SystemCardBubble extends ConsumerWidget {
             _buttonRow(context, <Widget>[
               _cardButton(
                 context,
-                label: '查看处理结果',
+                label: stringsOf(context).imReviewResult,
                 isReject: false,
                 onTap: () => unawaited(_openResult(context)),
               ),
@@ -1499,7 +1635,7 @@ class _SystemCardBubble extends ConsumerWidget {
             _buttonRow(context, <Widget>[
               _cardButton(
                 context,
-                label: '查看详情',
+                label: stringsOf(context).imDetails,
                 isReject: false,
                 onTap: () => _onCardTap(context, ref),
               ),
@@ -1672,8 +1808,8 @@ class _Bubble extends StatelessWidget {
     final String? raw = message.content;
     final bool unknownType = !message.isText && !message.isImage;
     final String body = unknownType
-        ? '[这条消息当前版本显示不了]'
-        : (raw == null || raw.trim().isEmpty ? '[消息为空]' : raw);
+        ? stringsOf(context).imUnsupported
+        : (raw == null || raw.trim().isEmpty ? stringsOf(context).imEmptyMessage : raw);
     final bool placeholder = unknownType || body != raw;
 
     return Container(
@@ -1832,7 +1968,7 @@ class _InputBarState extends State<_InputBar> {
                     container: true,
                     button: true,
                     // 与小程序同一个 aria-label(`添加图片、位置或路线`)。
-                    label: '添加图片、位置或路线',
+                    label: stringsOf(context).imAttachments,
                     enabled: enabled && !widget.sending,
                     onTap: !enabled || widget.sending
                         ? null
@@ -1863,7 +1999,7 @@ class _InputBarState extends State<_InputBar> {
                     enableSuggestions: true,
                     style: Theme.of(context).textTheme.bodyMedium,
                     onSubmitted: (_) => widget.onSend(),
-                    placeholder: enabled ? '发消息...' : '会话不可用',
+                    placeholder: enabled ? stringsOf(context).imCompose : stringsOf(context).imUnavailable,
                     padding: const EdgeInsets.symmetric(
                       horizontal: CyTokens.space3_5,
                       vertical: CyTokens.space3,
@@ -1935,8 +2071,8 @@ class _SendButton extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: CyTokens.space2),
       child: Semantics(
         container: true,
-        label: '发送消息',
-        value: sending ? '正在发送' : null,
+        label: stringsOf(context).imSendSemantics,
+        value: sending ? stringsOf(context).imSending : null,
         button: true,
         enabled: active,
         onTap: active ? onSend : null,
@@ -2002,12 +2138,12 @@ class _LocationCardBubble extends ConsumerWidget {
     final MapLaunchResult result = await ref.read(imMapLauncherProvider)(
       lat: lat,
       lng: lng,
-      name: name.isEmpty ? '共享位置' : name,
+      name: name.isEmpty ? stringsOf(context).imSharedLocation : name,
       address: address.isEmpty ? null : address,
       isIOS: defaultTargetPlatform == TargetPlatform.iOS,
     );
     if (!context.mounted) return;
-    final String message = mapLaunchMessage(result);
+    final String message = mapLaunchMessage(result, strings: stringsOf(context));
     if (message.isEmpty) return; // 打开了地图就别打扰
     CyNativeNotice.show(
       context,
@@ -2021,12 +2157,12 @@ class _LocationCardBubble extends ConsumerWidget {
     final CyPalette palette = CyPalette.of(context);
     final Color fg = isMine ? palette.actionPrimaryFg : palette.textPrimary;
     final Color sub = isMine ? palette.actionPrimaryFg : palette.textSecondary;
-    final String title = name.isEmpty ? '共享位置' : name;
+    final String title = name.isEmpty ? stringsOf(context).imSharedLocation : name;
     return Semantics(
       container: true,
       button: true,
-      // 与小程序同一个 aria-label(导航到{{name || '共享位置'}})。
-      label: '导航到$title',
+      // 与小程序同一个 aria-label(导航到{{name || stringsOf(context).imSharedLocation}})。
+      label: stringsOf(context).imNavigateTo(title),
       onTap: () => _navigate(context, ref),
       child: ExcludeSemantics(
         child: CupertinoButton(
@@ -2086,7 +2222,7 @@ class _LocationCardBubble extends ConsumerWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: <Widget>[
                     Text(
-                      '导航过去',
+                      stringsOf(context).imNavigate,
                       style: TextStyle(
                         fontSize: CyTokens.typeCaption,
                         color: sub,
@@ -2137,7 +2273,11 @@ class _RouteCardBubble extends ConsumerWidget {
         .watch(topicDetailProvider(topicId))
         .maybeWhen(
           data: (t) => t.name,
-          orElse: () => chatCardFallbackTitle(type: type, topicId: topicId),
+          orElse: () => switch (type) {
+            'route' => stringsOf(context).imRemainingRouteId(topicId),
+            'signup' => stringsOf(context).imRemainingActivityId(topicId),
+            _ => stringsOf(context).imRemainingContentId(topicId),
+          },
         );
     return CupertinoButton(
       key: Key('chat-card-$topicId'),
@@ -2177,7 +2317,7 @@ class _RouteCardBubble extends ConsumerWidget {
             if (type == 'signup')
               Semantics(
                 container: true,
-                label: '报名成功',
+                label: stringsOf(context).imRegistrationSuccess,
                 child: ExcludeSemantics(
                   child: Container(
                     width: double.infinity,
@@ -2187,7 +2327,7 @@ class _RouteCardBubble extends ConsumerWidget {
                     ),
                     color: palette.statusSuccess.withValues(alpha: 0.14),
                     child: Text(
-                      '报名成功',
+                      stringsOf(context).imRegistrationSuccess,
                       style: TextStyle(
                         fontSize: CyTokens.typeLabel,
                         fontWeight: FontWeight.w700,
@@ -2218,7 +2358,7 @@ class _RouteCardBubble extends ConsumerWidget {
                         Text(
                           // 报名卡与路线卡是两种东西,卡面上的类型字也跟着分 ——
                           // 降级文案同理(小程序:该活动已下架 / 该路线已下架)。
-                          type == 'signup' ? '活动' : '路线',
+                          type == 'signup' ? stringsOf(context).imActivity : stringsOf(context).imRoute,
                           style: TextStyle(
                             fontSize: CyTokens.typeMicro,
                             color: isMine

@@ -1,3 +1,4 @@
+import '../../core/network/request_session_scope.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -21,7 +22,7 @@ class ParticipationApi implements ParticipationRepository {
   @override
   Future<List<ParticipationRecord>> list() async {
     final Response<Map<String, dynamic>> response = await _client.dio
-        .post<Map<String, dynamic>>('/api/registration/my-joined');
+        .post<Map<String, dynamic>>('/api/registration/my-joined', options: RequestSessionScope.options());
     final Map<String, dynamic> body = response.data ?? <String, dynamic>{};
     _requireSuccess(body, '参与记录加载失败，请重试');
     final Object? data = body['data'];
@@ -43,6 +44,7 @@ class ParticipationApi implements ParticipationRepository {
     final Response<Map<String, dynamic>> response = await _client.dio
         .post<Map<String, dynamic>>(
           '/api/registration/info',
+          options: RequestSessionScope.options(),
           data: FormData.fromMap(<String, dynamic>{'id': id.toString()}),
         );
     final Map<String, dynamic> body = response.data ?? <String, dynamic>{};

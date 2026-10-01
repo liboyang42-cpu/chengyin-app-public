@@ -1,3 +1,4 @@
+import '../../core/network/request_session_scope.dart';
 import 'package:dio/dio.dart';
 
 import '../../core/network/dio_client.dart';
@@ -13,9 +14,10 @@ import '../../core/network/dio_client.dart';
 ///   不解析 msg(快照 `utils/map-team.js` 的纪律,契约里专门钉过)。
 /// ⚠️ 本层不做 UI 判断:patch / 撤下队伍 / 重拉都留给 `lib/data/models/team_map.dart`。
 class TeamMapApiException implements Exception {
-  const TeamMapApiException(this.message, {this.errorCode = ''});
+  const TeamMapApiException(this.message, {this.errorCode = '', this.localReason});
 
   final String message;
+  final TeamMapLocalFailure? localReason;
 
   /// 后端 errorCode(TICKET_REQUIRED / TEAM_FULL / APPLY_NOT_PENDING …),
   /// 没有就空串。
@@ -33,6 +35,7 @@ Map<String, dynamic> teamErrorBody(Object error) {
     return <String, dynamic>{
       'errorCode': error.errorCode,
       'msg': error.message,
+      if (error.localReason != null) '_localFailure': error.localReason!.name,
     };
   }
   return <String, dynamic>{'msg': '$error'};
@@ -62,7 +65,7 @@ class TeamMapApi {
           'radius': radiusM,
         },
       ),
-      '附近的队伍没能读到',
+      TeamMapLocalFailure.nearby,
     );
   }
 
@@ -81,7 +84,7 @@ class TeamMapApi {
         '/api/team/apply',
         data: <String, dynamic>{'teamId': teamId},
       ),
-      '申请没发出去',
+      TeamMapLocalFailure.apply,
     );
     final Object? data = body['data'];
     return data is Map ? data['applyExpireTime'] : null;
@@ -89,7 +92,7 @@ class TeamMapApi {
 
   /// 撤回申请:`POST /api/team/withdraw {teamId}`。快照 `index.js:401`。
   Future<void> withdraw(int teamId) =>
-      _post('/api/team/withdraw', <String, dynamic>{'teamId': teamId}, '撤回没成功');
+      _post('/api/team/withdraw', <String, dynamic>{'teamId': teamId}, TeamMapLocalFailure.withdraw);
 
   /// 队长读申请列表:`POST /api/team/applications {teamId}` → `[{memberId, memberName}]`。
   /// 快照 `index.js:415`(页面用 POST;`utils/map-team.js` 注释写的是 GET/POST 都可)。
@@ -98,7 +101,7 @@ class TeamMapApi {
       '/api/team/applications',
       data: <String, dynamic>{'teamId': teamId},
     ),
-    '申请列表没读到',
+    TeamMapLocalFailure.applications,
   );
 
   /// 队长处理申请:`POST /api/team/handle {teamId, memberId, approved}`。快照 `index.js:434`。
@@ -110,7 +113,7 @@ class TeamMapApi {
     'teamId': teamId,
     'memberId': memberId,
     'approved': approved,
-  }, '处理没成功');
+  }, TeamMapLocalFailure.handle);
 
   /// 我加入的队伍:`POST /api/team/my {}`
   /// → `[{id, title, joinedCount, maxMembers, status, ownerType, ownerId}]`。
@@ -119,14 +122,14 @@ class TeamMapApi {
   ///    (快照 `signup/index.js:219` 按 `ownerType:ownerId` 建索引),别当私有字段丢掉。
   Future<List<Map<String, dynamic>>> myTeams() => _list(
     () => _client.dio.post<Map<String, dynamic>>('/api/team/my'),
-    '我的队伍没读到',
+    TeamMapLocalFailure.mine,
   );
 
   /// 我的申请(待审 / 被拒):`POST /api/team/my-applications {}`
   /// → `[{teamId, title, leaderName, applyStatus}]`。快照 `index.js:469`。
   Future<List<Map<String, dynamic>>> myApplications() => _list(
     () => _client.dio.post<Map<String, dynamic>>('/api/team/my-applications'),
-    '我的队伍没读到',
+    TeamMapLocalFailure.mine,
   );
 
   /// 建活动队伍:`POST /api/team/create`(JSON)。真源 `utils/team-up.js`。
@@ -153,7 +156,7 @@ class TeamMapApi {
         },
       );
     } on DioException {
-      throw TeamMapApiException('网络异常，请稍后重试');
+      throw const TeamMapApiException('网络异常，请稍后重试', localReason: TeamMapLocalFailure.network);
     }
     final Map<String, dynamic> body = resp.data ?? const <String, dynamic>{};
     final String errorCode = '${body['errorCode'] ?? ''}'.trim();
@@ -162,6 +165,7 @@ class TeamMapApi {
       throw TeamMapApiException(
         msg.isEmpty ? '创建队伍失败，请稍后重试' : msg,
         errorCode: errorCode,
+        localReason: msg.isEmpty ? TeamMapLocalFailure.create : null,
       );
     }
     final Object? data = body['data'];
@@ -170,7 +174,7 @@ class TeamMapApi {
         ? rawTeamId.toInt()
         : int.tryParse('${rawTeamId ?? ''}') ?? 0;
     if (teamId <= 0) {
-      throw TeamMapApiException('创建队伍失败，请稍后重试', errorCode: errorCode);
+      throw TeamMapApiException('创建队伍失败，请稍后重试', errorCode: errorCode, localReason: TeamMapLocalFailure.create);
     }
     return teamId;
   }
@@ -189,47 +193,63 @@ class TeamMapApi {
       _post('/api/team/join-mode', <String, dynamic>{
         'teamId': teamId,
         'joinMode': inviteOnly ? 1 : 2,
-      }, '加入方式没改成功');
+      }, TeamMapLocalFailure.joinMode);
 
   Future<void> _post(
     String path,
     Map<String, dynamic> body,
-    String fallback,
+    TeamMapLocalFailure fallback,
   ) async {
     await _send(
-      () => _client.dio.post<Map<String, dynamic>>(path, data: body),
+      () => _client.dio.post<Map<String, dynamic>>(path, data: body, options: RequestSessionScope.options()),
       fallback,
     );
   }
 
   Future<List<Map<String, dynamic>>> _list(
     Future<Response<Map<String, dynamic>>> Function() request,
-    String fallback,
+    TeamMapLocalFailure fallback,
   ) async {
     final Map<String, dynamic> body = await _send(request, fallback);
     final Object? data = body['data'];
-    if (data is! List) throw TeamMapApiException(fallback);
+    if (data is! List) throw TeamMapApiException(fallback.message, localReason: fallback);
     return data.whereType<Map<String, dynamic>>().toList();
   }
 
   /// code==200 才算成功;非 200 把后端 `msg` + `errorCode` 原样抛上来。
   Future<Map<String, dynamic>> _send(
     Future<Response<Map<String, dynamic>>> Function() request,
-    String fallback,
+    TeamMapLocalFailure fallback,
   ) async {
     final Response<Map<String, dynamic>> resp;
     try {
       resp = await request();
     } on DioException {
       // 网络层失败没有 errorCode ⇒ 页面按「只报失败、不改状态」处理。
-      throw TeamMapApiException(fallback);
+      throw TeamMapApiException(fallback.message, localReason: fallback);
     }
     final Map<String, dynamic> body = resp.data ?? const <String, dynamic>{};
     if ((body['code'] as num?)?.toInt() != 200) {
       final String msg = '${body['msg'] ?? ''}'.trim();
       final String code = '${body['errorCode'] ?? ''}'.trim();
-      throw TeamMapApiException(msg.isEmpty ? fallback : msg, errorCode: code);
+      throw TeamMapApiException(msg.isEmpty ? fallback.message : msg, errorCode: code,
+        localReason: msg.isEmpty ? fallback : null);
     }
     return body;
   }
+}
+
+/// Authored fallback identity, never inferred from a server message.
+enum TeamMapLocalFailure {
+  nearby('附近的队伍没能读到'),
+  apply('申请没发出去'),
+  withdraw('撤回没成功'),
+  applications('申请列表没读到'),
+  handle('处理没成功'),
+  mine('我的队伍没读到'),
+  joinMode('加入方式没改成功'),
+  create('创建队伍失败，请稍后重试'),
+  network('网络异常，请稍后重试');
+  const TeamMapLocalFailure(this.message);
+  final String message;
 }

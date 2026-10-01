@@ -101,6 +101,15 @@ int? _teamEpochMs(Object? value) {
 /// 「N 分钟 / N 小时」的剩余时刻人话 —— 快照 `expireLeft()`:真实失效 =
 /// min(申请+24h, 场次开始),**由服务端 applyExpireTime 定夺**;
 /// 拿不到或已过期 → ''(调用方兜底通用规则句,不许断言固定小时数)。
+int? teamExpireMinutes(Object? applyExpireTime, DateTime now) {
+  final int? at = _teamEpochMs(applyExpireTime);
+  if (at == null) return null;
+  final int diffMs = at - now.millisecondsSinceEpoch;
+  if (diffMs <= 0) return null;
+  final int minutes = diffMs ~/ 60000;
+  return minutes < 1 ? 1 : minutes;
+}
+
 String teamExpireLeft(Object? applyExpireTime, DateTime now) {
   final int? at = _teamEpochMs(applyExpireTime);
   if (at == null) return '';
@@ -434,6 +443,11 @@ class TeamErrorOutcome {
     this.primary = '',
     this.secondary = '',
     this.primaryAction = '',
+    this.operation = '',
+    this.errorCode = '',
+    this.hasDisplayProvenance = false,
+    this.whyIsServerMessage = false,
+    this.localFailureKey = '',
   });
 
   final String title;
@@ -449,6 +463,11 @@ class TeamErrorOutcome {
   final String primary;
   final String secondary;
   final String primaryAction;
+  final String operation;
+  final String errorCode;
+  final bool hasDisplayProvenance;
+  final bool whyIsServerMessage;
+  final String localFailureKey;
 }
 
 TeamErrorOutcome resolveTeamError(String op, Map<String, dynamic>? res) {
@@ -460,6 +479,11 @@ TeamErrorOutcome resolveTeamError(String op, Map<String, dynamic>? res) {
       ? hit.why
       : (msg.isNotEmpty ? msg : '请稍后再试');
   return TeamErrorOutcome(
+    operation: op,
+    errorCode: code,
+    hasDisplayProvenance: true,
+    whyIsServerMessage: (hit == null || hit.why.isEmpty) && msg.isNotEmpty && _text(res?['_localFailure']).isEmpty,
+    localFailureKey: (hit == null || hit.why.isEmpty) ? _text(res?['_localFailure']) : '',
     title: hit != null && hit.title.isNotEmpty ? hit.title : fallbackTitle,
     why: why,
     patch: hit is _TeamErrorPatchRule ? hit.patch : null,
@@ -483,8 +507,10 @@ class MyTeamRow {
     required this.actionText,
     required this.actionKind,
     required this.action,
+    this.displaySource = const <String, dynamic>{},
   });
 
+  final Map<String, dynamic> displaySource;
   final String key;
   final int teamId;
   final String name;
@@ -521,6 +547,7 @@ List<MyTeamRow> myTeamRows(
     rows.add(
       MyTeamRow(
         key: 'j$id',
+        displaySource: Map<String, dynamic>.unmodifiable(t),
         teamId: id,
         name: teamDisplayName(t),
         sub: '${_int(t['joinedCount']) ?? 0}/${_int(t['maxMembers']) ?? 0} 人',
@@ -545,6 +572,7 @@ List<MyTeamRow> myTeamRows(
       rows.add(
         MyTeamRow(
           key: 'p$id',
+          displaySource: Map<String, dynamic>.unmodifiable(a),
           teamId: id,
           name: teamDisplayName(a),
           sub:
@@ -562,6 +590,7 @@ List<MyTeamRow> myTeamRows(
       rows.add(
         MyTeamRow(
           key: 'r$id',
+          displaySource: Map<String, dynamic>.unmodifiable(a),
           teamId: id,
           name: teamDisplayName(a),
           sub: '不能再申请这支队伍',

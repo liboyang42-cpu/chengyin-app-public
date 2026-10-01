@@ -1,3 +1,4 @@
+import '../../core/network/request_session_scope.dart';
 import 'package:dio/dio.dart';
 
 import '../../core/network/dio_client.dart';
@@ -30,9 +31,11 @@ class PageParityApi {
       'ownerId': activityId,
       'maxMembers': maxMembers,
     });
-    final int? teamId = (data['teamId'] as num?)?.toInt();
+    final Object? rawTeamId = data['teamId'];
+    final int? teamId = rawTeamId is num ? rawTeamId.toInt() : null;
     if (teamId == null || teamId <= 0) {
-      throw const PageParityApiException('创建队伍回执不完整');
+      throw const PageParityApiException('创建队伍回执不完整',
+        isLocalFallback: true, localReason: PageParityLocalFailure.teamCreateReceipt);
     }
     return teamId;
   }
@@ -431,13 +434,14 @@ class PageParityApi {
     Map<String, dynamic>? query,
   }) async {
     final Response<Map<String, dynamic>> response = await _client.dio
-        .get<Map<String, dynamic>>(path, queryParameters: query);
+        .get<Map<String, dynamic>>(path, queryParameters: query,
+          options: RequestSessionScope.options());
     return _unwrap(response.data);
   }
 
   Future<List<Map<String, dynamic>>> _getList(String path) async {
     final Response<Map<String, dynamic>> response = await _client.dio
-        .get<Map<String, dynamic>>(path);
+        .get<Map<String, dynamic>>(path, options: RequestSessionScope.options());
     final dynamic data = _unwrapValue(response.data);
     return _maps(data);
   }
@@ -448,7 +452,8 @@ class PageParityApi {
     Map<String, dynamic>? query,
   }) async {
     final Response<Map<String, dynamic>> response = await _client.dio
-        .post<Map<String, dynamic>>(path, data: body, queryParameters: query);
+        .post<Map<String, dynamic>>(path, data: body, queryParameters: query,
+          options: RequestSessionScope.options());
     return _unwrap(response.data);
   }
 
@@ -478,7 +483,8 @@ class PageParityApi {
     final dynamic code = body['code'];
     final bool ok = code is num ? code.toInt() == 200 : '$code' == '200';
     if (!ok) {
-      throw PageParityApiException((body['msg'] ?? '请求失败').toString());
+      throw PageParityApiException((body['msg'] ?? '请求失败').toString(),
+        isLocalFallback: body['msg'] == null);
     }
   }
 
@@ -498,9 +504,13 @@ class PageParityApi {
   }
 }
 
+enum PageParityLocalFailure { teamCreateReceipt }
+
 class PageParityApiException implements Exception {
-  const PageParityApiException(this.message);
+  const PageParityApiException(this.message, {this.isLocalFallback = false, this.localReason});
   final String message;
+  final bool isLocalFallback;
+  final PageParityLocalFailure? localReason;
 
   @override
   String toString() => message;

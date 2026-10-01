@@ -1,3 +1,5 @@
+import '../orders/registration_order_strings.dart';
+import '../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -61,7 +63,7 @@ class _BodyState extends ConsumerState<_Body> {
   /// 真源 joinStateText:公开团直进「已加入俱乐部」、私密团进待审
   /// 「申请已提交，等待主理人审核」—— 两种回执都要说清,
   /// 不许把 pending 显示成已入群。
-  String? _joinStateText;
+  bool? _joinSucceeded;
 
   Future<void> _follow(ExploreRevisit r) async {
     if (_following) return;
@@ -74,12 +76,12 @@ class _BodyState extends ConsumerState<_Body> {
       if (!mounted) return;
       setState(() => _followed = true);
       // 真源 followClub 成功只 toast「已关注」,不常驻状态文字。
-      CyNativeNotice.show(context, '已关注');
+      CyNativeNotice.show(context, stringsOf(context).ticketCompletionFollowed);
     } catch (e) {
       if (!mounted) return;
       CyNativeNotice.show(
         context,
-        e.toString().replaceFirst('Exception: ', ''),
+        localizedOrderError(context, e),
         isError: true,
       );
     } finally {
@@ -96,13 +98,13 @@ class _BodyState extends ConsumerState<_Body> {
       final bool joined = state == 'joined';
       setState(() {
         _joined = joined;
-        _joinStateText = joined ? '已加入俱乐部' : '申请已提交，等待主理人审核';
+        _joinSucceeded = joined;
       });
     } catch (e) {
       if (!mounted) return;
       CyNativeNotice.show(
         context,
-        e.toString().replaceFirst('Exception: ', ''),
+        localizedOrderError(context, e),
         isError: true,
       );
     } finally {
@@ -116,17 +118,21 @@ class _BodyState extends ConsumerState<_Body> {
     final CyPalette palette = CyPalette.of(context);
     final ExploreCompletion c = widget.completion;
     final ExploreRevisit? r = c.revisit;
-    final String? progress = c.stampProgressText;
-    final String? empty = c.awardsEmptyText;
+    final strings = stringsOf(context);
+    final String? progress = c.requiredChapterCount > 0
+        ? strings.ticketCompletionProgress(c.redeemedChapterCount, c.requiredChapterCount) : null;
+    final String? empty = c.awardsCredited ? null : c.completed
+        ? strings.ticketCompletionPendingAwards
+        : strings.ticketCompletionVisitAll(c.requiredChapterCount);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         const SizedBox(height: CyTokens.space5),
-        Row(
+        Wrap(
+          spacing: CyTokens.space3,
           children: <Widget>[
-            Text('探店图鉴', style: textTheme.titleMedium),
-            const Spacer(),
+            Text(stringsOf(context).ticketCompletionAlbum, style: textTheme.titleMedium),
             if (progress != null)
               Text(
                 progress,
@@ -147,7 +153,7 @@ class _BodyState extends ConsumerState<_Body> {
           ),
         ],
         const SizedBox(height: CyTokens.space4),
-        Text('通关奖励', style: textTheme.titleSmall),
+        Text(stringsOf(context).ticketCompletionAwards, style: textTheme.titleSmall),
         const SizedBox(height: CyTokens.space2),
         if (empty != null)
           Text(
@@ -159,15 +165,15 @@ class _BodyState extends ConsumerState<_Body> {
         if (r != null) ...<Widget>[
           const SizedBox(height: CyTokens.space4),
           // 真源批5 第三卡标题原话「下次再来」(旧文案「再来一次」是自造)。
-          Text('下次再来', style: textTheme.titleSmall),
+          Text(stringsOf(context).ticketCompletionRevisit, style: textTheme.titleSmall),
           const SizedBox(height: CyTokens.space2),
           Text(
-            r.clubName,
+            r.hasServerClubName ? r.clubName : strings.ticketCompletionHostClub,
             style: textTheme.bodyMedium,
             overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: CyTokens.space1),
-          Row(
+          Wrap(
             children: <Widget>[
               // 关注是**自愿**的,不与任何权益交换(小程序注释原话)。
               // 真源 revisit-actions 只有这两颗钮:关注主办俱乐部 / 加入俱乐部,
@@ -180,7 +186,7 @@ class _BodyState extends ConsumerState<_Body> {
                   padding: const EdgeInsets.symmetric(
                     horizontal: CyTokens.space2,
                   ),
-                  child: Text(_following ? '关注中…' : '关注主办俱乐部'),
+                  child: Text(_following ? stringsOf(context).ticketCompletionFollowing : stringsOf(context).ticketCompletionFollow),
                 ),
               if (r.canJoin && !_joined)
                 CupertinoButton(
@@ -190,13 +196,13 @@ class _BodyState extends ConsumerState<_Body> {
                   padding: const EdgeInsets.symmetric(
                     horizontal: CyTokens.space2,
                   ),
-                  child: Text(_joining ? '提交中…' : '加入俱乐部'),
+                  child: Text(_joining ? stringsOf(context).ticketCompletionSubmitting : stringsOf(context).ticketCompletionJoin),
                 ),
             ],
           ),
-          if (_joinStateText != null)
+          if (_joinSucceeded != null)
             Text(
-              _joinStateText!,
+              _joinSucceeded! ? stringsOf(context).ticketCompletionJoined : stringsOf(context).ticketCompletionJoinPending,
               style: textTheme.labelMedium?.copyWith(
                 color: palette.textTertiary,
               ),
@@ -211,7 +217,7 @@ class _BodyState extends ConsumerState<_Body> {
             minimumSize: const Size(44, 44),
             alignment: Alignment.centerLeft,
             padding: const EdgeInsets.symmetric(horizontal: CyTokens.space2),
-            child: Text(r.nextEditionText, style: textTheme.bodyMedium),
+            child: Text(_nextEditionText(context, r), style: textTheme.bodyMedium),
           ),
         ],
       ],
@@ -249,7 +255,7 @@ class _StampChip extends StatelessWidget {
           ),
           const SizedBox(width: CyTokens.space1),
           Text(
-            stamp.title,
+            stamp.hasServerTitle ? stamp.title : stringsOf(context).ticketCompletionChapter(stamp.chapterId),
             style: textTheme.bodySmall?.copyWith(
               color: stamp.collected
                   ? palette.textPrimary
@@ -293,4 +299,14 @@ class _AwardRow extends StatelessWidget {
       ),
     );
   }
+}
+
+String _nextEditionText(BuildContext context, ExploreRevisit revisit) {
+  final strings = stringsOf(context);
+  final next = revisit.nextEditionTarget;
+  if (next == null) return strings.ticketCompletionNextPending;
+  final raw = next.startDate ?? '';
+  final date = raw.length <= 5 ? '' : raw.substring(5, raw.length < 10 ? raw.length : 10);
+  return strings.ticketCompletionNextStarts(
+    next.hasServerName ? next.name : strings.ticketCompletionNext, date);
 }

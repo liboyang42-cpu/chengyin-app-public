@@ -30,6 +30,7 @@ class FakeImChatApi implements ImApi {
   final List<MessagesCall> calls = <MessagesCall>[];
   final List<int> deleted = <int>[];
   final List<int> readCalls = <int>[];
+  Future<void> Function(int conversationId)? onRead;
 
   /// 覆盖删除行为(默认成功);用来钉失败分支。
   Future<String> Function(int conversationId)? onDelete;
@@ -49,7 +50,10 @@ class FakeImChatApi implements ImApi {
   }
 
   @override
-  Future<void> read(int conversationId) async => readCalls.add(conversationId);
+  Future<void> read(int conversationId) async {
+    readCalls.add(conversationId);
+    await onRead?.call(conversationId);
+  }
 
   @override
   Future<String> deleteConversation(int conversationId) async {

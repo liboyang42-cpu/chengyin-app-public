@@ -1,3 +1,4 @@
+import '../../core/network/request_session_scope.dart';
 import '../../core/network/dio_client.dart';
 import '../models/coop_pool.dart';
 import '../models/coop_finance.dart';
@@ -213,6 +214,7 @@ class CoopApi {
     try {
       final resp = await _client.dio.post<Map<String, dynamic>>(
         '/api/coop/deposit/refund/retry',
+        options: RequestSessionScope.options(),
         data: <String, dynamic>{'inviteId': inviteId},
       );
       res = resp.data ?? const <String, dynamic>{};
@@ -421,7 +423,7 @@ class CoopApi {
     String path,
     Map<String, dynamic> body,
   ) async {
-    final resp = await _client.dio.post<Map<String, dynamic>>(path, data: body);
+    final resp = await _client.dio.post<Map<String, dynamic>>(path, data: body, options: RequestSessionScope.options());
     final Map<String, dynamic> res = resp.data ?? <String, dynamic>{};
     if ((res['code'] as num?)?.toInt() != 200) {
       throw Exception((res['msg'] as String?) ?? '操作失败');
@@ -437,6 +439,7 @@ class CoopApi {
   ]) async {
     final resp = await _client.dio.post<Map<String, dynamic>>(
       path,
+      options: RequestSessionScope.options(),
       data: body ?? <String, dynamic>{},
     );
     final data = resp.data ?? <String, dynamic>{};

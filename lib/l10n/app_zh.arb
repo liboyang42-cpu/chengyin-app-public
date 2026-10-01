@@ -16760,5 +16760,6 @@
   "accountDeleteNoticeIrreversible": "注销后账号无法再登录,个人信息将被匿名化处理,操作不可恢复。",
   "accountDeleteNoticeCoolingOff": "提交后进入七日冷静期,到期才真正执行;这七天内可随时撤销。",
   "accountDeleteNoticeOutstanding": "账户有余额、在途提现、进行中的订单或有效报名时不能注销,请先处理完。",
-  "accountDeleteNoticeRoles": "已开通商家或俱乐部身份的账号需先完成相应退出流程。"
+  "accountDeleteNoticeRoles": "已开通商家或俱乐部身份的账号需先完成相应退出流程。",
+  "imSessionChanged": "账号已切换，请从消息列表重新打开会话"
 }

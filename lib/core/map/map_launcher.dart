@@ -1,3 +1,4 @@
+import '../../l10n/app_localizations.dart';
 // 唤起外部地图做导航 —— 对应小程序的 `wx.openLocation`。
 //
 // ★ 小程序有微信内置地图,一句 `wx.openLocation({lat,lng,name,address})` 就完事。
@@ -99,14 +100,14 @@ Future<MapLaunchResult> launchNavigation({
 
 /// 每一档对应的提示语。★ 「已复制」必须说清**为什么只能复制**,
 /// 否则用户以为按钮坏了。
-String mapLaunchMessage(MapLaunchResult r) {
+String mapLaunchMessage(MapLaunchResult r, {AppLocalizations? strings}) {
   switch (r) {
     case MapLaunchResult.opened:
       return '';
     case MapLaunchResult.copied:
-      return '没找到可用的地图应用,地址已复制到剪贴板';
+      return strings?.mapNavigationCopied ?? '没找到可用的地图应用,地址已复制到剪贴板';
     case MapLaunchResult.noCoordinates:
       // 这是数据没给,不是操作失败 —— 别说「导航失败,请重试」,重试也没用。
-      return '这个地点还没有坐标,暂时导航不了';
+      return strings?.mapNavigationNoCoordinates ?? '这个地点还没有坐标,暂时导航不了';
   }
 }

@@ -1,8 +1,11 @@
+import 'package:dio/dio.dart';
+import '../../l10n/strings.dart';
+import 'ticket_wallet_copy.dart';
+import '../../data/models/registration_read_failure.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../core/network/dio_client.dart';
 import '../../core/providers.dart';
 import '../../core/theme/cy_palette.dart';
 import '../../core/theme/cy_tokens.dart';
@@ -21,13 +24,84 @@ import '../auth/login_gate.dart';
 /// 排序口径照真源 `topics.concat(activities)`:路线票在前、场次票在后,
 /// 组内保持接口返回序,不自造任何排序。
 class WalletSnapshot {
-  const WalletSnapshot({required this.tickets, this.halfFailure});
+  const WalletSnapshot({required this.tickets, this.halfFailure, this.halfFailureKind});
 
   final List<MyRegistration> tickets;
 
   /// 只挂了一路:票夹照常显示能拿到的那半,但要报一次 ——
   /// 真源 `_reportHalfFailure` 原话「别让缺的那半静默」。
   final String? halfFailure;
+  final WalletFailureKind? halfFailureKind;
+}
+
+/// Fallback provenance stays separate from backend text, including identical
+/// Chinese sentences sent explicitly by the server.
+enum WalletFailureKind { route, activity, general, login, network }
+
+class WalletFailureInfo {
+  const WalletFailureInfo(this.message, this.kind);
+  final String message;
+  final WalletFailureKind? kind;
+}
+
+class WalletLoadFailure implements Exception {
+  const WalletLoadFailure(this.info);
+  final WalletFailureInfo info;
+  @override
+  String toString() => info.message;
+}
+
+WalletFailureInfo describeWalletFailure(Object error, WalletFailureKind fallback) {
+  if (error is RegistrationReadFailure) {
+    if (error.hasServerMessage) return WalletFailureInfo(error.message, null);
+    return WalletFailureInfo('', switch (error.kind) {
+      RegistrationReadKind.routeTickets => WalletFailureKind.route,
+      RegistrationReadKind.activityTickets => WalletFailureKind.activity,
+      _ => WalletFailureKind.general,
+    });
+  }
+  final text = '$error'.replaceFirst('Exception: ', '');
+  if (text == '__wallet_route_missing_message__') {
+    return const WalletFailureInfo('路线票加载失败', WalletFailureKind.route);
+  }
+  if (text == '__wallet_activity_missing_message__') {
+    return const WalletFailureInfo('活动票加载失败', WalletFailureKind.activity);
+  }
+  if (error is DioException) {
+    final data = error.response?.data;
+    if (data is Map && data['msg'] is String) {
+      return WalletFailureInfo(data['msg'] as String, null);
+    }
+    if (error.response?.statusCode == 401) {
+      return const WalletFailureInfo('', WalletFailureKind.login);
+    }
+    if (error.type == DioExceptionType.connectionError ||
+        error.type == DioExceptionType.connectionTimeout ||
+        error.type == DioExceptionType.receiveTimeout ||
+        error.type == DioExceptionType.sendTimeout) {
+      return const WalletFailureInfo('', WalletFailureKind.network);
+    }
+  } else if (error.toString().startsWith('Exception: ')) {
+    // Legacy API wrappers own this message; its language is not a status code.
+    return WalletFailureInfo(text, null);
+  }
+  return WalletFailureInfo(fallback == WalletFailureKind.route ? '路线票加载失败'
+      : fallback == WalletFailureKind.activity ? '活动票加载失败' : '票夹没能打开', fallback);
+}
+
+String walletFailureCopy(BuildContext context, String message, WalletFailureKind? kind) => switch (kind) {
+  WalletFailureKind.route => stringsOf(context).ticketWalletRouteError,
+  WalletFailureKind.activity => stringsOf(context).ticketWalletActivityError,
+  WalletFailureKind.general => stringsOf(context).ticketWalletLoadError,
+  WalletFailureKind.login => stringsOf(context).benefitsLoginExpired,
+  WalletFailureKind.network => stringsOf(context).benefitsNetwork,
+  null => message,
+};
+
+String walletExceptionCopy(BuildContext context, Object error) {
+  final info = error is WalletLoadFailure ? error.info
+      : describeWalletFailure(error, WalletFailureKind.general);
+  return walletFailureCopy(context, info.message, info.kind);
 }
 
 /// 我的票夹:`POST /api/registration/list` 两路(1=路线票 / 2=场次票)。
@@ -46,25 +120,22 @@ final myTicketsProvider = FutureProvider.autoDispose<WalletSnapshot>((
   final api = ref.watch(activityApiProvider);
   final results = await Future.wait(<Future<Object>>[
     api
-        .topicTicketList(fallbackMsg: '路线票加载失败')
+        .topicTicketList(fallbackMsg: '__wallet_route_missing_message__')
         .then<Object>((List<MyRegistration> v) => v)
         .catchError((Object e) => e),
     api
-        .ticketList(fallbackMsg: '活动票加载失败')
+        .ticketList(fallbackMsg: '__wallet_activity_missing_message__')
         .then<Object>((List<MyRegistration> v) => v)
         .catchError((Object e) => e),
   ]);
   final Object topic = results[0];
   final Object activity = results[1];
-  final String? topicErr = topic is List<MyRegistration>
-      ? null
-      : friendlyOrBackendMessage(topic, fallback: '路线票加载失败');
-  final String? activityErr = activity is List<MyRegistration>
-      ? null
-      : friendlyOrBackendMessage(activity, fallback: '活动票加载失败');
-  if (topicErr != null && activityErr != null) {
-    // 真源 walletErrorMsg = topic.err || activity.err —— 两路都挂才判死整页。
-    throw Exception(topicErr);
+  final topicFailure = topic is List<MyRegistration> ? null
+      : describeWalletFailure(topic, WalletFailureKind.route);
+  final activityFailure = activity is List<MyRegistration> ? null
+      : describeWalletFailure(activity, WalletFailureKind.activity);
+  if (topicFailure != null && activityFailure != null) {
+    throw WalletLoadFailure(topicFailure);
   }
   final List<MyRegistration> merged = <MyRegistration>[
     ...topic is List<MyRegistration> ? topic : const <MyRegistration>[],
@@ -76,7 +147,8 @@ final myTicketsProvider = FutureProvider.autoDispose<WalletSnapshot>((
     tickets: merged
         .where((MyRegistration r) => r.shouldShowInApp)
         .toList(growable: false),
-    halfFailure: topicErr ?? activityErr,
+    halfFailure: (topicFailure ?? activityFailure)?.message,
+    halfFailureKind: (topicFailure ?? activityFailure)?.kind,
   );
 });
 
@@ -190,7 +262,7 @@ class _TicketsPageState extends ConsumerState<TicketsPage> {
       AsyncValue<WalletSnapshot> next,
     ) {
       final String? half = next.value?.halfFailure;
-      if (half != null) CyNativeNotice.show(context, half);
+      if (half != null) CyNativeNotice.show(context, walletFailureCopy(context, half, next.value?.halfFailureKind));
     });
     return CupertinoPageScaffold(
       navigationBar: const CupertinoNavigationBar(),
@@ -203,16 +275,16 @@ class _TicketsPageState extends ConsumerState<TicketsPage> {
             // 不显式 stretch 会把 58rpx 大标题推到屏幕正中,与小程序完全不同。
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              const CyPageTitle('票夹'),
+              CyPageTitle(stringsOf(context).ticketWalletTitle),
               Expanded(
                 child: guest
                     ? StatusView(
                         key: const Key('tickets-login-gate'),
-                        message: '登录后查看票夹',
-                        sub: '票都在账号里，登录完就能看到。',
+                        message: stringsOf(context).ticketWalletLogin,
+                        sub: stringsOf(context).ticketWalletLoginDetail,
                         icon: CupertinoIcons.lock,
                         large: true,
-                        retryLabel: '去登录',
+                        retryLabel: stringsOf(context).ticketWalletSignIn,
                         onRetry: () async {
                           if (!await requireLogin(context, ref)) return;
                         },
@@ -226,7 +298,7 @@ class _TicketsPageState extends ConsumerState<TicketsPage> {
                           loading: () => Semantics(
                             container: true,
                             liveRegion: true,
-                            label: '正在加载我的票',
+                            label: stringsOf(context).ticketWalletLoading,
                             // 真源 subpackageMember/signup 票夹用 ticket 档(居中单票)。
                             child: const CySkeleton(
                               type: CySkeletonType.ticket,
@@ -236,11 +308,8 @@ class _TicketsPageState extends ConsumerState<TicketsPage> {
                           // 真源 `index.wxml:57`:title「票夹没能打开」,
                           // sub = walletErrorMsg(后端原文,不许吞成一句套话)。
                           error: (Object err, StackTrace st) => StatusView(
-                            message: '票夹没能打开',
-                            sub: friendlyOrBackendMessage(
-                              err,
-                              fallback: '票夹没能打开',
-                            ),
+                            message: stringsOf(context).ticketWalletLoadError,
+                            sub: walletExceptionCopy(context, err),
                             icon: CupertinoIcons.cloud,
                             scrollable: true,
                             onRetry: () => ref.invalidate(myTicketsProvider),
@@ -250,8 +319,8 @@ class _TicketsPageState extends ConsumerState<TicketsPage> {
                             // 真源 `index.wxml:60`:删了 tab 就只有一句空态。
                             if (list.isEmpty) {
                               return StatusView(
-                                message: '还没有票',
-                                sub: '去首页发现路线或报名场次，票会在这里出现。',
+                                message: stringsOf(context).ticketWalletEmpty,
+                                sub: stringsOf(context).ticketWalletEmptyDetail,
                                 large: true,
                                 icon: CupertinoIcons.ticket,
                                 scrollable: true,
@@ -357,7 +426,7 @@ class _TicketCard extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
               _TicketFace(ticket: ticket),
-              _TicketStub(state: state, label: ticket.ticketStatusLabel),
+              _TicketStub(state: state, label: walletStatusLabel(context, ticket)),
             ],
           ),
           // 左缘状态色带,贯穿票面与票根。
@@ -376,8 +445,10 @@ class _TicketCard extends StatelessWidget {
     return Semantics(
       button: true,
       label:
-          '${state.cta.isEmpty ? ticket.ticketStatusLabel : state.cta}，'
-          '${ticket.title ?? '票券'}',
+          stringsOf(context).ticketWalletCardSemantics(
+            state.cta.isEmpty ? walletStatusLabel(context, ticket) : walletCta(context, state),
+            ticket.title ?? stringsOf(context).ticketWalletTicket,
+          ),
       child: ExcludeSemantics(
         child: CupertinoButton(
           onPressed: () {
@@ -390,7 +461,7 @@ class _TicketCard extends StatelessWidget {
               return;
             }
             final String? notice = action.notice;
-            if (notice != null) CyNativeNotice.show(context, notice);
+            if (notice != null) CyNativeNotice.show(context, walletNotice(context, ticket));
           },
           minimumSize: Size.zero,
           padding: EdgeInsets.zero,
@@ -421,7 +492,7 @@ class _WalletTeamEntry extends StatelessWidget {
       padding: EdgeInsets.only(top: CyTokens.space4),
       child: Semantics(
         button: true,
-        label: team.title.isEmpty ? '打开我的队伍' : '打开我的队伍：${team.title}',
+        label: team.title.isEmpty ? stringsOf(context).ticketWalletOpenTeam : stringsOf(context).ticketWalletOpenNamedTeam(team.title),
         child: ExcludeSemantics(
           child: CupertinoButton(
             // 真源是普通 view + hover 按压,不是凸起的按钮:默认内边距清零。
@@ -444,7 +515,7 @@ class _WalletTeamEntry extends StatelessWidget {
                       textBaseline: TextBaseline.alphabetic,
                       children: <Widget>[
                         Text(
-                          '我的队伍',
+                          stringsOf(context).ticketWalletTeam,
                           style: TextStyle(
                             fontSize: CyTokens.typeBody,
                             fontWeight: FontWeight.w600,
@@ -516,7 +587,7 @@ class _TicketFace extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Text(
-            ticket.title ?? '未命名活动',
+            ticket.title ?? stringsOf(context).ticketWalletUnnamed,
             style: textTheme.titleMedium?.copyWith(
               fontSize: CyTokens.typeCardTitle,
               height: CyTokens.leadingTight,
@@ -563,30 +634,31 @@ class _TicketStub extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final CyPalette palette = CyPalette.of(context);
     return SizedBox(
-      height: _height,
+      height: _height * (MediaQuery.textScalerOf(context).scale(17) / 17).clamp(1, 3),
       child: Stack(
         clipBehavior: Clip.none,
         children: <Widget>[
           Container(
             width: double.infinity,
-            height: _height,
+            height: _height * (MediaQuery.textScalerOf(context).scale(17) / 17).clamp(1, 3),
             color: palette.bgElevated,
             padding: EdgeInsets.symmetric(horizontal: CyTokens.space4),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: <Widget>[
-                Text(
+                Expanded(child: Text(
                   label,
                   style: textTheme.bodyMedium?.copyWith(
                     fontSize: CyTokens.typeBody,
                     fontWeight: FontWeight.w700,
                     color: palette.textPrimary,
                   ),
-                ),
+                )),
                 // 真源 wxs `cta()`:已核验/已取消不出 CTA,票根只剩状态词。
                 if (state.cta.isNotEmpty)
-                  Text(
-                    state.cta,
+                  Flexible(child: Text(
+                    walletCta(context, state),
+                    textAlign: TextAlign.end,
                     style: textTheme.labelMedium?.copyWith(
                       fontSize: CyTokens.typeLabel,
                       // 只有待使用态把动作提示提亮,其余保持次要。
@@ -594,7 +666,7 @@ class _TicketStub extends StatelessWidget {
                           ? palette.textPrimary
                           : palette.textTertiary,
                     ),
-                  ),
+                  )),
               ],
             ),
           ),

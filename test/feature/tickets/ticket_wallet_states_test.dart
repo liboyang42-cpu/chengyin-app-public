@@ -1,3 +1,4 @@
+import 'package:chengyin_app/l10n/app_localizations.dart';
 // 票夹三态文案(b1 报告 P2-4/P2-5)。真源 `subpackageMember/signup/index.wxml`:
 //   · 载(:54) loading-label「正在加载我的票」—— 走 aria,骨架不渲染可见文字;
 //   · 空(:60)「还没有票」+ sub「去首页发现路线或报名场次，票会在这里出现。」;
@@ -135,6 +136,8 @@ void main() {
   Future<void> pumpWallet(
     WidgetTester tester, {
     required Future<WalletSnapshot> tickets,
+    Locale locale = const Locale('zh'),
+    TextScaler textScaler = TextScaler.noScaling,
   }) async {
     await tester.pumpWidget(
       ProviderScope(
@@ -145,10 +148,37 @@ void main() {
             (ref) async => const <String, WalletTeam>{},
           ),
         ],
-        child: const MaterialApp(home: TicketsPage()),
+        child: MaterialApp(
+          locale: locale,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          builder: (context, child) => MediaQuery(data: MediaQuery.of(context).copyWith(textScaler: textScaler), child: child!),
+          home: const TicketsPage()),
       ),
     );
   }
+
+  testWidgets('English tickets at large text preserve title and localized status', (tester) async {
+    await pumpWallet(tester,
+      locale: const Locale('en'), textScaler: const TextScaler.linear(2),
+      tickets: Future.value(WalletSnapshot(tickets: [_reg(1, 1)])),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Tickets'), findsOneWidget);
+    expect(find.text('票1'), findsOneWidget);
+    expect(find.text('Ready to use'), findsOneWidget);
+    expect(find.text('Start playing ›'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  test('ticket fallback provenance never rewrites identical server copy', () {
+    final generated = describeWalletFailure(
+      Exception('__wallet_route_missing_message__'), WalletFailureKind.route);
+    final server = describeWalletFailure(Exception('路线票加载失败'), WalletFailureKind.route);
+    expect(generated.kind, WalletFailureKind.route);
+    expect(server.kind, isNull);
+    expect(server.message, '路线票加载失败');
+  });
 
   testWidgets('加载态:骨架屏只画结构,「正在加载我的票」走 aria(真源 loading-label)', (
     WidgetTester tester,

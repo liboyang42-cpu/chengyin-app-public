@@ -281,10 +281,19 @@ class _FakeImApi implements ImApi {
   Future<void> read(int conversationId) async => readIds.add(conversationId);
 
   @override
+  Future<ImReceipt> muteReceipt(int conversationId, {required bool muted}) async =>
+      ImReceipt(muted ? ImReceiptKind.muted : ImReceiptKind.unmuted,
+        serverMessage: await mute(conversationId, muted: muted));
+
+  @override
   Future<String> mute(int conversationId, {required bool muted}) async {
     muteValues.add(muted);
     return muted ? '已开启免打扰' : '已关闭免打扰';
   }
+
+  @override
+  Future<ImReceipt> deleteConversationReceipt(int conversationId) async =>
+      ImReceipt(ImReceiptKind.deleted, serverMessage: await deleteConversation(conversationId));
 
   @override
   Future<String> deleteConversation(int conversationId) async {

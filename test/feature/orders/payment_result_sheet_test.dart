@@ -121,7 +121,7 @@ void main() {
     );
     await tester.pump(const Duration(milliseconds: 100));
     expect(find.text('这笔没有付成功'), findsOneWidget);
-    expect(find.text('钱没有扣,可以直接重试。'), findsOneWidget);
+    expect(find.text('请查看订单确认最终状态，暂不要重复支付。'), findsOneWidget);
     expect(find.text('支付未完成'), findsOneWidget);
     expect(done, isNull, reason: 'fail 相不自愈,停留到人工关');
     await tester.tap(find.byKey(const Key('payment-result-close')));

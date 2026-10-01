@@ -45,7 +45,7 @@ class _FakeImApi implements ImApi {
   Future<ChatMessage> send(int conversationId,
       {required String content,
       int msgType = kMsgText,
-      String? extraJson}) async {
+      String? extraJson, String? clientMessageId}) async {
     sent.add((content: content, msgType: msgType, extraJson: extraJson));
     return ChatMessage(
       id: 100 + sent.length,

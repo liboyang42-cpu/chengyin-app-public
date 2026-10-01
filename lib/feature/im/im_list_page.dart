@@ -1,3 +1,7 @@
+import '../../data/api/im_api.dart';
+import '../../l10n/im_api_display.dart';
+import '../../core/network/request_session_scope.dart';
+import '../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -21,13 +25,21 @@ import '../../core/widgets/cy_native_notice.dart';
 
 /// 会话显示名。★ 系统/官方会话后端可能没有 nickname ——
 /// 那时**不能**落成「城瘾用户」(那是在说对面是个人),按会话类型给通用称呼。
-/// 与小程序 im/list 的兜底文案一致(`cp.nickname || (type==2 ? '系统通知' : '城瘾消息')`)。
-String conversationDisplayName(Conversation conv) {
+/// 与小程序 im/list 的兜底文案一致(`cp.nickname || (type==2 ? stringsOf(context).imSystemNotifications : stringsOf(context).imOfficialMessages)`)。
+String conversationDisplayName(BuildContext context, Conversation conv) {
   final String name = conv.counterparty.nickname;
   if (name.isNotEmpty) return name;
-  if (conv.type == kImTypeSystem) return '系统通知';
-  if (conv.type == kImTypeMerchant) return '城瘾消息';
-  return '城瘾用户';
+  if (conv.type == kImTypeSystem) return stringsOf(context).imSystemNotifications;
+  if (conv.type == kImTypeMerchant) return stringsOf(context).imOfficialMessages;
+  return stringsOf(context).imMemberFallback;
+}
+
+/// Only replace locally generated placeholders. Server/user preview text is verbatim.
+String conversationPreview(BuildContext context, Conversation conv) {
+  if (conv.lastMsgText?.isNotEmpty == true) return conv.lastMsgText!;
+  if (conv.lastMsgType == kMsgImage) return stringsOf(context).imPhotoPreview;
+  if (conv.lastMsgType == kMsgCard) return stringsOf(context).imCardPreview;
+  return '';
 }
 
 /// IM 会话列表:头像 + 昵称 + 最后消息 + 未读角标。点进聊天页。
@@ -110,6 +122,16 @@ class ImListPage extends ConsumerStatefulWidget {
 enum _ConversationScope { all, channels, direct }
 
 class _ImListPageState extends ConsumerState<ImListPage> {
+  late final RequestSessionScope _requestScope;
+
+  @override
+  void initState() {
+    super.initState();
+    _requestScope = ref.read(authControllerProvider.notifier).requestScope(
+      ref.read(authControllerProvider).user?.id ?? 0,
+    );
+  }
+
   _ConversationScope _scope = _ConversationScope.all;
 
   /// 当前生效的筛选词。
@@ -158,8 +180,8 @@ class _ImListPageState extends ConsumerState<ImListPage> {
     return scoped
         .where(
           (Conversation c) =>
-              conversationDisplayName(c).toLowerCase().contains(kw) ||
-              c.preview.toLowerCase().contains(kw),
+              conversationDisplayName(context, c).toLowerCase().contains(kw) ||
+              conversationPreview(context, c).toLowerCase().contains(kw),
         )
         .toList(growable: false);
   }
@@ -169,7 +191,12 @@ class _ImListPageState extends ConsumerState<ImListPage> {
   /// ⚠️ 后端只有**单会话** `read(conversation_id)`,没有批量端点 —— 所以这里逐个发,
   ///   并且**按真实成功数回话**:一条都没成也弹「已全部标为已读」,就是给用户一个
   ///   假回执(小程序 im/list 在同一处踩过这个坑)。
-  Future<void> _readAll(List<Conversation> list) async {
+  Future<void> _readAll(List<Conversation> list) => RequestSessionScope.run(
+    _requestScope,
+    () => _readAllScoped(list),
+  );
+
+  Future<void> _readAllScoped(List<Conversation> list) async {
     if (_readingAll) return;
     final List<int> ids = list
         .where((Conversation c) => c.unread > 0)
@@ -189,11 +216,11 @@ class _ImListPageState extends ConsumerState<ImListPage> {
     setState(() => _readingAll = false);
     ref.invalidate(imConversationsProvider);
     if (failed == 0) {
-      CyNativeNotice.show(context, '已全部标为已读');
+      CyNativeNotice.show(context, stringsOf(context).imReadAllDone);
     } else if (failed == ids.length) {
-      CyNativeNotice.show(context, '标记已读失败，请重试', isError: true);
+      CyNativeNotice.show(context, stringsOf(context).imReadFailed, isError: true);
     } else {
-      CyNativeNotice.show(context, '还有 $failed 条没标记成功，请重试', isError: true);
+      CyNativeNotice.show(context, stringsOf(context).imReadRemaining(failed), isError: true);
     }
   }
 
@@ -205,12 +232,12 @@ class _ImListPageState extends ConsumerState<ImListPage> {
     return CupertinoPageScaffold(
       // 导航栏尾侧 = 「全部已读」(小程序 im/list 右上角那个 ✓ 的等价物)。
       // ⚠️ 中槽**保持空**:本页的标题是页内 CyPageTitle,导航栏再写一遍
-      //   「消息」会出现两个同名文本,而 Dynamic Type 门禁正是按 '消息' 找锚点的。
+      //   「消息」会出现两个同名文本,而 Dynamic Type 门禁正是按 stringsOf(context).imMessages 找锚点的。
       navigationBar: CupertinoNavigationBar(
         trailing: Semantics(
           container: true,
           button: true,
-          label: '全部已读',
+          label: stringsOf(context).imReadAll,
           enabled: hasUnread && !_readingAll,
           onTap: hasUnread ? () => _readAll(loaded) : null,
           child: ExcludeSemantics(
@@ -240,11 +267,11 @@ class _ImListPageState extends ConsumerState<ImListPage> {
             // 不显式 stretch 会把 58rpx 大标题推到屏幕正中,与小程序完全不同。
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              const CyPageTitle('消息'),
+              CyPageTitle(stringsOf(context).imMessages),
               CyCell(
                 key: const Key('im-coop-pool-entry'),
-                title: '合作池',
-                subtitle: '看开放给俱乐部承接的主题',
+                title: stringsOf(context).imCoopPool,
+                subtitle: stringsOf(context).imCoopPoolHint,
                 onTap: _openCoopPool,
               ),
               // 竞猜待答:玩家押完了,答案得商家给,而且**有期限** ——
@@ -260,10 +287,10 @@ class _ImListPageState extends ConsumerState<ImListPage> {
                 ),
                 child: CupertinoSlidingSegmentedControl<_ConversationScope>(
                   groupValue: _scope,
-                  children: const <_ConversationScope, Widget>{
-                    _ConversationScope.all: Text('全部'),
-                    _ConversationScope.channels: Text('频道'),
-                    _ConversationScope.direct: Text('私信'),
+                  children: <_ConversationScope, Widget>{
+                    _ConversationScope.all: Text(stringsOf(context).imAll),
+                    _ConversationScope.channels: Text(stringsOf(context).imChannels),
+                    _ConversationScope.direct: Text(stringsOf(context).imDirect),
                   },
                   onValueChanged: (_ConversationScope? value) {
                     if (value != null) setState(() => _scope = value);
@@ -275,8 +302,8 @@ class _ImListPageState extends ConsumerState<ImListPage> {
                   loading: () =>
                       const CySkeleton(type: CySkeletonType.list, count: 6),
                   error: (Object err, StackTrace st) => StatusView(
-                    message: '消息拉取失败',
-                    sub: '网络好像出了点问题,重试会重新拉取',
+                    message: stringsOf(context).imFetchFailed,
+                    sub: stringsOf(context).imFetchHint,
                     icon: CupertinoIcons.wifi_slash,
                     scrollable: true,
                     onRetry: () => ref.invalidate(imConversationsProvider),
@@ -296,12 +323,12 @@ class _ImListPageState extends ConsumerState<ImListPage> {
   Widget _scopeEmpty() {
     final bool channels = _scope == _ConversationScope.channels;
     return StatusView(
-      message: channels ? '还没有频道' : '还没有私信',
-      sub: channels ? '从主题、俱乐部或队伍进入讨论后,频道会出现在这里' : '去广场认识几个同路的人,聊起来就在这儿了',
+      message: channels ? stringsOf(context).imNoChannels : stringsOf(context).imNoDirect,
+      sub: channels ? stringsOf(context).imNoChannelsHint : stringsOf(context).imNoDirectHint,
       icon: CupertinoIcons.chat_bubble,
       scrollable: true,
       onRetry: channels ? null : _openSquare,
-      retryLabel: '去广场找人',
+      retryLabel: stringsOf(context).imFindPeople,
     );
   }
 
@@ -325,7 +352,7 @@ class _ImListPageState extends ConsumerState<ImListPage> {
           child: CySearchField(
             key: const Key('im-search'),
             value: _keyword,
-            placeholder: '搜索会话',
+            placeholder: stringsOf(context).imSearch,
             onChanged: (String v) => setState(() {
               _keyword = v;
               _openRow = null;
@@ -338,9 +365,9 @@ class _ImListPageState extends ConsumerState<ImListPage> {
               // 出该 tab 的来路空态(_scopeEmpty),不许蹭搜索文案。
               ? (_keyword.trim().isEmpty
                     ? _scopeEmpty()
-                    : const StatusView(
-                        message: '没有匹配的会话',
-                        sub: '换个名字试试，或者清空关键词看全部会话',
+                    : StatusView(
+                        message: stringsOf(context).imNoMatches,
+                        sub: stringsOf(context).imNoMatchesHint,
                         icon: CupertinoIcons.search,
                         scrollable: true,
                       ))
@@ -371,16 +398,16 @@ class _ImListPageState extends ConsumerState<ImListPage> {
       final String key =
           conversation.type == kImTypeSingle ||
               conversation.type == kImTypeMerchant
-          ? '私信'
+          ? stringsOf(context).imDirect
           : !conversation.isGroup
-          ? '通知与服务'
+          ? stringsOf(context).imNotifications
           : conversation.counterparty.bizKey.startsWith('topic_')
-          ? '主题频道'
+          ? stringsOf(context).imThemeChannels
           : conversation.counterparty.bizKey.startsWith('club_')
-          ? '俱乐部频道'
+          ? stringsOf(context).imClubChannels
           : conversation.counterparty.bizKey.startsWith('team_')
-          ? '队伍频道'
-          : '其他频道';
+          ? stringsOf(context).imTeamChannels
+          : stringsOf(context).imOtherChannels;
       (groups[key] ??= <Conversation>[]).add(conversation);
     }
     return groups.entries
@@ -442,8 +469,8 @@ class _PredictInboxEntry extends ConsumerWidget {
     if (!visible) return const SizedBox.shrink();
     return CyCell(
       key: const Key('im-predict-entry'),
-      title: '竞猜待答',
-      subtitle: '玩家押完了，等你公布答案',
+      title: stringsOf(context).imPredictInbox,
+      subtitle: stringsOf(context).imPredictInboxHint,
       onTap: () => context.push('/merchant/predict'),
     );
   }
@@ -476,25 +503,35 @@ class _ConversationTile extends ConsumerStatefulWidget {
 }
 
 class _ConversationTileState extends ConsumerState<_ConversationTile> {
+  late final RequestSessionScope _requestScope;
+
+  @override
+  void initState() {
+    super.initState();
+    _requestScope = ref.read(authControllerProvider.notifier).requestScope(
+      ref.read(authControllerProvider).user?.id ?? 0,
+    );
+  }
+
   bool _busy = false;
   bool _menuOpen = false;
 
   List<ImConversationActionItem> get _items => <ImConversationActionItem>[
-    const ImConversationActionItem(id: 'read', title: '标已读'),
+    ImConversationActionItem(id: 'read', title: stringsOf(context).imRead),
     ImConversationActionItem(
       id: 'mute',
       title: switch (widget.conv.muted) {
-        true => '恢复提醒',
-        false => '免打扰',
-        null => '提醒状态暂不可用',
+        true => stringsOf(context).imUnmute,
+        false => stringsOf(context).imMute,
+        null => stringsOf(context).imMuteUnknown,
       },
     ),
-    const ImConversationActionItem(
+    ImConversationActionItem(
       id: 'delete',
-      title: '删除',
+      title: stringsOf(context).imDelete,
       isDestructive: true,
     ),
-    const ImConversationActionItem(id: 'cancel', title: '取消', isCancel: true),
+    ImConversationActionItem(id: 'cancel', title: stringsOf(context).cancel, isCancel: true),
   ];
 
   void _toast(String message, {bool isError = false}) {
@@ -521,7 +558,7 @@ class _ConversationTileState extends ConsumerState<_ConversationTile> {
         cancelButton: CupertinoActionSheetAction(
           isDefaultAction: true,
           onPressed: () => Navigator.of(sheetContext).pop(),
-          child: const Text('取消'),
+          child: Text(stringsOf(context).cancel),
         ),
       ),
     );
@@ -565,39 +602,44 @@ class _ConversationTileState extends ConsumerState<_ConversationTile> {
 
   /// 执行一个动作。★ 长按菜单与左右滑动**共用这一个出口** ——
   ///   两份实现迟早会分叉成两套语义(L6:滑动与长按顶部动作必须一致)。
-  Future<void> _run(String action) async {
+  Future<void> _run(String action) => RequestSessionScope.run(
+    _requestScope,
+    () => _runScoped(action),
+  );
+
+  Future<void> _runScoped(String action) async {
     if (_busy) return;
     if (action == 'mute' && widget.conv.muted == null) {
-      _toast('提醒状态暂不可用，请刷新后重试', isError: true);
+      _toast(stringsOf(context).imMuteRefresh, isError: true);
       return;
     }
     setState(() => _busy = true);
     try {
-      String? message;
+      ImReceipt? message;
       if (action == 'read') {
         await ref.read(imApiProvider).read(widget.conv.conversationId);
       } else if (action == 'mute') {
         message = await ref
             .read(imApiProvider)
-            .mute(widget.conv.conversationId, muted: !widget.conv.muted!);
+            .muteReceipt(widget.conv.conversationId, muted: !widget.conv.muted!);
       } else if (action == 'delete') {
         final bool ok = await cyConfirm(
           context,
-          title: '删除会话',
-          content: '删除后不会清除对方消息记录，确定删除这条会话吗？',
-          confirmText: '删除',
+          title: stringsOf(context).imDeleteConversation,
+          content: stringsOf(context).imDeleteConfirm,
+          confirmText: stringsOf(context).imDelete,
           danger: true,
         );
         if (!ok || !mounted) return;
         message = await ref
             .read(imApiProvider)
-            .deleteConversation(widget.conv.conversationId);
+            .deleteConversationReceipt(widget.conv.conversationId);
       }
       if (!mounted) return;
-      if (message != null) _toast(message);
+      if (message != null) _toast(imReceiptText(message, stringsOf(context)));
       widget.onChanged();
     } catch (e) {
-      _toast(e.toString().replaceFirst('Exception: ', ''), isError: true);
+      _toast(imErrorText(e, stringsOf(context)), isError: true);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -609,7 +651,7 @@ class _ConversationTileState extends ConsumerState<_ConversationTile> {
     final textTheme = Theme.of(context).textTheme;
     final conv = widget.conv;
     final cp = conv.counterparty;
-    final name = conversationDisplayName(conv);
+    final name = conversationDisplayName(context, conv);
     final bool unread = conv.unread > 0;
     void openChat() {
       // 带上对方 memberId —— 拉黑接口要的是 target_member_id,
@@ -632,13 +674,13 @@ class _ConversationTileState extends ConsumerState<_ConversationTile> {
         if (unread)
           CySwipeAction(
             id: 'read',
-            label: '标已读',
+            label: stringsOf(context).imRead,
             icon: CupertinoIcons.checkmark_alt,
             onPressed: () => _run('read'),
           ),
         CySwipeAction(
           id: 'mute',
-          label: conv.muted == true ? '恢复提醒' : '免打扰',
+          label: conv.muted == true ? stringsOf(context).imUnmute : stringsOf(context).imMute,
           icon: conv.muted == true
               ? CupertinoIcons.bell
               : CupertinoIcons.bell_slash,
@@ -650,7 +692,7 @@ class _ConversationTileState extends ConsumerState<_ConversationTile> {
       trailing: <CySwipeAction>[
         CySwipeAction(
           id: 'delete',
-          label: '删除',
+          label: stringsOf(context).imDelete,
           icon: CupertinoIcons.delete,
           destructive: true,
           onPressed: () => _run('delete'),
@@ -658,7 +700,7 @@ class _ConversationTileState extends ConsumerState<_ConversationTile> {
       ],
       child: Semantics(
         button: true,
-        label: '$name，会话，长按显示操作',
+        label: stringsOf(context).imConversationSemantics(name),
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onLongPress: _busy ? null : _menu,
@@ -717,7 +759,7 @@ class _ConversationTileState extends ConsumerState<_ConversationTile> {
                                     left: CyTokens.space2,
                                   ),
                                   child: Text(
-                                    fmtConversationTime(conv.lastMsgAt),
+                                    fmtConversationTime(conv.lastMsgAt, context: context),
                                     // .conv-time:label(24rpx) + --cy-text-secondary
                                     style: textTheme.labelMedium?.copyWith(
                                       color: p.textSecondary,
@@ -731,7 +773,7 @@ class _ConversationTileState extends ConsumerState<_ConversationTile> {
                             children: <Widget>[
                               Expanded(
                                 child: Text(
-                                  conv.preview,
+                                  conversationPreview(context, conv),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   // .conv-preview:body(28rpx) + --cy-text-secondary
@@ -798,7 +840,7 @@ class _OfficialTag extends StatelessWidget {
         borderRadius: BorderRadius.circular(CyTokens.radiusSm),
       ),
       child: Text(
-        '官方',
+        stringsOf(context).imOfficial,
         style: TextStyle(
           fontSize: CyTokens.typeMicro,
           fontWeight: FontWeight.w700,

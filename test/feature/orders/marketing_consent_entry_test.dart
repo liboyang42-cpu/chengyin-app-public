@@ -204,5 +204,21 @@ void main() {
         '网络连接失败，请重试',
       );
     });
+    test('localized fallbacks preserve nonempty backend messages and request identity', () async {
+      const offer = ConsentOffer(merchantRowId: 7, merchantOwnerMemberId: 5, merchantName: '原始商家');
+      for (final entry in <(Object, String)>[
+        (const PageParityApiException(''), 'Could not save'),
+        (const PageParityApiException('原始后端说明'), '原始后端说明'),
+        (DioException(requestOptions: RequestOptions(path: '/test')), 'Connection failed'),
+      ]) {
+        final api = _FakeApi(setError: entry.$1);
+        expect(await submitConsent(api, offer: offer, optedIn: true,
+          requestId: 'stable-request', saveFailureText: 'Could not save',
+          networkFailureText: 'Connection failed'), entry.$2);
+        expect(api.setCalls.single['requestId'], 'stable-request');
+        expect(api.setCalls.single['channel'], 'IN_APP');
+        expect(api.setCalls.single['merchantOwnerMemberId'], 5);
+      }
+    });
   });
 }
