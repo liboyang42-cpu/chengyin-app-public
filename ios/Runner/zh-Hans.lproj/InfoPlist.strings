@@ -1,0 +1,6 @@
+"NSCameraUsageDescription" = "用于扫描节点二维码、实时预览滤镜并拍照完成打卡和拍摄城市邮票";
+"NSLocationWhenInUseUsageDescription" = "用于判断你是否到达节点完成到店打卡";
+"NSPhotoLibraryUsageDescription" = "用于选择照片完成拍照打卡";
+"NSMicrophoneUsageDescription" = "用于录制你的五句话样本，生成本店 AI 形象的声音；以及在店铺分身对话里按住说话向它提问";
+"NSMotionUsageDescription" = "用于检测设备是否保持静止，完成静止挑战";
+"NSPhotoLibraryAddUsageDescription" = "用于把你生成的漫游分享海报保存到系统相册";

@@ -1,3 +1,4 @@
+import '../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:go_router/go_router.dart';
 import '../router/route_paths.dart';
@@ -18,7 +19,7 @@ class StatusView extends StatelessWidget {
     this.scrollable = false,
     this.controller,
     this.onRetry,
-    this.retryLabel = '重试',
+    this.retryLabel,
   });
 
   final String message;
@@ -38,7 +39,7 @@ class StatusView extends StatelessWidget {
   final VoidCallback? onRetry;
 
   /// 重试按钮文案。默认「重试」;需要登录这类场景要写清下一步做什么。
-  final String retryLabel;
+  final String? retryLabel;
 
   /// 用户是不是**退不出去了**。见下面那个按钮处的两条判据。
   static bool _isStranded(BuildContext context) {
@@ -83,7 +84,7 @@ class StatusView extends StatelessWidget {
         Semantics(
           container: true,
           liveRegion: true,
-          label: sub == null ? message : '$message。$sub',
+          label: sub == null ? message : stringsOf(context).sharedStatusAnnouncement(message, sub!),
           child: ExcludeSemantics(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -123,7 +124,7 @@ class StatusView extends StatelessWidget {
           //   radius-pill + btn-h 高,components/cy/error/index.wxss)。
           //   用 TextButton 渲成裸文字,在浅色页上就是一行飘着的粗体字 ——
           //   看不出可以点,也和小程序对不上(2026-08-19 浅色错误态基准图实拍)。
-          CyNativeButton(label: retryLabel, onPressed: onRetry),
+          CyNativeButton(label: retryLabel ?? stringsOf(context).retry, onPressed: onRetry),
         ],
         // ★★ 冷启动深链的「困死」出口。
         //
@@ -148,7 +149,7 @@ class StatusView extends StatelessWidget {
             minimumSize: const Size(44, 44),
             padding: const EdgeInsets.symmetric(horizontal: CyTokens.space3),
             onPressed: () => GoRouter.of(context).go(kHomeRoute),
-            child: const Text('回首页'),
+            child: Text(stringsOf(context).backHome),
           ),
         ],
       ],
@@ -174,16 +175,31 @@ class StatusView extends StatelessWidget {
 /// ⚠️ 列表/详情类页面优先用 [CySkeleton] —— 小程序用的是骨架屏,
 /// 转圈只留给"没有结构可画"的场景(如提交中)。
 class LoadingView extends StatelessWidget {
-  const LoadingView({super.key});
+  const LoadingView({super.key, this.message});
+
+  /// Optional visible progress description; remains announced only once.
+  final String? message;
 
   @override
   Widget build(BuildContext context) {
     return Semantics(
       container: true,
       liveRegion: true,
-      label: '正在加载',
-      child: const ExcludeSemantics(
-        child: Center(child: CupertinoActivityIndicator()),
+      label: message ?? stringsOf(context).loadingAnnouncement,
+      child: ExcludeSemantics(
+        child: Center(
+          child: message == null
+              ? const CupertinoActivityIndicator()
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const CupertinoActivityIndicator(),
+                    const SizedBox(height: CyTokens.space2),
+                    Text(message!, textAlign: TextAlign.center,
+                      style: CyType.body.copyWith(color: CyPalette.of(context).textSecondary)),
+                  ],
+                ),
+        ),
       ),
     );
   }

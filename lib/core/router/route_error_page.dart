@@ -1,3 +1,4 @@
+import '../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:go_router/go_router.dart';
 
@@ -22,13 +23,13 @@ class RouteErrorPage extends StatelessWidget {
     final bool notFound =
         error == null || error!.message.startsWith('no routes for location');
     return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(middle: Text('页面打不开')),
+      navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).routeUnavailableTitle)),
       child: SafeArea(
         child: StatusView(
           large: true,
           icon: CupertinoIcons.question_circle,
-          message: notFound ? '这个页面找不到了' : '这个页面打不开',
-          sub: notFound ? '链接可能过期或打错了,从首页继续逛' : '这个页面遇到了问题,从首页继续逛',
+          message: notFound ? stringsOf(context).routeNotFound : stringsOf(context).routeCannotOpen,
+          sub: notFound ? stringsOf(context).routeNotFoundHint : stringsOf(context).routeCannotOpenHint,
         ),
       ),
     );

@@ -138,12 +138,12 @@ import UIKit
       }
     }
     alert.addAction(UIAlertAction(
-      title: args["cancelText"] as? String ?? "取消",
+      title: args["cancelText"] as? String ?? NSLocalizedString("cancel", comment: "Cancel"),
       style: .cancel,
       handler: { [weak coordinator] _ in coordinator?.complete(nil) }
     ))
     alert.addAction(UIAlertAction(
-      title: args["confirmText"] as? String ?? "确定",
+      title: args["confirmText"] as? String ?? NSLocalizedString("confirm", comment: "Confirm"),
       style: .default,
       handler: { [weak coordinator] _ in
         coordinator?.complete(alert.textFields?.first?.text?.trimmingCharacters(in: .whitespacesAndNewlines))
@@ -178,7 +178,10 @@ import UIKit
     }
 
     let controller = NativeDatePickerViewController(
-      titleText: args["title"] as? String ?? "选择日期",
+      titleText: args["title"] as? String ?? NSLocalizedString("datePickerTitle", comment: "Date picker title"),
+      cancelText: args["cancelText"] as? String ?? NSLocalizedString("cancel", comment: "Cancel"),
+      doneText: args["doneText"] as? String ?? NSLocalizedString("done", comment: "Done"),
+      localeIdentifier: args["localeIdentifier"] as? String,
       mode: pickerMode,
       initialDate: Date(timeIntervalSince1970: initialMilliseconds.doubleValue / 1000),
       minimumDate: Date(timeIntervalSince1970: minimumMilliseconds.doubleValue / 1000),
@@ -259,10 +262,15 @@ private final class NativeDatePickerViewController: UIViewController,
   private let onFinish: () -> Void
   private var didComplete = false
   private let titleText: String
+  private let cancelText: String
+  private let doneText: String
   private let mode: UIDatePicker.Mode
 
   init(
     titleText: String,
+    cancelText: String,
+    doneText: String,
+    localeIdentifier: String?,
     mode: UIDatePicker.Mode,
     initialDate: Date,
     minimumDate: Date,
@@ -271,7 +279,12 @@ private final class NativeDatePickerViewController: UIViewController,
     onFinish: @escaping () -> Void
   ) {
     self.titleText = titleText
+    self.cancelText = cancelText
+    self.doneText = doneText
     self.mode = mode
+    if let localeIdentifier = localeIdentifier {
+      picker.locale = Locale(identifier: localeIdentifier)
+    }
     completion = result
     self.onFinish = onFinish
     picker.date = initialDate
@@ -299,12 +312,12 @@ private final class NativeDatePickerViewController: UIViewController,
     picker.translatesAutoresizingMaskIntoConstraints = false
 
     let cancel = UIButton(type: .system)
-    cancel.setTitle("取消", for: .normal)
+    cancel.setTitle(cancelText, for: .normal)
     cancel.titleLabel?.font = .preferredFont(forTextStyle: .body)
     cancel.addTarget(self, action: #selector(cancelTapped), for: .touchUpInside)
 
     let done = UIButton(type: .system)
-    done.setTitle("完成", for: .normal)
+    done.setTitle(doneText, for: .normal)
     done.titleLabel?.font = .preferredFont(forTextStyle: .headline)
     done.addTarget(self, action: #selector(doneTapped), for: .touchUpInside)
 

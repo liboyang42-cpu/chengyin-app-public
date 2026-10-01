@@ -1,3 +1,5 @@
+import '../../l10n/app_localizations.dart';
+
 // 上传位的**尺寸提示**。
 //
 // ★★ 小程序在 6 处上传位都标了比例(俱乐部封面/头像、个人背景图、
@@ -17,3 +19,7 @@ const String kHint1x1 = '1:1 方图';
 
 /// 拼一句完整提示。[what] 是这个位是什么,如「封面」。
 String uploadHint(String what, String ratio) => '$what · $ratio';
+
+String landscapeUploadHint(AppLocalizations strings) => strings.uploadLandscapeRatio;
+
+String squareUploadHint(AppLocalizations strings) => strings.uploadSquareRatio;

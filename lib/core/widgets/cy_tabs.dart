@@ -1,3 +1,4 @@
+import '../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:native_liquid_glass/native_liquid_glass.dart';
@@ -325,7 +326,7 @@ class CyTabs extends StatelessWidget {
       button: true,
       selected: selected,
       label: t.badge != null && t.badge! > 0
-          ? '${t.label}，${t.badge} 条未读'
+          ? stringsOf(context).sharedUnreadTabLabel(t.label, t.badge!)
           : t.label,
       onTap: () => onChanged(t.key),
       child: ExcludeSemantics(

@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import '../../l10n/strings.dart';
 
 /// iOS 真机优先调用 UIKit `UIDatePicker`;其他平台、测试环境或通道
 /// 不可用时，退回 Flutter 官方 CupertinoDatePicker。
@@ -17,8 +18,15 @@ Future<DateTime?> showCySystemDatePicker({
   required DateTime initialDateTime,
   required DateTime minimumDate,
   required DateTime maximumDate,
-  String title = '选择日期',
+  String? title,
 }) async {
+  final strings = stringsOf(context);
+  final resolvedTitle = title ?? strings.selectDate;
+  final deviceLocale = View.of(context).platformDispatcher.locale;
+  final pickerLocale = Locale.fromSubtags(
+    languageCode: Localizations.localeOf(context).languageCode,
+    countryCode: deviceLocale.countryCode,
+  );
   final DateTime initial = _clamp(initialDateTime, minimumDate, maximumDate);
 
   if (defaultTargetPlatform == TargetPlatform.iOS && !kIsWeb) {
@@ -33,7 +41,10 @@ Future<DateTime?> showCySystemDatePicker({
             'initialMilliseconds': initial.millisecondsSinceEpoch,
             'minimumMilliseconds': minimumDate.millisecondsSinceEpoch,
             'maximumMilliseconds': maximumDate.millisecondsSinceEpoch,
-            'title': title,
+            'title': resolvedTitle,
+            'cancelText': strings.cancel,
+            'doneText': strings.done,
+            'localeIdentifier': pickerLocale.toLanguageTag(),
           });
       return milliseconds == null
           ? null
@@ -52,7 +63,7 @@ Future<DateTime?> showCySystemDatePicker({
     initialDateTime: initial,
     minimumDate: minimumDate,
     maximumDate: maximumDate,
-    title: title,
+    title: resolvedTitle,
   );
 }
 
@@ -90,7 +101,7 @@ Future<DateTime?> _showCupertinoFallback({
                       key: const Key('cy-native-picker-cancel'),
                       minimumSize: const Size(44, 44),
                       onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('取消'),
+                      child: Text(stringsOf(context).cancel),
                     ),
                     Expanded(
                       child: Text(
@@ -105,7 +116,7 @@ Future<DateTime?> _showCupertinoFallback({
                       key: const Key('cy-native-picker-done'),
                       minimumSize: const Size(44, 44),
                       onPressed: () => Navigator.of(context).pop(pending),
-                      child: const Text('完成'),
+                      child: Text(stringsOf(context).done),
                     ),
                   ],
                 ),
@@ -116,7 +127,7 @@ Future<DateTime?> _showCupertinoFallback({
                   initialDateTime: initialDateTime,
                   minimumDate: minimumDate,
                   maximumDate: maximumDate,
-                  use24hFormat: true,
+                  use24hFormat: MediaQuery.alwaysUse24HourFormatOf(context),
                   showDayOfWeek: mode == CupertinoDatePickerMode.date,
                   onDateTimeChanged: (DateTime value) => pending = value,
                 ),

@@ -1,3 +1,4 @@
+import '../../l10n/strings.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
@@ -204,6 +205,7 @@ class CyNativeButton extends StatelessWidget {
             enabled: enabled,
           )
         : _cupertinoButton(
+            context: context,
             colors: colors,
             effectiveHeight: effectiveHeight,
             enabled: enabled,
@@ -236,6 +238,7 @@ class CyNativeButton extends StatelessWidget {
   }
 
   Widget _cupertinoButton({
+    required BuildContext context,
     required _ButtonColors colors,
     required double effectiveHeight,
     required bool enabled,
@@ -273,7 +276,7 @@ class CyNativeButton extends StatelessWidget {
       button: true,
       enabled: enabled,
       label: label,
-      value: loading ? '正在处理' : null,
+      value: loading ? stringsOf(context).processing : null,
       liveRegion: loading,
       onTap: enabled ? onPressed : null,
       child: ExcludeSemantics(

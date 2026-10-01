@@ -1,3 +1,4 @@
+import '../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:mjn_liquid_ui/mjn_liquid_ui.dart';
@@ -26,8 +27,9 @@ Future<T?> showCyNativeActionSheet<T>({
   required String title,
   required List<CyNativeAction<T>> actions,
   String? message,
-  String cancelLabel = '取消',
+  String? cancelLabel,
 }) async {
+  final String effectiveCancelLabel = cancelLabel ?? stringsOf(context).cancel;
   T? selection;
   try {
     final bool shown = await AppleLiquidSheet.showSheet(
@@ -36,7 +38,7 @@ Future<T?> showCyNativeActionSheet<T>({
       backgroundZoomScale: 1,
       content: AppleLiquidSheetContent(
         title: title,
-        doneSemanticLabel: cancelLabel,
+        doneSemanticLabel: effectiveCancelLabel,
         sections: <AppleLiquidSheetSection>[
           AppleLiquidSheetSection(
             title: message,
@@ -88,7 +90,7 @@ Future<T?> showCyNativeActionSheet<T>({
       cancelButton: CupertinoActionSheetAction(
         isDefaultAction: true,
         onPressed: () => Navigator.of(popupContext).pop(),
-        child: Text(cancelLabel),
+        child: Text(effectiveCancelLabel),
       ),
     ),
   );
