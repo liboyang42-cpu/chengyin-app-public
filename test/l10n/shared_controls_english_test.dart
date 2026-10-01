@@ -60,21 +60,27 @@ void main() {
 
   testWidgets('shared progress has one localized announcement and visible label', (tester) async {
     final semantics = tester.ensureSemantics();
-    addTearDown(semantics.dispose);
-    await tester.pumpWidget(_app(const LoadingView(message: 'Planning route…')));
-    expect(find.text('Planning route…'), findsOneWidget);
-    expect(find.bySemanticsLabel('Planning route…'), findsOneWidget);
-    expect(find.byType(CupertinoActivityIndicator), findsOneWidget);
-    expect(tester.takeException(), isNull);
+    try {
+      await tester.pumpWidget(_app(const LoadingView(message: 'Planning route…')));
+      expect(find.text('Planning route…'), findsOneWidget);
+      expect(find.bySemanticsLabel('Planning route…'), findsOneWidget);
+      expect(find.byType(CupertinoActivityIndicator), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    } finally {
+      semantics.dispose();
+    }
   });
 
   testWidgets('shared status preserves detail and localizes retry', (tester) async {
     final semantics = tester.ensureSemantics();
-    addTearDown(semantics.dispose);
-    await tester.pumpWidget(_app(StatusView(message: 'Not available', sub: '服务器原文', onRetry: () {})));
-    expect(find.text('服务器原文'), findsOneWidget);
-    expect(find.text('Retry'), findsOneWidget);
-    expect(find.bySemanticsLabel('Not available. 服务器原文'), findsOneWidget);
-    expect(tester.takeException(), isNull);
+    try {
+      await tester.pumpWidget(_app(StatusView(message: 'Not available', sub: '服务器原文', onRetry: () {})));
+      expect(find.text('服务器原文'), findsOneWidget);
+      expect(find.text('Retry'), findsOneWidget);
+      expect(find.bySemanticsLabel('Not available. 服务器原文'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    } finally {
+      semantics.dispose();
+    }
   });
 }

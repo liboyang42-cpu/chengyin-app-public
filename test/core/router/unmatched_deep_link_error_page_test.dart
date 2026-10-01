@@ -1,3 +1,4 @@
+import 'package:chengyin_app/l10n/locale_preference.dart';
 // 未匹配深链不许整屏英文 GoException(B1 模拟器报告 P2)。
 //
 // go_router 默认错误页渲染 `PageNotFoundException`(英文,带 "Page not found:
@@ -26,6 +27,7 @@ void main() {
     );
     final container = ProviderContainer(retry: (int _, Object _) => null);
     addTearDown(container.dispose);
+    await container.read(localePreferenceProvider.notifier).select('zh');
 
     await tester.pumpWidget(
       UncontrolledProviderScope(
@@ -55,6 +57,7 @@ void main() {
   testWidgets('页内 push 未匹配路由 → 有系统返回,不必叠回首页', (WidgetTester tester) async {
     final container = ProviderContainer(retry: (int _, Object _) => null);
     addTearDown(container.dispose);
+    await container.read(localePreferenceProvider.notifier).select('zh');
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
