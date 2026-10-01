@@ -23,7 +23,7 @@ Future<String?> showCySystemTextInputAlert({
   String initialValue = '',
   CySystemKeyboardKind keyboardKind = CySystemKeyboardKind.ascii,
 }) async {
-  cancelText ??= stringsOf(context).cancel;
+  final resolvedCancelText = cancelText ?? stringsOf(context).cancel;
   if (defaultTargetPlatform == TargetPlatform.iOS && !kIsWeb) {
     try {
       return await _nativeInputAlertChannel
@@ -31,7 +31,7 @@ Future<String?> showCySystemTextInputAlert({
             'title': title,
             'placeholder': placeholder,
             'confirmText': confirmText,
-            'cancelText': cancelText,
+            'cancelText': resolvedCancelText,
             'initialValue': initialValue,
             'keyboardKind': keyboardKind.name,
           });
@@ -75,7 +75,7 @@ Future<String?> showCySystemTextInputAlert({
       actions: <Widget>[
         CupertinoDialogAction(
           onPressed: () => Navigator.of(context).pop(),
-          child: Text(cancelText),
+          child: Text(resolvedCancelText),
         ),
         CupertinoDialogAction(
           isDefaultAction: true,

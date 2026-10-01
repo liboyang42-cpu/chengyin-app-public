@@ -205,6 +205,7 @@ class CyNativeButton extends StatelessWidget {
             enabled: enabled,
           )
         : _cupertinoButton(
+            context: context,
             colors: colors,
             effectiveHeight: effectiveHeight,
             enabled: enabled,
@@ -237,6 +238,7 @@ class CyNativeButton extends StatelessWidget {
   }
 
   Widget _cupertinoButton({
+    required BuildContext context,
     required _ButtonColors colors,
     required double effectiveHeight,
     required bool enabled,

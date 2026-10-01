@@ -154,16 +154,16 @@ Future<bool> cyConfirm(
   bool showCancel = true,
   CyNativeConfirmPresenter? nativePresenter,
 }) async {
-  confirmText ??= stringsOf(context).ok;
-  cancelText ??= stringsOf(context).cancel;
+  final resolvedConfirmText = confirmText ?? stringsOf(context).ok;
+  final resolvedCancelText = cancelText ?? stringsOf(context).cancel;
   final CyNativeConfirmResult nativeResult =
       await (nativePresenter ?? const CyLiquidGlassConfirmPresenter()).show(
         context,
         CyNativeConfirmRequest(
           title: title,
           content: content,
-          confirmText: confirmText,
-          cancelText: cancelText,
+          confirmText: resolvedConfirmText,
+          cancelText: resolvedCancelText,
           danger: danger,
           showCancel: showCancel,
         ),
@@ -188,13 +188,13 @@ Future<bool> cyConfirm(
         if (showCancel)
           CupertinoDialogAction(
             onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: Text(cancelText),
+            child: Text(resolvedCancelText),
           ),
         CupertinoDialogAction(
           isDefaultAction: !danger,
           isDestructiveAction: danger,
           onPressed: () => Navigator.of(dialogContext).pop(true),
-          child: Text(confirmText),
+          child: Text(resolvedConfirmText),
         ),
       ],
     ),
