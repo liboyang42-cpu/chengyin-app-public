@@ -133,21 +133,24 @@ void main() {
     tester,
   ) async {
     final semantics = tester.ensureSemantics();
-    addTearDown(semantics.dispose);
-    await _pumpSettings(tester);
-    await tester.ensureVisible(find.text('Sound and haptics').first);
-    await tester.tap(find.text('Sound and haptics').first);
-    await tester.pumpAndSettle();
-    expect(find.text('Ambient sound'), findsOneWidget);
-    expect(find.text('Airplane engine'), findsOneWidget);
-    final row = find.byKey(const Key('sound-haptics-row-sound'));
-    expect(tester.getSemantics(row).value, 'On');
-    await tester.tap(find.text('Sound'));
-    await tester.pumpAndSettle();
-    expect(find.text('Settings were not saved. Try again.'), findsOneWidget);
-    expect(tester.getSemantics(row).value, 'On');
-    expect(find.byType(CupertinoSwitch), findsNWidgets(6));
-    expect(tester.takeException(), isNull);
+    try {
+      await _pumpSettings(tester);
+      await tester.ensureVisible(find.text('Sound and haptics').first);
+      await tester.tap(find.text('Sound and haptics').first);
+      await tester.pumpAndSettle();
+      expect(find.text('Ambient sound'), findsOneWidget);
+      expect(find.text('Airplane engine'), findsOneWidget);
+      final row = find.byKey(const Key('sound-haptics-row-sound'));
+      expect(tester.getSemantics(row).value, 'On');
+      await tester.tap(find.text('Sound'));
+      await tester.pumpAndSettle();
+      expect(find.text('Settings were not saved. Try again.'), findsOneWidget);
+      expect(tester.getSemantics(row).value, 'On');
+      expect(find.byType(CupertinoSwitch), findsNWidgets(6));
+      expect(tester.takeException(), isNull);
+    } finally {
+      semantics.dispose();
+    }
   });
 
   testWidgets('English privacy failure uses a localized document action', (
