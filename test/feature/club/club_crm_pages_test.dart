@@ -540,6 +540,7 @@ void main() {
       expect(find.text('¥128.00'), findsOneWidget);
       expect(find.text('标准单人票 ×1'), findsOneWidget);
       await tester.ensureVisible(find.byKey(const Key('club-checkin-refund')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('club-checkin-refund')));
       await tester.pumpAndSettle();
       expect(cancelled.shown, 1);
@@ -630,6 +631,7 @@ void main() {
         confirmPresenter: _Confirm(CyNativeConfirmResult.confirmed))));
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.byKey(const Key('club-checkin-refund')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('club-checkin-refund')));
       await tester.pumpAndSettle();
       expect(club.cancelCalls, 1);
@@ -650,6 +652,7 @@ void main() {
         confirmPresenter: _Confirm(CyNativeConfirmResult.confirmed)), auth: auth));
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.byKey(const Key('club-checkin-refund')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('club-checkin-refund')));
       await tester.pump();
       expect(club.cancelCalls, 1);
@@ -664,17 +667,22 @@ void main() {
     });
     testWidgets('account switch while confirming cancels the original refund intent', (tester) async {
       final confirmation = Completer<CyNativeConfirmResult>();
+      final presenter = _Confirm(CyNativeConfirmResult.confirmed, pending: confirmation);
       final club = _FakeClubApi();
       final crm = _FakeClubCrmApi(checkin: _checkinJson);
       final auth = _SessionAuth();
       await tester.pumpWidget(_host(<dynamic>[
         clubCrmApiProvider.overrideWithValue(crm), clubApiProvider.overrideWithValue(club),
       ], ClubCheckinDetailPage(clubId: 1, registrationId: 11,
-        confirmPresenter: _Confirm(CyNativeConfirmResult.confirmed, pending: confirmation)), auth: auth));
+        confirmPresenter: presenter), auth: auth));
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.byKey(const Key('club-checkin-refund')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('club-checkin-refund')));
       await tester.pump();
+      expect(presenter.shown, 1, reason: 'The confirmation must be open before switching accounts');
+      expect(confirmation.isCompleted, isFalse);
+      expect(club.cancelCalls, 0);
       auth.switchAccount();
       await tester.pump();
       confirmation.complete(CyNativeConfirmResult.confirmed);
