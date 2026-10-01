@@ -1,3 +1,4 @@
+import 'package:chengyin_app/l10n/locale_preference.dart';
 // 未匹配的深链兜底。
 //
 // ★ 起因(2026-09-18,b1-sim-orders 真跑):用 App 唯一注册的 URL scheme
@@ -36,6 +37,7 @@ void main() {
     );
     final container = ProviderContainer(retry: (int _, Object _) => null);
     addTearDown(container.dispose);
+    await container.read(localePreferenceProvider.notifier).select('zh');
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,

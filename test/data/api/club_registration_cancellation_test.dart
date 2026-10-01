@@ -86,6 +86,6 @@ void main() {
     });
     await expectLater(ClubApi(client).cancelRegistrationByOwner(11),
       throwsA(isA<ClubApiException>().having((e) => e.message, 'original message', '  Refund was rejected  ')));
-  }
+  });
 
 }
