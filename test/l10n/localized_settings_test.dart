@@ -1,6 +1,5 @@
 import 'package:chengyin_app/l10n/locale_preference.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:chengyin_app/core/providers.dart';
 import 'package:chengyin_app/data/api/account_api.dart';
 import 'package:chengyin_app/data/models/consent_record.dart';
 import 'package:chengyin_app/feature/settings/settings_page.dart';

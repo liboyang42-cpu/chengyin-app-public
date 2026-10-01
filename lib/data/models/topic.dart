@@ -11,6 +11,7 @@ class Topic {
     this.startDate,
     this.addressName,
     this.isRecommend = 0,
+    this.betaFlag = 0,
     this.isLike = 0,
     this.likeNum = 0,
   });
@@ -29,6 +30,8 @@ class Topic {
   /// 地点(`addressName`)。null/空 = 没配。
   final String? addressName;
   final int isRecommend;
+  /// Source home recommendation marker: exactly betaFlag == 1.
+  final int betaFlag;
   final int isLike;
   final int likeNum;
 
@@ -44,6 +47,7 @@ class Topic {
     startDate: (json['startDate'] ?? json['start_date'])?.toString(),
     addressName: json['addressName']?.toString(),
     isRecommend: asInt(json['isRecommend']),
+    betaFlag: asInt(json['betaFlag']),
     isLike: asInt(json['isLike']),
     likeNum: asInt(json['likeNum']),
   );
