@@ -1,3 +1,4 @@
+import '../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -33,7 +34,7 @@ class _ClubLeaderboardPageState extends ConsumerState<ClubLeaderboardPage> {
     );
     return CupertinoPageScaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      navigationBar: const CupertinoNavigationBar(middle: Text('贡献榜')),
+      navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).clubRankTitle)),
       child: Material(
         color: Colors.transparent,
         child: SafeArea(
@@ -43,7 +44,7 @@ class _ClubLeaderboardPageState extends ConsumerState<ClubLeaderboardPage> {
             children: <Widget>[
               CyTabs(
                 tabs: ClubRankSort.values
-                    .map((ClubRankSort s) => CyTab(key: s.wire, label: s.label))
+                    .map((ClubRankSort s) => CyTab(key: s.wire, label: _sortLabel(context, s)))
                     .toList(),
                 active: _sort.wire,
                 variant: CyTabsVariant.segmented,
@@ -55,16 +56,16 @@ class _ClubLeaderboardPageState extends ConsumerState<ClubLeaderboardPage> {
                 child: rows.when(
                   loading: () => const CySkeleton(),
                   error: (Object e, StackTrace st) => StatusView(
-                    message: '没能加载贡献榜',
-                    sub: '检查网络后重试',
+                    message: stringsOf(context).clubRankLoadFailed,
+                    sub: stringsOf(context).clubPanelRetryNetwork,
                     icon: CupertinoIcons.exclamationmark_triangle,
                     onRetry: () => ref.invalidate(clubLeaderboardProvider),
                   ),
                   data: (List<ClubRankRow> list) {
                     if (list.isEmpty) {
-                      return const StatusView(
-                        message: '还没有人上榜',
-                        sub: '完成一次团后就会出现在这里。',
+                      return StatusView(
+                        message: stringsOf(context).clubRankEmpty,
+                        sub: stringsOf(context).clubRankEmptyBody,
                         icon: Icons.emoji_events_outlined,
                         large: true,
                       );
@@ -98,7 +99,7 @@ class _RankTile extends StatelessWidget {
   /// 当前维度下这一行显示的主数值。
   ///
   /// ★ 配速/用时的 null 显示「—」,**不是 0**。
-  String get _value {
+  String _value(BuildContext context) {
     switch (sort) {
       case ClubRankSort.mileage:
         return '${row.mileage} km';
@@ -109,7 +110,7 @@ class _RankTile extends StatelessWidget {
             ? '—'
             : '${row.completionDuration} min';
       case ClubRankSort.composite:
-        return '${row.score} 分';
+        return stringsOf(context).clubRankPoints(row.score.toString());
     }
   }
 
@@ -136,14 +137,14 @@ class _RankTile extends StatelessWidget {
                   Text(
                     (row.nickname?.isNotEmpty ?? false)
                         ? row.nickname!
-                        : '成员 ${row.memberId}',
+                        : stringsOf(context).clubRankMember(row.memberId),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: t.titleSmall,
                   ),
                   const SizedBox(height: CyTokens.space1),
                   Text(
-                    '通关 ${row.clearCount} · 带团 ${row.hostedCount}',
+                    stringsOf(context).clubRankSummary(row.clearCount, row.hostedCount),
                     style: t.labelSmall?.copyWith(
                       color: AppColors.textSecondary,
                     ),
@@ -151,10 +152,17 @@ class _RankTile extends StatelessWidget {
                 ],
               ),
             ),
-            Text(_value, style: t.titleSmall),
+            Text(_value(context), style: t.titleSmall),
           ],
         ),
       ),
     );
   }
 }
+
+String _sortLabel(BuildContext context, ClubRankSort sort) => switch (sort) {
+  ClubRankSort.composite => stringsOf(context).clubRankSortComposite,
+  ClubRankSort.mileage => stringsOf(context).clubRankSortMileage,
+  ClubRankSort.pace => stringsOf(context).clubRankSortPace,
+  ClubRankSort.duration => stringsOf(context).clubRankSortDuration,
+};

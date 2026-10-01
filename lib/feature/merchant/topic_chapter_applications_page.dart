@@ -1,3 +1,4 @@
+import '../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -76,7 +77,7 @@ class _TopicChapterApplicationsPageState
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      navigationBar: const CupertinoNavigationBar(middle: Text('章节承接')),
+      navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).merchantOwnerReviewTitle)),
       child: Material(
         color: Colors.transparent,
         child: SafeArea(
@@ -92,10 +93,10 @@ class _TopicChapterApplicationsPageState
                 ),
                 child: CyTabs(
                   variant: CyTabsVariant.segmented,
-                  tabs: const <CyTab>[
-                    CyTab(key: 'applications', label: '待我审'),
-                    CyTab(key: 'nodes', label: '点位待审'),
-                    CyTab(key: 'invitable', label: '可邀请'),
+                  tabs: <CyTab>[
+                    CyTab(key: 'applications', label: stringsOf(context).merchantOwnerReviewApplications),
+                    CyTab(key: 'nodes', label: stringsOf(context).merchantOwnerReviewNodes),
+                    CyTab(key: 'invitable', label: stringsOf(context).merchantOwnerReviewInvitable),
                   ],
                   active: _active,
                   onChanged: (String value) => setState(() {
@@ -145,7 +146,7 @@ class _ApplicationsTab extends ConsumerWidget {
       loading: () => const CySkeleton(),
       error: (Object e, StackTrace _) => StatusView(
         icon: CupertinoIcons.exclamationmark_triangle,
-        message: '申请列表没读出来',
+        message: stringsOf(context).merchantOwnerReviewListError,
         sub: e.toString().replaceFirst('Exception: ', ''),
         large: true,
         onRetry: () =>
@@ -153,11 +154,11 @@ class _ApplicationsTab extends ConsumerWidget {
       ),
       data: (List<Map<String, dynamic>> rows) {
         if (rows.isEmpty) {
-          return const StatusView(
+          return StatusView(
             key: Key('owner-applications-empty'),
             icon: CupertinoIcons.tray,
-            message: '还没有商家申请承接',
-            sub: '在「可邀请」里可以直接邀商家来接',
+            message: stringsOf(context).merchantOwnerReviewListEmpty,
+            sub: stringsOf(context).merchantOwnerReviewListEmptyHint,
             large: true,
           );
         }
@@ -196,6 +197,7 @@ class _ApplicationRowState extends ConsumerState<_ApplicationRow> {
   int? get _status => (widget.row['status'] as num?)?.toInt();
 
   Future<void> _audit(bool approve) async {
+    final strings = stringsOf(context);
     String? reason;
     if (!approve) {
       reason = await _askReason();
@@ -203,9 +205,9 @@ class _ApplicationRowState extends ConsumerState<_ApplicationRow> {
     } else {
       final bool ok = await cyConfirm(
         context,
-        title: '通过这家的承接申请?',
-        content: '通过 = 准入,不是背书。通过后这家可以填实际供给并上线点位。',
-        confirmText: '通过',
+        title: stringsOf(context).merchantOwnerReviewApproveTitle,
+        content: stringsOf(context).merchantResidualPolicyApprove,
+        confirmText: stringsOf(context).merchantOwnerReviewApprove,
       );
       if (!ok || !mounted) return;
     }
@@ -220,7 +222,7 @@ class _ApplicationRowState extends ConsumerState<_ApplicationRow> {
             approve: approve,
             reason: reason,
           );
-      text = approve ? '已通过' : '已拒绝';
+      text = approve ? strings.merchantOwnerReviewApproved : strings.merchantOwnerReviewDeclined;
     } on MerchantApiException catch (e) {
       text = e.message;
       isError = true;
@@ -239,21 +241,21 @@ class _ApplicationRowState extends ConsumerState<_ApplicationRow> {
   /// 拒绝必须给理由 —— 只说「已拒绝」,商家不知道改什么就只能反复重投。
   Future<String?> _askReason() => askOwnerRejectReason(
     context,
-    title: '拒绝这家的理由',
-    placeholder: '写清楚哪里不合适',
-    confirmLabel: '确认拒绝',
+    title: stringsOf(context).merchantOwnerReviewReasonTitle,
+    placeholder: stringsOf(context).merchantOwnerReviewReasonHint,
+    confirmLabel: stringsOf(context).merchantOwnerReviewDeclineConfirm,
   );
 
   String get _statusText {
     switch (_status) {
       case 0:
-        return '待审核';
+        return stringsOf(context).merchantOwnerReviewPending;
       case 1:
-        return '已通过';
+        return stringsOf(context).merchantOwnerReviewApproved;
       case 2:
-        return '已拒绝';
+        return stringsOf(context).merchantOwnerReviewDeclined;
       default:
-        return '状态未知';
+        return stringsOf(context).merchantOwnerReviewUnknown;
     }
   }
 
@@ -283,7 +285,7 @@ class _ApplicationRowState extends ConsumerState<_ApplicationRow> {
               Expanded(
                 child: Text(
                   (r['merchantName'] ?? '').toString().trim().isEmpty
-                      ? '未命名商家'
+                      ? stringsOf(context).merchantOwnerReviewUnnamedMerchant
                       : r['merchantName'].toString().trim(),
                   style: t.titleSmall,
                 ),
@@ -297,25 +299,25 @@ class _ApplicationRowState extends ConsumerState<_ApplicationRow> {
           const SizedBox(height: CyTokens.space1),
           Text(
             (r['chapterName'] ?? '').toString().trim().isEmpty
-                ? '未命名章节'
+                ? stringsOf(context).merchantOwnerReviewUnnamedChapter
                 : r['chapterName'].toString().trim(),
             style: t.bodySmall?.copyWith(color: p.textSecondary),
           ),
           // 邀请来的和自己申请来的要分开说 —— 前者是我自己邀的,已经预先批准。
           if (invited)
             Text(
-              '这是你邀请来的,已预先批准',
+              stringsOf(context).merchantOwnerReviewInvited,
               style: t.bodySmall?.copyWith(color: p.textTertiary),
             ),
           if (message.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: CyTokens.space2),
-              child: Text('申请说明:$message', style: t.bodySmall),
+              child: Text(stringsOf(context).merchantOwnerReviewMessage(message), style: t.bodySmall),
             ),
           if (remark.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: CyTokens.space2),
-              child: Text('审核备注:$remark', style: t.bodySmall),
+              child: Text(stringsOf(context).merchantOwnerReviewRemark(remark), style: t.bodySmall),
             ),
           // ★ 只有**待审核**的才摆按钮。已通过/已拒绝的再点必被服务端拒;
           //   状态未知的更不能摆 —— 我们连它在哪一档都不知道。
@@ -327,7 +329,7 @@ class _ApplicationRowState extends ConsumerState<_ApplicationRow> {
                   child: CyNativeButton(
                     key: Key('owner-reject-$_id'),
                     onPressed: _busy ? null : () => _audit(false),
-                    label: '拒绝',
+                    label: stringsOf(context).merchantOwnerReviewDecline,
                     role: CyNativeButtonRole.secondary,
                   ),
                 ),
@@ -336,7 +338,7 @@ class _ApplicationRowState extends ConsumerState<_ApplicationRow> {
                   child: CyNativeButton(
                     key: Key('owner-approve-$_id'),
                     onPressed: _busy ? null : () => _audit(true),
-                    label: '通过',
+                    label: stringsOf(context).merchantOwnerReviewApprove,
                   ),
                 ),
               ],
@@ -377,7 +379,7 @@ Future<String?> askOwnerRejectReason(
                       minimumSize: const Size(44, 44),
                       padding: EdgeInsets.zero,
                       onPressed: () => Navigator.of(ctx).pop(),
-                      child: const Text('取消'),
+                      child: Text(stringsOf(context).merchantOwnerReviewCancel),
                     ),
                   ),
                   child: SafeArea(
@@ -394,9 +396,9 @@ Future<String?> askOwnerRejectReason(
                       ),
                       children: <Widget>[
                         CyField(
-                          label: '理由(会原样发给商家)',
+                          label: stringsOf(context).merchantOwnerReviewReasonLabel,
                           child: Semantics(
-                            label: '拒绝理由，会原样发给商家',
+                            label: stringsOf(context).merchantOwnerReviewReasonSemantics,
                             textField: true,
                             child: CupertinoTextField(
                               key: const Key('owner-reject-reason'),
@@ -467,7 +469,7 @@ class _PendingNodesTab extends ConsumerWidget {
       loading: () => const CySkeleton(),
       error: (Object e, StackTrace _) => StatusView(
         icon: CupertinoIcons.exclamationmark_triangle,
-        message: '待审点位没读出来',
+        message: stringsOf(context).merchantOwnerReviewNodesError,
         sub: e.toString().replaceFirst('Exception: ', ''),
         large: true,
         onRetry: () => ref.invalidate(pendingChapterNodesProvider(topicId)),
@@ -476,11 +478,11 @@ class _PendingNodesTab extends ConsumerWidget {
         if (rows.isEmpty) {
           // ★ 与「可邀请」同理:读到的空列表不能说成「确实没人交」——
           //   服务端对非发布者也可能是空。
-          return const StatusView(
+          return StatusView(
             key: Key('owner-pending-nodes-empty'),
             icon: CupertinoIcons.location,
-            message: '暂时没有待审的商家点位',
-            sub: '商家提交或改动点位后会进入这里,等你过内容准入',
+            message: stringsOf(context).merchantOwnerReviewNodesEmpty,
+            sub: stringsOf(context).merchantOwnerReviewNodesEmptyHint,
             large: true,
           );
         }
@@ -515,23 +517,24 @@ class _PendingNodeRowState extends ConsumerState<_PendingNodeRow> {
   int get _id => (widget.row['id'] as num?)?.toInt() ?? 0;
 
   Future<void> _audit(bool approve) async {
+    final strings = stringsOf(context);
     String? reason;
     if (approve) {
       // ★ 「准入,非背书」是小程序的原话(merchantinfo.js:1464 的 modal 文案)——
       //   只说「确认通过」会让主办方以为平台替商家做了担保。
       final bool ok = await cyConfirm(
         context,
-        title: '通过商家点位?',
-        content: '这是内容准入，不代表平台或主办方为商家背书。',
-        confirmText: '确认通过',
+        title: stringsOf(context).merchantOwnerReviewNodeApproveTitle,
+        content: stringsOf(context).merchantResidualPolicyNodeApprove,
+        confirmText: stringsOf(context).merchantOwnerReviewApproveConfirm,
       );
       if (!ok || !mounted) return;
     } else {
       reason = await askOwnerRejectReason(
         context,
-        title: '驳回商家点位',
-        placeholder: '填写需修改的内容',
-        confirmLabel: '确认驳回',
+        title: stringsOf(context).merchantOwnerReviewNodeRejectTitle,
+        placeholder: stringsOf(context).merchantOwnerReviewNodeReasonHint,
+        confirmLabel: stringsOf(context).merchantOwnerReviewRejectConfirm,
       );
       if (reason == null || !mounted) return;
     }
@@ -542,7 +545,7 @@ class _PendingNodeRowState extends ConsumerState<_PendingNodeRow> {
       await ref
           .read(merchantApiProvider)
           .auditChapterNode(nodeId: _id, approve: approve, reason: reason);
-      text = approve ? '点位已通过' : '点位已驳回';
+      text = approve ? strings.merchantOwnerReviewNodeApproved : strings.merchantOwnerReviewNodeRejected;
     } on MerchantApiException catch (e) {
       // 「承接已失效或未生效,不能编辑节点内容」这类是状态态,不是重试能解决的。
       text = e.message;
@@ -580,7 +583,7 @@ class _PendingNodeRowState extends ConsumerState<_PendingNodeRow> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Text(
-            name.isEmpty ? '未命名点位' : name,
+            name.isEmpty ? stringsOf(context).merchantOwnerReviewUnnamedNode : name,
             style: t.titleSmall,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -610,7 +613,7 @@ class _PendingNodeRowState extends ConsumerState<_PendingNodeRow> {
                 child: CyNativeButton(
                   key: Key('owner-node-reject-$_id'),
                   onPressed: _busy ? null : () => _audit(false),
-                  label: '驳回',
+                  label: stringsOf(context).merchantOwnerReviewReject,
                   role: CyNativeButtonRole.secondary,
                 ),
               ),
@@ -619,7 +622,7 @@ class _PendingNodeRowState extends ConsumerState<_PendingNodeRow> {
                 child: CyNativeButton(
                   key: Key('owner-node-approve-$_id'),
                   onPressed: _busy ? null : () => _audit(true),
-                  label: '通过',
+                  label: stringsOf(context).merchantOwnerReviewApprove,
                 ),
               ),
             ],
@@ -644,7 +647,7 @@ class _InvitableTab extends ConsumerWidget {
       loading: () => const CySkeleton(),
       error: (Object e, StackTrace _) => StatusView(
         icon: CupertinoIcons.exclamationmark_triangle,
-        message: '可邀请名单没读出来',
+        message: stringsOf(context).merchantOwnerReviewInvitableError,
         sub: e.toString().replaceFirst('Exception: ', ''),
         large: true,
         onRetry: () => ref.invalidate(invitableMerchantsProvider(topicId)),
@@ -653,11 +656,11 @@ class _InvitableTab extends ConsumerWidget {
         if (rows.isEmpty) {
           // ★★ 措辞刻意留了余地:服务端对「不是本主题发布者」也返回空列表,
           //   所以这里说不出「确实没有可邀请的商家」这句话。
-          return const StatusView(
+          return StatusView(
             key: Key('owner-invitable-empty'),
             icon: Icons.person_search_outlined,
-            message: '这里暂时没有可邀请的商家',
-            sub: '只有你自己发布的路线、且章节开了招商并配了品类时才会有名单',
+            message: stringsOf(context).merchantOwnerReviewInvitableEmpty,
+            sub: stringsOf(context).merchantOwnerReviewInvitableEmptyHint,
             large: true,
           );
         }
@@ -690,18 +693,19 @@ class _InvitableRowState extends ConsumerState<_InvitableRow> {
   bool _busy = false;
 
   Future<void> _invite() async {
+    final strings = stringsOf(context);
     final Map<String, dynamic> r = widget.row;
     final int chapterId = (r['chapterId'] as num?)?.toInt() ?? 0;
     final int memberId = (r['memberId'] as num?)?.toInt() ?? 0;
     final bool ok = await cyConfirm(
       context,
-      title: '邀请这家承接?',
+      title: stringsOf(context).merchantOwnerReviewInviteTitle,
       // ★ 邀请 = **预先批准的申请**,比"发个消息"重得多:对方收到就能直接
       //   填供给和点位,不再走一轮审核,而且当场占掉一个名额。
       content:
           '邀请等于预先批准:对方可以直接填供给和点位,不再经过你审核,'
           '同时占掉这一章的一个名额。',
-      confirmText: '确认邀请',
+      confirmText: stringsOf(context).merchantOwnerReviewInviteConfirm,
     );
     if (!ok || !mounted) return;
     setState(() => _busy = true);
@@ -714,7 +718,7 @@ class _InvitableRowState extends ConsumerState<_InvitableRow> {
             chapterId: chapterId,
             merchantMemberId: memberId,
           );
-      text = '已邀请,对方可以直接承接';
+      text = strings.merchantOwnerReviewInviteSuccess;
     } on MerchantApiException catch (e) {
       // 「该商家已有本章节的申请」「名额已满」「不能邀请自己」—— 照原文显示。
       text = e.message;
@@ -764,9 +768,9 @@ class _InvitableRowState extends ConsumerState<_InvitableRow> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text((r['name'] ?? '未命名商家').toString(), style: t.titleSmall),
+                Text((r['name'] ?? stringsOf(context).merchantOwnerReviewUnnamedMerchant).toString(), style: t.titleSmall),
                 Text(
-                  (r['chapterName'] ?? '未命名章节').toString(),
+                  (r['chapterName'] ?? stringsOf(context).merchantOwnerReviewUnnamedChapter).toString(),
                   style: t.bodySmall?.copyWith(color: p.textSecondary),
                 ),
                 // ★ 地址和距离**拿不到就不显示这一行**。
@@ -780,7 +784,7 @@ class _InvitableRowState extends ConsumerState<_InvitableRow> {
                   ),
                 if (distance != null)
                   Text(
-                    '约 ${distance.round()} 米',
+                    stringsOf(context).merchantOwnerReviewDistance(distance.round()),
                     style: t.bodySmall?.copyWith(color: p.textTertiary),
                   ),
               ],
@@ -790,7 +794,7 @@ class _InvitableRowState extends ConsumerState<_InvitableRow> {
           CyNativeButton(
             key: Key('owner-invite-${(r['memberId'] ?? 0)}'),
             onPressed: _busy ? null : _invite,
-            label: '邀请',
+            label: stringsOf(context).merchantOwnerReviewInvite,
             role: CyNativeButtonRole.secondary,
           ),
         ],

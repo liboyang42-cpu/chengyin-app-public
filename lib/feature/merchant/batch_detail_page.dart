@@ -1,3 +1,6 @@
+import '../../l10n/strings.dart';
+import 'merchant_operations_strings.dart';
+import 'merchant_finance_detail_strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -38,18 +41,18 @@ class BatchDetailPage extends ConsumerWidget {
     return CupertinoPageScaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       // 标题照小程序 `pages/merchant/ledger/batch-detail/index.wxml:5`(cy-nav-bar title)。
-      navigationBar: const CupertinoNavigationBar(middle: Text('对公结算')),
+      navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).merchantFinanceDetailBatchTitle)),
       child: Material(
         color: Colors.transparent,
         child: SafeArea(
           bottom: false,
           child: id == null || id <= 0
               ? StatusView(
-                  message: '缺少结算批次标识',
-                  sub: '请返回结算列表重新进入',
+                  message: stringsOf(context).merchantFinanceDetailBatchIdMissing,
+                  sub: stringsOf(context).merchantFinanceDetailBatchIdHint,
                   large: true,
                   onRetry: () => _backToList(context),
-                  retryLabel: '返回上一页',
+                  retryLabel: stringsOf(context).merchantFinanceDetailBack,
                 )
               : _Detail(id: id),
         ),
@@ -81,7 +84,7 @@ String _errorText(Object error) =>
 Future<void> _copyVoucher(BuildContext context, String voucher) async {
   await Clipboard.setData(ClipboardData(text: voucher));
   if (!context.mounted) return;
-  CyNativeNotice.show(context, '打款凭证已复制');
+  CyNativeNotice.show(context, stringsOf(context).merchantFinanceDetailVoucherCopied);
 }
 
 class _Detail extends ConsumerWidget {
@@ -108,7 +111,7 @@ class _Detail extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: CyTokens.pageX),
               child: CrmInlineError(
-                title: '结算详情没有更新',
+                title: stringsOf(context).merchantFinanceDetailBatchStale,
                 sub: _errorText(async.error!),
                 onAction: retry,
               ),
@@ -125,14 +128,14 @@ class _Detail extends ConsumerWidget {
     // 「记录不可见」照原文说,不给点了没用的重试(merchant_api 批次详情注释)。
     if (error is MerchantApiException && _isMissingRecord(error.message)) {
       return StatusView(
-        message: '结算批次不可见',
-        sub: '这条记录可能已撤回或不属于当前账号',
+        message: stringsOf(context).merchantFinanceDetailBatchUnavailable,
+        sub: stringsOf(context).merchantFinanceDetailBatchUnavailableHint,
         large: true,
         onRetry: () => _backToList(context),
-        retryLabel: '返回结算列表',
+        retryLabel: stringsOf(context).merchantFinanceDetailBatchList,
       );
     }
-    return merchantErrorView(context, error, what: '结算详情', onRetry: retry);
+    return merchantErrorView(context, error, what: stringsOf(context).merchantFinanceDetailBatchDetail, onRetry: retry);
   }
 }
 
@@ -156,11 +159,11 @@ class _Refreshing extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Text(
-              '正在更新结算详情',
+              stringsOf(context).merchantFinanceDetailBatchRefreshing,
               style: CyType.caption1.copyWith(color: p.textSecondary),
             ),
             Text(
-              '现有详情仍可查看',
+              stringsOf(context).merchantFinanceDetailOldDetails,
               style: CyType.caption1.copyWith(color: p.textTertiary),
             ),
           ],
@@ -192,7 +195,8 @@ class _Body extends StatelessWidget {
     final String amount = (b.amountTotal ?? '').trim();
     // 明细页比列表页多说一句:这里认不出来说「发票状态待确认」而不是整块藏起来
     // ——列表可以省略,明细页省略会让人以为这批没有发票这回事。
-    final String invoice = invoiceText(b.invoiceState) ?? '发票状态待确认';
+    final rawInvoice = invoiceText(b.invoiceState);
+    final String invoice = rawInvoice == null ? stringsOf(context).merchantFinanceDetailInvoiceUnknown : merchantOperationModelText(context, rawInvoice);
 
     return ListView(
       padding: const EdgeInsets.all(CyTokens.pageX),
@@ -207,7 +211,7 @@ class _Body extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               Text(
-                '${b.periodYm ?? '未标注月份'} 批次净额',
+                stringsOf(context).merchantFinanceDetailNetAmount(b.periodYm ?? stringsOf(context).merchantFinanceDetailPeriodUnknown),
                 style: textTheme.labelMedium?.copyWith(color: p.textSecondary),
               ),
               const SizedBox(height: CyTokens.space1),
@@ -228,13 +232,13 @@ class _Body extends StatelessWidget {
                 runSpacing: CyTokens.space1,
                 children: <Widget>[
                   Text(
-                    batchStateText(
+                    merchantOperationModelText(context, batchStateText(
                       displayState: b.displayState,
                       netDirection: b.netDirection,
                       paymentState: b.paymentState,
                       invoiceState: b.invoiceState,
                       holdState: b.holdState,
-                    ),
+                    )),
                     style: textTheme.labelMedium,
                   ),
                   Text(
@@ -249,28 +253,28 @@ class _Body extends StatelessWidget {
               //   反方向的批次即使 paymentState=PAID 也不算,那笔是商家欠平台的。
               if (paidToMe) ...<Widget>[
                 const SizedBox(height: CyTokens.space3),
-                if ((b.paidAt ?? '').isNotEmpty) _Kv('打款日期', b.paidAt!),
+                if ((b.paidAt ?? '').isNotEmpty) _Kv(stringsOf(context).merchantFinanceDetailPaidDate, b.paidAt!),
                 if ((b.payVoucherNo ?? '').isNotEmpty)
                   // 凭证号是拿去跟财务对账的,只在屏上显示带不走没有用 ——
                   // 小程序那行整行可点(`aria-label="复制打款凭证"`)。
                   _Kv(
-                    '打款凭证',
-                    '${b.payVoucherNo!} · 复制',
+                    stringsOf(context).merchantFinanceDetailVoucher,
+                    stringsOf(context).merchantFinanceDetailVoucherCopy(b.payVoucherNo!),
                     onTap: () => _copyVoucher(context, b.payVoucherNo!),
-                    semanticsLabel: '复制打款凭证',
+                    semanticsLabel: stringsOf(context).merchantFinanceDetailCopyVoucher,
                   ),
               ],
             ],
           ),
         ),
         const SizedBox(height: CyTokens.space5),
-        Text('批次对账单', style: textTheme.titleMedium),
+        Text(stringsOf(context).merchantFinanceDetailStatement, style: textTheme.titleMedium),
         const SizedBox(height: CyTokens.space2),
         if (detail.earningEntries.isEmpty && detail.adjustments.isEmpty)
-          const StatusView(
+          StatusView(
             icon: CupertinoIcons.tray,
-            message: '本批次没有可列明的条目',
-            sub: '明细在履约成立后逐条计入',
+            message: stringsOf(context).merchantFinanceDetailEntriesEmpty,
+            sub: stringsOf(context).merchantFinanceDetailEntriesEmptyHint,
           )
         else ...<Widget>[
           // ★★ 收入与调整**分开两段**。后端就是分开给的,合并成一个列表
@@ -281,7 +285,7 @@ class _Body extends StatelessWidget {
           if (detail.adjustments.isNotEmpty) ...<Widget>[
             const SizedBox(height: CyTokens.space2),
             Text(
-              '调整',
+              stringsOf(context).merchantFinanceDetailAdjustments,
               style: textTheme.labelMedium?.copyWith(color: p.textSecondary),
             ),
             const SizedBox(height: CyTokens.space1),
@@ -292,9 +296,9 @@ class _Body extends StatelessWidget {
         ],
         if (timeline.isNotEmpty) ...<Widget>[
           const SizedBox(height: CyTokens.space5),
-          Text('打款进度', style: textTheme.titleMedium),
+          Text(stringsOf(context).merchantFinanceDetailPaymentProgress, style: textTheme.titleMedium),
           const SizedBox(height: CyTokens.space2),
-          ...timeline.map((BatchTimelineNode n) => FinanceTimelineRow(node: n)),
+          ...timeline.map((BatchTimelineNode n) => FinanceTimelineRow(node: n, displayAt: merchantFinanceBatchAt(context, b, n))),
         ],
       ],
     );
@@ -349,7 +353,7 @@ class _EntryRow extends StatelessWidget {
         children: <Widget>[
           Expanded(
             child: Text(
-              entry.source ?? entry.entryKind ?? '分录',
+              entry.source ?? entry.entryKind ?? stringsOf(context).merchantFinanceDetailEntry,
               style: textTheme.bodyMedium,
             ),
           ),

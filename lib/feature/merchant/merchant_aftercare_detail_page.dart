@@ -2,6 +2,8 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/cupertino.dart';
+import '../../l10n/strings.dart';
+import 'merchant_operations_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
@@ -31,10 +33,10 @@ typedef MerchantAftercareSettingsOpener = Future<bool> Function();
 
 Future<bool> _confirmEvidencePurpose(BuildContext context) => cyConfirm(
   context,
-  title: '添加售后凭证',
-  content: '仅在你主动选择后访问相机或照片，用于拍摄并上传本次售后的真实凭证；不会在后台访问其他图片。',
-  cancelText: '暂不添加',
-  confirmText: '继续选择',
+  title: stringsOf(context).merchantOperationsAddAfterSalesEvidence,
+  content: stringsOf(context).merchantResidualPolicyEvidencePhoto,
+  cancelText: stringsOf(context).merchantOperationsNotNow,
+  confirmText: stringsOf(context).merchantOperationsContinueChoosing,
 );
 
 Future<bool> _openSystemSettings() => Geolocator.openAppSettings();
@@ -71,9 +73,9 @@ class _MerchantAftercareDetailPageState
 
   /// 三档意见各自的说明(快照 index.wxml:134-143 的 decision-sub)。
   String get _decisionHint => switch (_decision) {
-    MerchantAftercareDecision.agree => '同意平台继续审核',
-    MerchantAftercareDecision.reject => '必须填写原因',
-    MerchantAftercareDecision.evidence => '只追加材料',
+    MerchantAftercareDecision.agree => stringsOf(context).merchantOperationsAgreeToFurtherPlatformReview,
+    MerchantAftercareDecision.reject => stringsOf(context).merchantOperationsAReasonIsRequired,
+    MerchantAftercareDecision.evidence => stringsOf(context).merchantOperationsAddEvidenceOnly,
     null => '',
   };
   MerchantAftercareEvidence? _evidence;
@@ -172,10 +174,10 @@ class _MerchantAftercareDetailPageState
       setState(() => _uploading = false);
       final bool shouldOpenSettings = await cyConfirm(
         context,
-        title: '无法访问相机或照片',
-        content: '请前往系统“设置”允许城瘾访问相机或照片，然后返回重试。',
-        cancelText: '取消',
-        confirmText: '打开设置',
+        title: stringsOf(context).merchantOperationsCannotAccessCameraOrPhotos,
+        content: stringsOf(context).merchantOperationsAllowChengyinToAccessTheCameraOrPhotosInSystemSettingsThenTryAgai,
+        cancelText: stringsOf(context).cancel,
+        confirmText: stringsOf(context).merchantOperationsOpenSettings,
       );
       if (shouldOpenSettings) {
         await widget.openSystemSettings();
@@ -194,7 +196,7 @@ class _MerchantAftercareDetailPageState
     if (_submitting || _uploading) return;
     final MerchantAftercareResponseDraft? draft = _draft();
     if (draft == null) {
-      setState(() => _submitError = '请选择处理意见');
+      setState(() => _submitError = stringsOf(context).merchantOperationsChooseAResponse);
       return;
     }
     final String? validationError = draft.validationError;
@@ -228,8 +230,8 @@ class _MerchantAftercareDetailPageState
       CyNativeNotice.show(
         context,
         receipt.decision == MerchantAftercareDecision.evidence
-            ? '凭证已提交，等待平台处理'
-            : '意见已提交，等待平台处理',
+            ? stringsOf(context).merchantOperationsEvidenceSubmittedAwaitingPlatformProcessing
+            : stringsOf(context).merchantOperationsResponseSubmittedAwaitingPlatformProcessing,
       );
       await _load();
     } catch (error) {
@@ -258,9 +260,9 @@ class _MerchantAftercareDetailPageState
                   child: CupertinoButton(
                     minimumSize: const Size(44, 44),
                     onPressed: () => Navigator.of(previewContext).pop(),
-                    child: const Icon(
+                    child: Icon(
                       CupertinoIcons.xmark_circle_fill,
-                      semanticLabel: '关闭凭证预览',
+                      semanticLabel: stringsOf(context).merchantOperationsCloseEvidencePreview,
                     ),
                   ),
                 ),
@@ -289,7 +291,7 @@ class _MerchantAftercareDetailPageState
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
       backgroundColor: CyPalette.of(context).bgPage,
-      navigationBar: const CupertinoNavigationBar(middle: Text('退款售后')),
+      navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).merchantOperationsRefundsAndAfterSales)),
       child: Material(
         color: Colors.transparent,
         child: SafeArea(bottom: false, child: _body(context)),
@@ -307,34 +309,34 @@ class _MerchantAftercareDetailPageState
       return StatusView(
         icon: CupertinoIcons.lock,
         message: error.message,
-        sub: '请联系店主调整经营团队权限',
+        sub: stringsOf(context).merchantOperationsContactTheStoreOwnerToUpdateTeamPermissions,
         large: true,
       );
     }
     if (error is MerchantAftercareApiException && error.isForbidden) {
-      return const StatusView(
+      return StatusView(
         icon: CupertinoIcons.lock,
-        message: '当前岗位没有售后查看权限',
-        sub: '请联系店主调整经营团队权限',
+        message: stringsOf(context).merchantOperationsYourRoleCannotViewAfterSalesRequests,
+        sub: stringsOf(context).merchantOperationsContactTheStoreOwnerToUpdateTeamPermissions,
         large: true,
       );
     }
     if (error is MerchantAftercareApiException && error.isNotFound) {
-      return const StatusView(
+      return StatusView(
         icon: CupertinoIcons.doc_text,
-        message: '售后单不存在或无权访问',
-        sub: '这笔申请可能已撤回，或不属于当前门店',
+        message: stringsOf(context).merchantOperationsAfterSalesRequestUnavailableOrAccessDenied,
+        sub: stringsOf(context).merchantOperationsThisRequestMayHaveBeenWithdrawnOrBelongsToAnotherStore,
         large: true,
       );
     }
     if (error != null && _detail == null) {
       return StatusView(
         icon: CupertinoIcons.exclamationmark_triangle,
-        message: '退款售后没能加载出来',
+        message: stringsOf(context).merchantOperationsCouldNotLoadRefundAndAfterSalesDetails,
         sub: error.toString(),
         large: true,
         onRetry: _load,
-        retryLabel: '重新加载',
+        retryLabel: stringsOf(context).merchantOperationsReload,
       );
     }
     final MerchantAftercareDetail detail = _detail!;
@@ -352,10 +354,10 @@ class _MerchantAftercareDetailPageState
         children: <Widget>[
           _hero(context, detail),
           const SizedBox(height: CyTokens.space5),
-          _sectionTitle(context, '当前状态'),
+          _sectionTitle(context, stringsOf(context).merchantOperationsCurrentStatus),
           _statusCard(context, detail),
           const SizedBox(height: CyTokens.space5),
-          _sectionTitle(context, '商家意见与处理记录'),
+          _sectionTitle(context, stringsOf(context).merchantOperationsMerchantResponsesAndProcessingHistory),
           _history(context, detail),
           const SizedBox(height: CyTokens.space5),
           if (detail.canRespond)
@@ -384,7 +386,7 @@ class _MerchantAftercareDetailPageState
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     Text(
-                      detail.sourceText,
+                      merchantOperationModelText(context, detail.sourceText),
                       style: textTheme.bodySmall?.copyWith(
                         color: palette.textSecondary,
                       ),
@@ -395,7 +397,7 @@ class _MerchantAftercareDetailPageState
                 ),
               ),
               Text(
-                detail.refundAmountText,
+                (detail.refundAmount == null ? stringsOf(context).merchantOperationsAmountToBeConfirmed : detail.refundAmountText),
                 style: textTheme.headlineSmall?.copyWith(
                   fontFeatures: const <FontFeature>[
                     FontFeature.tabularFigures(),
@@ -408,7 +410,7 @@ class _MerchantAftercareDetailPageState
             const SizedBox(height: CyTokens.space3),
             Divider(height: 1, color: palette.borderSubtle),
             const SizedBox(height: CyTokens.space3),
-            Text('申请原因', style: textTheme.bodySmall),
+            Text(stringsOf(context).merchantOperationsRequestReason, style: textTheme.bodySmall),
             const SizedBox(height: CyTokens.space1),
             Text(detail.reason!, style: textTheme.bodyMedium),
           ],
@@ -418,17 +420,17 @@ class _MerchantAftercareDetailPageState
             const SizedBox(height: CyTokens.space3),
             Divider(height: 1, color: palette.borderSubtle),
             const SizedBox(height: CyTokens.space3),
-            Text('退款政策快照', style: textTheme.bodySmall),
+            Text(stringsOf(context).merchantOperationsRefundPolicySnapshot, style: textTheme.bodySmall),
             const SizedBox(height: CyTokens.space1),
             Text(detail.refundPolicyText, style: textTheme.bodyMedium),
             if (detail.refundPolicyVersion != null)
               Text(
-                '政策版本 ${detail.refundPolicyVersion}',
+                stringsOf(context).merchantOperationsPolicyVersion(detail.refundPolicyVersion.toString()),
                 style: textTheme.bodySmall,
               ),
             if (detail.refundDeadline != null)
               Text(
-                '可退截止 ${_minute(detail.refundDeadline)}',
+                stringsOf(context).merchantOperationsRefundDeadline(_minute(detail.refundDeadline)!),
                 style: textTheme.bodySmall,
               ),
           ],
@@ -444,23 +446,23 @@ class _MerchantAftercareDetailPageState
         children: <Widget>[
           _statusRow(
             context,
-            label: '平台处理',
-            value: detail.processing.label,
+            label: stringsOf(context).merchantOperationsPlatformProcessing,
+            value: merchantOperationModelText(context, detail.processing.label),
             hint: detail.processing.hint,
           ),
           _line(context),
           _statusRow(
             context,
-            label: '商家意见',
-            value: detail.merchantOpinion.label,
+            label: stringsOf(context).merchantOperationsMerchantResponse,
+            value: merchantOperationModelText(context, detail.merchantOpinion.label),
             hint: detail.merchantOpinion.hint,
           ),
           _line(context),
           _statusRow(
             context,
-            label: '款项结果',
-            value: detail.refunded ? '已确认退回' : '尚未确认退回',
-            hint: detail.refunded ? '款项结果已由平台确认' : '不要根据商家意见推断退款结果',
+            label: stringsOf(context).merchantOperationsPaymentResult,
+            value: detail.refunded ? stringsOf(context).merchantOperationsRefundConfirmed : stringsOf(context).merchantOperationsRefundNotYetConfirmed,
+            hint: detail.refunded ? stringsOf(context).merchantOperationsThePlatformHasConfirmedThePaymentResult : stringsOf(context).merchantOperationsAMerchantResponseDoesNotEstablishTheRefundResult,
           ),
         ],
       ),
@@ -507,7 +509,7 @@ class _MerchantAftercareDetailPageState
         padding: const EdgeInsets.all(CyTokens.space5),
         alignment: Alignment.center,
         decoration: _cardDecoration(context),
-        child: const Text('暂无商家补充记录'),
+        child: Text(stringsOf(context).merchantOperationsNoAdditionalMerchantResponses),
       );
     }
     return Container(
@@ -537,10 +539,10 @@ class _MerchantAftercareDetailPageState
         children: <Widget>[
           Row(
             children: <Widget>[
-              _Pill(label: response.decision.label),
+              _Pill(label: merchantOperationModelText(context, response.decision.label)),
               const Spacer(),
               Text(
-                '${response.actorText}${response.createTime == null ? '' : ' · ${_minute(response.createTime)}'}',
+                '${merchantOperationModelText(context, response.actorText)}${response.createTime == null ? '' : ' · ${_minute(response.createTime)}'}',
                 style: textTheme.bodySmall?.copyWith(
                   color: palette.textSecondary,
                 ),
@@ -562,10 +564,10 @@ class _MerchantAftercareDetailPageState
               onPressed: () => _previewEvidence(response.evidenceUrl!),
               child: Row(
                 children: <Widget>[
-                  const Text('售后凭证'),
+                  Text(stringsOf(context).merchantOperationsAfterSalesEvidence),
                   const Spacer(),
                   Text(
-                    '短时授权查看',
+                    stringsOf(context).merchantOperationsTemporaryAuthorizedAccess,
                     style: textTheme.bodySmall?.copyWith(
                       color: palette.textSecondary,
                     ),
@@ -592,15 +594,15 @@ class _MerchantAftercareDetailPageState
         children: <Widget>[
           Text(
             detail.allowedDecisions.contains(MerchantAftercareDecision.agree)
-                ? '追加商家意见'
-                : '补充售后凭证',
+                ? stringsOf(context).merchantOperationsAddMerchantResponse
+                : stringsOf(context).merchantOperationsAddAfterSalesEvidenceAlt,
             style: textTheme.titleMedium,
           ),
           const SizedBox(height: CyTokens.space1),
           Text(
             detail.allowedDecisions.contains(MerchantAftercareDecision.agree)
                 ? '平台独立审核；选择“同意”也不会直接改变退款或打款状态。'
-                : '当前岗位仅可补充审核材料，不能同意或建议驳回。',
+                : stringsOf(context).merchantOperationsYourRoleCanOnlyAddReviewEvidenceNotAgreeOrRecommendRejection,
             style: textTheme.bodySmall?.copyWith(color: palette.textSecondary),
           ),
           const SizedBox(height: CyTokens.space3),
@@ -624,7 +626,7 @@ class _MerchantAftercareDetailPageState
                       ? null
                       : () => _selectDecision(decision),
                   child: Text(
-                    decision.label,
+                    merchantOperationModelText(context, decision.label),
                     style: TextStyle(
                       color: _decision == decision
                           ? palette.actionPrimaryFg
@@ -648,7 +650,7 @@ class _MerchantAftercareDetailPageState
           Row(
             children: <Widget>[
               Text(
-                '意见说明${_decision == MerchantAftercareDecision.reject ? '（必填）' : '（选填）'}',
+                _decision == MerchantAftercareDecision.reject ? stringsOf(context).merchantOperationsRequiredResponse : stringsOf(context).merchantOperationsOptionalResponse,
                 style: textTheme.titleSmall,
               ),
               const Spacer(),
@@ -672,7 +674,7 @@ class _MerchantAftercareDetailPageState
             maxLength: 500,
             keyboardType: TextInputType.multiline,
             textInputAction: TextInputAction.newline,
-            placeholder: '写下可供平台审核的订单事实',
+            placeholder: stringsOf(context).merchantOperationsDescribeOrderFactsForThePlatformToReview,
             padding: const EdgeInsets.all(CyTokens.space3),
             decoration: BoxDecoration(
               color: palette.inputBgEmpty,
@@ -686,10 +688,10 @@ class _MerchantAftercareDetailPageState
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
                 Semantics(
-                  label: '选择图片并上传凭证',
+                  label: stringsOf(context).merchantOperationsChooseAnImageAndUploadEvidence,
                   button: true,
                   child: CyNativeButton(
-                    label: '选择图片并上传',
+                    label: stringsOf(context).merchantOperationsChooseAndUploadImage,
                     role: CyNativeButtonRole.secondary,
                     loading: _uploading,
                     onPressed: _submitting ? null : _pickEvidence,
@@ -701,7 +703,7 @@ class _MerchantAftercareDetailPageState
                 ),
                 const SizedBox(height: CyTokens.space1),
                 Text(
-                  '支持相册或拍摄，上传成功后才可提交补充凭证',
+                  stringsOf(context).merchantOperationsChooseFromPhotosOrTakeAPictureUploadItBeforeSubmittingAdditionalE,
                   style: textTheme.bodySmall?.copyWith(
                     color: palette.textSecondary,
                   ),
@@ -736,9 +738,9 @@ class _MerchantAftercareDetailPageState
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
-                        const Text('凭证已上传'),
+                        Text(stringsOf(context).merchantOperationsEvidenceUploaded),
                         Text(
-                          '点击预览，可移除后重新选择',
+                          stringsOf(context).merchantOperationsTapToPreviewRemoveItToChooseAnotherImage,
                           style: textTheme.bodySmall?.copyWith(
                             color: palette.textSecondary,
                           ),
@@ -747,10 +749,10 @@ class _MerchantAftercareDetailPageState
                     ),
                   ),
                   Semantics(
-                    label: '移除凭证',
+                    label: stringsOf(context).merchantOperationsRemoveEvidence,
                     button: true,
                     child: CyNativeButton(
-                      label: '移除凭证',
+                      label: stringsOf(context).merchantOperationsRemoveEvidence,
                       role: CyNativeButtonRole.destructive,
                       onPressed: _submitting
                           ? null
@@ -773,7 +775,7 @@ class _MerchantAftercareDetailPageState
           const SizedBox(height: CyTokens.space4),
           CyNativeButton(
             key: const Key('aftercare-submit'),
-            label: '提交商家意见',
+            label: stringsOf(context).merchantOperationsSubmitMerchantResponse,
             loading: _submitting,
             onPressed: _submitting || _uploading ? null : _submit,
           ),
@@ -785,12 +787,12 @@ class _MerchantAftercareDetailPageState
   Widget _readonly(BuildContext context) => Container(
     padding: const EdgeInsets.all(CyTokens.space4),
     decoration: _cardDecoration(context),
-    child: const Column(
+    child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Text('当前不可追加意见'),
+        Text(stringsOf(context).merchantOperationsResponsesCannotBeAddedNow),
         SizedBox(height: CyTokens.space1),
-        Text('平台审核已结束，请以当前处理和款项状态为准。'),
+        Text(stringsOf(context).merchantOperationsPlatformReviewHasEndedReferToTheCurrentProcessingAndPaymentStatus),
       ],
     ),
   );

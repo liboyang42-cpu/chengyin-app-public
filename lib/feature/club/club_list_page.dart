@@ -1,3 +1,5 @@
+import 'club_api_messages.dart';
+import '../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -112,8 +114,8 @@ class _ClubRootViewState extends State<ClubRootView> {
                   container: true,
                   excludeSemantics: true,
                   label: widget.imUnread > 0
-                      ? '站内消息,${widget.imUnread > 99 ? '99+' : widget.imUnread} 条未读'
-                      : '站内消息',
+                      ? stringsOf(context).clubMainUnread(widget.imUnread > 99 ? '99+' : widget.imUnread.toString())
+                      : stringsOf(context).clubMainMessages,
                   button: true,
                   onTap: openMessages,
                   child: CupertinoButton(
@@ -224,7 +226,7 @@ class _ClubListPageState extends ConsumerState<ClubListPage> {
               if (!context.mounted) return;
               CyNativeNotice.show(
                 context,
-                error.toString().replaceFirst('Exception: ', ''),
+                clubApiErrorMessage(context, error),
                 isError: true,
               );
             } finally {
@@ -273,8 +275,8 @@ class _ClubTabs extends StatelessWidget {
 
     return Row(
       children: <Widget>[
-        item(ClubRootTab.posts, '帖文'),
-        item(ClubRootTab.clubs, '俱乐部'),
+        item(ClubRootTab.posts, stringsOf(context).clubMainPosts),
+        item(ClubRootTab.clubs, stringsOf(context).clubMainClubs),
       ],
     );
   }
@@ -297,20 +299,20 @@ class _PostTab extends StatelessWidget {
       // 游客态整页 401(实测生产):说成「检查网络后重试」是误导 —— 重试按
       // 多少次都还是 401。走登录门,登录完就地把 feed 重取一次。
       error: (Object error, StackTrace stack) => clubLoginRequired(error)
-          ? ClubLoginGate(message: '登录后查看帖文', onSignedIn: onRetry)
+          ? ClubLoginGate(message: stringsOf(context).clubMainPostsLogin, onSignedIn: onRetry)
           : StatusView(
-              message: '动态加载失败',
-              sub: '检查网络后重试',
+              message: stringsOf(context).clubMainPostsLoadError,
+              sub: stringsOf(context).clubMainNetworkRetry,
               icon: CupertinoIcons.cloud,
               onRetry: onRetry,
             ),
       data: (ClubFeed value) {
         if (value.rows.isEmpty) {
           return StatusView(
-            message: value.hasNoClub ? '这里还没有帖文' : '还没有帖文',
+            message: value.hasNoClub ? stringsOf(context).clubMainNoPostsHere : stringsOf(context).clubMainNoPosts,
             sub: value.hasNoClub
-                ? '帖文来自你加入的俱乐部，加入或创建一个俱乐部后即可看到'
-                : '你加入的俱乐部还没有人发布帖文，去俱乐部主页发第一条',
+                ? stringsOf(context).clubMainJoinForPosts
+                : stringsOf(context).clubMainFirstPostHint,
             icon: CupertinoIcons.news,
             large: true,
           );
@@ -354,10 +356,10 @@ class _ClubsTab extends StatelessWidget {
     return home.when(
       loading: () => const CySkeleton(),
       error: (Object error, StackTrace stack) => clubLoginRequired(error)
-          ? ClubLoginGate(message: '登录后查看俱乐部', onSignedIn: onRetry)
+          ? ClubLoginGate(message: stringsOf(context).clubMainClubsLogin, onSignedIn: onRetry)
           : StatusView(
-              message: '没能加载俱乐部',
-              sub: '检查网络后重试',
+              message: stringsOf(context).clubMainClubsLoadError,
+              sub: stringsOf(context).clubMainNetworkRetry,
               icon: CupertinoIcons.cloud,
               onRetry: onRetry,
             ),
@@ -378,11 +380,11 @@ class _ClubsTab extends StatelessWidget {
           ),
           if (!merchant) ...<Widget>[
             const SizedBox(height: CyTokens.space5),
-            const _SectionHeading(title: '我的', subtitle: '我创建或加入的俱乐部'),
+            _SectionHeading(title: stringsOf(context).clubMainMine, subtitle: stringsOf(context).clubMainMyClubsHint),
             if (value.owned.isEmpty && value.joined.isEmpty)
-              const _EmptyState(
-                title: '还没有加入俱乐部',
-                subtitle: '创建自己的俱乐部，或从附近找到同好',
+              _EmptyState(
+                title: stringsOf(context).clubMainNoJoinedClubs,
+                subtitle: stringsOf(context).clubMainCreateOrFind,
               )
             else
               ...<Club>[...value.owned, ...value.joined].map(
@@ -400,14 +402,14 @@ class _ClubsTab extends StatelessWidget {
               ),
           ],
           const SizedBox(height: CyTokens.space6),
-          const _SectionHeading(title: '附近', subtitle: '发现本城正在组织探索的同好'),
+          _SectionHeading(title: stringsOf(context).clubMainNearby, subtitle: stringsOf(context).clubMainNearbyHint),
           if (value.nearby.isEmpty)
             _EmptyState(
-              title: '附近还没有其他俱乐部',
+              title: stringsOf(context).clubMainNoNearbyClubs,
               subtitle: merchant
-                  ? '本城暂无正在组织探索的同好'
-                  : '本城暂无正在组织探索的同好，创建你自己的俱乐部，成为第一个',
-              actionLabel: merchant ? null : '创建俱乐部',
+                  ? stringsOf(context).clubMainNoLocalExplorers
+                  : stringsOf(context).clubMainCreateFirstClub,
+              actionLabel: merchant ? null : stringsOf(context).clubMainCreateClub,
               onAction: merchant
                   ? null
                   : () => onDestination(ClubDestination.create, null),
@@ -442,7 +444,7 @@ class _CreateEntry extends StatelessWidget {
       children: <Widget>[
         Expanded(
           child: Text(
-            merchant ? '俱乐部邀约情况 · 接受 / 拒绝合作' : '创建你自己的俱乐部',
+            merchant ? stringsOf(context).clubMainMerchantInvitations : stringsOf(context).clubMainCreateYourClub,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
               color: palette.textPrimary,
               fontWeight: FontWeight.w700,
@@ -460,7 +462,7 @@ class _CreateEntry extends StatelessWidget {
           color: palette.actionSecondaryBg,
           onPressed: onTap,
           child: Text(
-            merchant ? '查看' : '创建俱乐部',
+            merchant ? stringsOf(context).clubMainView : stringsOf(context).clubMainCreateClub,
             style: TextStyle(color: palette.textPrimary),
           ),
         ),
@@ -578,12 +580,12 @@ class _ClubCard extends StatelessWidget {
         (club.city ?? club.address)!,
     ].join(' · ');
     final button = club.isOwner
-        ? '管理'
+        ? stringsOf(context).clubMainManage
         : club.isJoined
-        ? '进入'
+        ? stringsOf(context).clubMainEnter
         : club.needsApproval
-        ? '申请加入'
-        : '加入';
+        ? stringsOf(context).clubMainApplyJoin
+        : stringsOf(context).clubMainJoin;
     return Padding(
       padding: const EdgeInsets.only(bottom: CyTokens.space3),
       child: DecoratedBox(
@@ -624,7 +626,7 @@ class _ClubCard extends StatelessWidget {
                         children: <Widget>[
                           Expanded(
                             child: Text(
-                              club.name.isEmpty ? '未命名俱乐部' : club.name,
+                              club.name.isEmpty ? stringsOf(context).clubMainUnnamedClub : club.name,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: Theme.of(context).textTheme.titleMedium
@@ -649,7 +651,7 @@ class _ClubCard extends StatelessWidget {
                       ],
                       const SizedBox(height: CyTokens.space1),
                       Text(
-                        '${club.memberCount} 位成员',
+                        stringsOf(context).clubMainMemberCount(club.memberCount),
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: palette.textTertiary,
                         ),

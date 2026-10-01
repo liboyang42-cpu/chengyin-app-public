@@ -13,6 +13,7 @@
 // 最后一步才撞「在架据点已达上限」——那是最坏的失败时机。
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:chengyin_app/l10n/app_localizations_zh.dart';
 
 import 'package:chengyin_app/data/models/merchant_city_node.dart';
 import '../../support/source_text.dart';
@@ -58,7 +59,8 @@ void main() {
   });
 
   test('★ 回读没找到时说「还没同步」,不说「失败」', () {
-    expect(page.contains('申请已提交,但审核状态还没同步出来'), isTrue);
+    expect(page.contains('merchantNodeAwaitSync'), isTrue);
+    expect(AppLocalizationsZh().merchantNodeAwaitSync, contains('申请已提交,但审核状态还没同步出来'));
     // 说失败会让商家再提一次 —— 而申请其实已经在了。
     expect(page.contains('提交失败'), isFalse);
   });
@@ -81,9 +83,10 @@ void main() {
   });
 
   test('★ 店址确认的提示必须说清**后果**', () {
-    expect(page.contains('米内才算到达'), isTrue);
+    expect(page.contains('merchantNodeAddressHint(_radiusM)'), isTrue);
+    expect(AppLocalizationsZh().merchantNodeAddressHint(80), contains('80 米内才算到达'));
     expect(
-      page.contains('偏了他会一直打不了卡'),
+      AppLocalizationsZh().merchantNodeAddressHint(80).contains('偏了他会一直打不了卡'),
       isTrue,
       reason: '只说"请确认店址"的话,商家不知道确认的是什么、错了会怎样',
     );
@@ -91,8 +94,9 @@ void main() {
 
   group('配额', () {
     test('★ 投放入口保留，配额满时点击原样说明', () {
-      expect(list.contains("child: const Text('+ 投放据点')"), isTrue);
-      expect(list.contains('在架据点已达上限,请先下线其他据点'), isTrue);
+      expect(list.contains('merchantNodePlace'), isTrue);
+      expect(list.contains('merchantNodeQuota'), isTrue);
+      expect(AppLocalizationsZh().merchantNodeQuota, '在架据点已达上限,请先下线其他据点');
       expect(list.contains('home.quotaExhausted'), isTrue);
     });
 

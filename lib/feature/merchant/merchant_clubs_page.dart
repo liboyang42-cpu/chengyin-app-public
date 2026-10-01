@@ -1,3 +1,4 @@
+import '../../l10n/strings.dart';
 import '../../core/theme/cy_palette.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -38,7 +39,7 @@ class _MerchantClubsPageState extends ConsumerState<MerchantClubsPage> {
     final async = ref.watch(merchantClubsProvider(_keyword));
     return CupertinoPageScaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      navigationBar: const CupertinoNavigationBar(middle: Text('可邀请的俱乐部')),
+      navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).merchantDirectoryInviteClubs)),
       child: Material(
         color: Colors.transparent,
         child: SafeArea(
@@ -54,7 +55,7 @@ class _MerchantClubsPageState extends ConsumerState<MerchantClubsPage> {
                 ),
                 child: CySearchField(
                   value: _query,
-                  placeholder: '搜索俱乐部名称',
+                  placeholder: stringsOf(context).merchantDirectorySearchClub,
                   onChanged: (String v) => setState(() => _query = v),
                   onSubmitted: (String v) =>
                       setState(() => _keyword = v.trim()),
@@ -67,15 +68,15 @@ class _MerchantClubsPageState extends ConsumerState<MerchantClubsPage> {
                   error: (Object e, _) => merchantErrorView(
                     context,
                     e,
-                    what: '俱乐部列表',
+                    what: stringsOf(context).merchantDirectoryClubList,
                     onRetry: () =>
                         ref.invalidate(merchantClubsProvider(_keyword)),
                   ),
                   data: (List<Map<String, dynamic>> rows) {
                     if (rows.isEmpty) {
                       return StatusView(
-                        message: _keyword.isEmpty ? '暂时没有已开放的俱乐部' : '没有匹配的俱乐部',
-                        sub: _keyword.isEmpty ? '' : '换个关键词试试',
+                        message: _keyword.isEmpty ? stringsOf(context).merchantDirectoryNoOpenClubs : stringsOf(context).merchantDirectoryNoClubMatches,
+                        sub: _keyword.isEmpty ? '' : stringsOf(context).merchantDirectoryTryKeyword,
                         large: true,
                         scrollable: true,
                       );
@@ -128,7 +129,7 @@ class _ClubTile extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               Text(
-                name.isEmpty ? '俱乐部' : name,
+                name.isEmpty ? stringsOf(context).merchantDirectoryClub : name,
                 style: textTheme.titleSmall,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -140,7 +141,7 @@ class _ClubTile extends StatelessWidget {
                   child: Text(
                     <String>[
                       if ((city ?? '').isNotEmpty) city!,
-                      if (memberCount != null) '$memberCount 位成员',
+                      if (memberCount != null) stringsOf(context).merchantDirectoryMembers(memberCount),
                     ].join(' · '),
                     style: textTheme.bodySmall?.copyWith(
                       color: CyPalette.of(context).textSecondary,

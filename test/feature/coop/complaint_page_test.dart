@@ -12,6 +12,9 @@
 // ★ ③ 成功文案说「已提交,客服会跟进」,不说「已解决」——
 //   后端 status=0 只叫受理,后面还有垫付/追偿/关闭三档。
 
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/source_text.dart';
@@ -66,7 +69,9 @@ void main() {
   });
 
   test('★ 成功文案不替客服承诺结果', () {
-    expect(code.contains('投诉已提交'), isTrue, reason: '保持小程序提交成功回执原文');
+    expect(code.contains('coopComplaintSubmitted'), isTrue);
+    final resources = jsonDecode(File('lib/l10n/app_zh.arb').readAsStringSync()) as Map<String, dynamic>;
+    expect(resources['coopComplaintSubmitted'], '投诉已提交', reason: '保持小程序提交成功回执原文');
     for (final String overclaim in <String>['已解决', '已赔付', '已受理并赔付']) {
       expect(
         code.contains(overclaim),

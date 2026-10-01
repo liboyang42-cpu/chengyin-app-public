@@ -1,3 +1,6 @@
+import 'club_api_messages.dart';
+import '../../l10n/strings.dart';
+import 'club_form_labels.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -138,7 +141,7 @@ class _ClubApplyPageState extends ConsumerState<ClubApplyPage> {
   Future<void> _pickCerts() async {
     final remain = 9 - _certImages.length;
     if (remain <= 0) {
-      CyNativeNotice.show(context, '最多9张');
+      CyNativeNotice.show(context, stringsOf(context).clubFormMaxNine);
       return;
     }
     final urls = await pickAndUploadImages(context, ref, maxCount: remain);
@@ -167,6 +170,7 @@ class _ClubApplyPageState extends ConsumerState<ClubApplyPage> {
       final outcome = await registerPublisherIdentity(
         ref.read(publisherIdentityApiProvider),
         _publisherIdentity.form,
+        strings: stringsOf(context),
       );
       _publisherIdentity.setBusy(false);
       if (!mounted) return;
@@ -213,12 +217,12 @@ class _ClubApplyPageState extends ConsumerState<ClubApplyPage> {
       if (!mounted) return;
       // 真源 `isTransportFailure` 两档:连不上/超时走网络文案,其余原样显示
       // 后端话术(它带可执行信息),缺话时兜底「提交没有完成,请稍后重试」。
-      final String detail = e.toString().replaceFirst('Exception: ', '');
+      final String detail = clubApiErrorMessage(context, e);
       setState(() {
         _submitting = false;
         _submitError = _isNetworkFailure(e)
-            ? '网络异常，请检查连接后重试'
-            : (detail.isEmpty ? '提交没有完成，请稍后重试' : detail);
+            ? stringsOf(context).clubFormNetworkError
+            : (detail.isEmpty ? stringsOf(context).clubFormSubmitError : detail);
       });
     }
   }
@@ -233,7 +237,7 @@ class _ClubApplyPageState extends ConsumerState<ClubApplyPage> {
     // 同义的『知道了』弹窗」。这里只补一条轻提示点一下正在按提交的按钮。
     CyNativeNotice.show(
       context,
-      '您已注册为商户,一个账户不能同时是商户与俱乐部主理人。',
+      stringsOf(context).clubFormMerchantApplyBlocked,
       isError: true,
     );
   }
@@ -265,18 +269,17 @@ class _ClubApplyPageState extends ConsumerState<ClubApplyPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
-                const CyPageTitle('主理人申请'),
+                CyPageTitle(stringsOf(context).clubFormApplyTitle),
                 Expanded(
                   child: StatusView(
-                    message: merchantBlocked ? '无法申请' : '暂时不能再建',
+                    message: merchantBlocked ? stringsOf(context).clubFormCannotApply : stringsOf(context).clubFormCannotCreateMore,
                     sub: merchantBlocked
-                        ? '您已注册为商户,一个账户不能同时是商户与俱乐部主理人。'
+                        ? stringsOf(context).clubFormMerchantApplyBlocked
                         : (quotaFull
                               // 说清是**建满了**,不是"已成为主理人" ——
                               // 后者会让人以为功能没了。
-                              ? '你已经有 ${role.ownedClubCount} 个俱乐部,'
-                                    '达到上限 ${role.maxOwnedClubs} 个了。'
-                              : '当前身份暂时不能创建俱乐部。'),
+                              ? stringsOf(context).clubFormQuota(role.ownedClubCount, role.maxOwnedClubs)
+                              : stringsOf(context).clubFormRoleCannotCreate),
                     icon: merchantBlocked
                         ? Icons.lock_outline
                         : Icons.info_outline,
@@ -291,12 +294,12 @@ class _ClubApplyPageState extends ConsumerState<ClubApplyPage> {
     }
 
     return ClubStepScaffold(
-      title: _stepTitles[_step - 1],
+      title: clubFormValueLabel(context, _stepTitles[_step - 1]),
       step: _step,
       stepCount: 4,
-      backLabel: _step == 1 ? '设置' : _stepTitles[_step - 2],
+      backLabel: _step == 1 ? stringsOf(context).settings : clubFormValueLabel(context, _stepTitles[_step - 2]),
       onBack: _onBack,
-      nextLabel: _step < 4 ? '继续' : '成为俱乐部主理人',
+      nextLabel: _step < 4 ? stringsOf(context).clubFormContinue : stringsOf(context).clubFormBecomeOrganizer,
       canNext: _canNext(),
       busy: _submitting,
       onNext: _onNext,
@@ -322,12 +325,12 @@ class _ClubApplyPageState extends ConsumerState<ClubApplyPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              const CyPageTitle('成为主理人'),
+              CyPageTitle(stringsOf(context).clubFormOrganizerTitle),
               Expanded(
                 child: ListView(
                   padding: const EdgeInsets.all(CyTokens.space4),
                   children: <Widget>[
-                    const CySectionTitle('已成为主理人'),
+                    CySectionTitle(stringsOf(context).clubFormOrganizerGranted),
                     const SizedBox(height: CyTokens.space3),
                     Container(
                       padding: const EdgeInsets.all(CyTokens.space4),
@@ -340,7 +343,7 @@ class _ClubApplyPageState extends ConsumerState<ClubApplyPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
                           Text(
-                            '已生效',
+                            stringsOf(context).clubFormActive,
                             style: textTheme.labelMedium?.copyWith(
                               color: AppColors.success,
                               fontWeight: FontWeight.w700,
@@ -348,20 +351,20 @@ class _ClubApplyPageState extends ConsumerState<ClubApplyPage> {
                           ),
                           const SizedBox(height: CyTokens.space3),
                           Text(
-                            '你已成为俱乐部主理人,身份立即生效。L1-L5 等级由平台后台稍后评定,不影响你现在创建与运营俱乐部。',
+                            stringsOf(context).clubFormOrganizerActiveHint,
                             style: textTheme.bodyMedium,
                           ),
                           const SizedBox(height: CyTokens.space4),
                           Row(
                             children: <Widget>[
                               Text(
-                                '可建俱乐部',
+                                stringsOf(context).clubFormClubAllowance,
                                 style: textTheme.labelMedium?.copyWith(
                                   color: palette.textSecondary,
                                 ),
                               ),
                               const Spacer(),
-                              Text('最多 2 个', style: textTheme.bodyMedium),
+                              Text(stringsOf(context).clubFormUpToTwo, style: textTheme.bodyMedium),
                             ],
                           ),
                         ],
@@ -369,7 +372,7 @@ class _ClubApplyPageState extends ConsumerState<ClubApplyPage> {
                     ),
                     const SizedBox(height: CyTokens.space3),
                     Text(
-                      '接下来创建你的第一个俱乐部,开始招募成员、发布城市路线。',
+                      stringsOf(context).clubFormFirstClubHint,
                       style: textTheme.labelSmall?.copyWith(
                         color: palette.textTertiary,
                       ),
@@ -388,7 +391,7 @@ class _ClubApplyPageState extends ConsumerState<ClubApplyPage> {
                 child: CupertinoButton.filled(
                   minimumSize: const Size.fromHeight(44),
                   onPressed: () => context.replace('/club/create'),
-                  child: const Text('创建我的俱乐部'),
+                  child: Text(stringsOf(context).clubFormCreateMine),
                 ),
               ),
             ],
@@ -403,10 +406,10 @@ class _ClubApplyPageState extends ConsumerState<ClubApplyPage> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
         CyField(
-          label: '实名/昵称',
+          label: stringsOf(context).clubFormNameOrNickname,
           child: _input(
             _leaderName,
-            '你的称呼',
+            stringsOf(context).clubFormPreferredName,
             key: const ValueKey<String>('club-apply-leader-name'),
             keyboard: TextInputType.name,
             action: TextInputAction.next,
@@ -414,29 +417,29 @@ class _ClubApplyPageState extends ConsumerState<ClubApplyPage> {
           ),
         ),
         CyField(
-          label: '联系方式',
+          label: stringsOf(context).clubFormContact,
           child: _input(
             _phone,
-            '手机号或微信号',
+            stringsOf(context).clubFormContactHint,
             key: const ValueKey<String>('club-apply-phone'),
             keyboard: TextInputType.text,
             action: TextInputAction.next,
           ),
         ),
         CyField(
-          label: '身份说明',
+          label: stringsOf(context).clubFormIdentity,
           child: _input(
             _identity,
-            '如 高校社团负责人 / 户外领队',
+            stringsOf(context).clubFormIdentityHint,
             key: const ValueKey<String>('club-apply-identity'),
             action: TextInputAction.next,
           ),
         ),
         CyField(
-          label: '联合创始人',
+          label: stringsOf(context).clubFormCofounders,
           child: _input(
             _coFounders,
-            '选填,多人用逗号分隔',
+            stringsOf(context).clubFormCofoundersHint,
             key: const ValueKey<String>('club-apply-cofounders'),
             action: TextInputAction.done,
           ),
@@ -449,7 +452,7 @@ class _ClubApplyPageState extends ConsumerState<ClubApplyPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        const CyField(label: '过往组织经验', child: SizedBox.shrink()),
+        CyField(label: stringsOf(context).clubFormExperienceTitle, child: SizedBox.shrink()),
         Wrap(
           spacing: CyTokens.space2,
           runSpacing: CyTokens.space2,
@@ -457,7 +460,7 @@ class _ClubApplyPageState extends ConsumerState<ClubApplyPage> {
             for (final String opt in _expOptions)
               _NativeChoicePill(
                 key: ValueKey<String>('club-apply-exp-$opt'),
-                label: opt,
+                label: clubFormValueLabel(context, opt),
                 selected: _experience == opt,
                 onTap: () => setState(() => _experience = opt),
               ),
@@ -465,10 +468,10 @@ class _ClubApplyPageState extends ConsumerState<ClubApplyPage> {
         ),
         const SizedBox(height: CyTokens.space3),
         CyField(
-          label: '最大带队人数',
+          label: stringsOf(context).clubFormMaxGroupSize,
           child: _input(
             _maxEventSize,
-            '如 50',
+            stringsOf(context).clubFormMaxGroupSizeHint,
             key: const ValueKey<String>('club-apply-max-size'),
             keyboard: TextInputType.number,
             action: TextInputAction.next,
@@ -478,10 +481,10 @@ class _ClubApplyPageState extends ConsumerState<ClubApplyPage> {
           ),
         ),
         CyField(
-          label: '平均参与人数',
+          label: stringsOf(context).clubFormAverageGroupSize,
           child: _input(
             _avgEventSize,
-            '如 20',
+            stringsOf(context).clubFormAverageGroupSizeHint,
             key: const ValueKey<String>('club-apply-avg-size'),
             keyboard: TextInputType.number,
             action: TextInputAction.done,
@@ -498,17 +501,17 @@ class _ClubApplyPageState extends ConsumerState<ClubApplyPage> {
     // L1:开关只活在列表行里 —— 四行能力自评走 insetGrouped,不落裸黑底。
     return CupertinoListSection.insetGrouped(
       footer: Text(
-        '能力越强、案例越足,越可能被定到更高等级。',
+        stringsOf(context).clubFormAbilityHint,
         style: Theme.of(
           context,
         ).textTheme.labelSmall?.copyWith(color: CyTokens.textTertiary),
       ),
       children: <Widget>[
         for (final (String field, String label) in <(String, String)>[
-          ('route', '能设计城市路线'),
-          ('task', '能设计任务/解谜'),
-          ('npc', '能带 NPC/角色'),
-          ('merchant', '能与商家联动'),
+          ('route', stringsOf(context).clubFormRouteSkill),
+          ('task', stringsOf(context).clubFormTaskSkill),
+          ('npc', stringsOf(context).clubFormNpcSkill),
+          ('merchant', stringsOf(context).clubFormMerchantSkill),
         ])
           _abilityRow(field, label),
       ],
@@ -552,9 +555,9 @@ class _ClubApplyPageState extends ConsumerState<ClubApplyPage> {
             padding: const EdgeInsets.only(bottom: CyTokens.space3),
             child: CyInlineError(
               key: const Key('apply-submit-error'),
-              title: '提交没有完成',
+              title: stringsOf(context).clubFormSubmissionIncomplete,
               detail: _submitError!,
-              actionLabel: '重试',
+              actionLabel: stringsOf(context).retry,
               onAction: _submit,
             ),
           ),
@@ -563,7 +566,7 @@ class _ClubApplyPageState extends ConsumerState<ClubApplyPage> {
           children: <Widget>[
             CupertinoListTile(
               title: Text(
-                '持导游/旅游资质',
+                stringsOf(context).clubFormGuideQualifications,
                 style: textTheme.bodyMedium,
               ),
               trailing: CupertinoSwitch(
@@ -575,7 +578,7 @@ class _ClubApplyPageState extends ConsumerState<ClubApplyPage> {
         ),
         const SizedBox(height: CyTokens.space2),
         Text(
-          '资质/案例图',
+          stringsOf(context).clubFormCertificateImages,
           style: textTheme.labelMedium?.copyWith(
             color: AppColors.textSecondary,
           ),
@@ -606,7 +609,7 @@ class _ClubApplyPageState extends ConsumerState<ClubApplyPage> {
             children: <Widget>[
               const Icon(CupertinoIcons.photo_on_rectangle, size: 20),
               const SizedBox(width: CyTokens.space2),
-              Text(_certImages.isEmpty ? '添加资质证明' : '继续添加'),
+              Text(_certImages.isEmpty ? stringsOf(context).clubFormAddCertificate : stringsOf(context).clubFormAddMore),
             ],
           ),
         ),
@@ -615,8 +618,8 @@ class _ClubApplyPageState extends ConsumerState<ClubApplyPage> {
         // 只回状态、改绑走人工,这里连值都不下发。
         PublisherIdentityFields(
           controller: _publisherIdentity,
-          title: '发布者实名',
-          footHint: '填过一次就不再出现。营业执照、导游证仍在上方「资质 / 案例图」,两件事互不替代。',
+          title: stringsOf(context).clubFormPublisherIdentity,
+          footHint: stringsOf(context).clubFormPublisherIdentityHint,
         ),
       ],
     );
@@ -734,7 +737,7 @@ class _CertThumb extends StatelessWidget {
           top: -8,
           child: Semantics(
             button: true,
-            label: '删除资质图片',
+            label: stringsOf(context).clubFormDeleteCertificate,
             child: CupertinoButton(
               minimumSize: const Size(44, 44),
               padding: EdgeInsets.zero,

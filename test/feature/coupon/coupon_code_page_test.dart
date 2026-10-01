@@ -1,3 +1,4 @@
+import 'package:chengyin_app/l10n/app_localizations.dart';
 // 券码出示页:四件事各自说自己的话。
 //
 // ★ 真源 `subpackageMember/coupon-qr/index.{wxml,js}` + `scene-qr-coupon`:
@@ -103,6 +104,7 @@ Future<void> _pump(
   CouponApi api, {
   int id = 7,
   bool signedIn = true,
+  Locale locale = const Locale('zh'),
 }) async {
   await t.pumpWidget(
     ProviderScope(
@@ -114,7 +116,11 @@ Future<void> _pump(
           ),
         ),
       ].cast(),
-      child: MaterialApp(home: CouponCodePage(couponHistoryId: id)),
+      child: MaterialApp(
+        locale: locale,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: CouponCodePage(couponHistoryId: id)),
     ),
   );
   await t.pump();
@@ -125,6 +131,17 @@ Future<void> _pump(
 Future<void> _teardown(WidgetTester t) => t.pumpWidget(const SizedBox.shrink());
 
 void main() {
+  testWidgets('English QR failure localizes app error but preserves backend revocation', (t) async {
+    final api = _FakeCouponApi()..qrError = StateError('unavailable');
+    await _pump(t, api, locale: const Locale('en'));
+    expect(find.text('Couldn’t generate the QR code. Try again later.'), findsOneWidget);
+    await _teardown(t);
+    await _pump(t, _FakeCouponApi(unavailableCode: 410), locale: const Locale('en'));
+    expect(find.text('该券已停用'), findsOneWidget);
+    expect(find.text('Retry'), findsOneWidget);
+    await _teardown(t);
+  });
+
   testWidgets('★ 链接缺券 id:说「缺少券信息」,不拉接口', (WidgetTester t) async {
     final api = _FakeCouponApi();
     await _pump(t, api, id: 0);

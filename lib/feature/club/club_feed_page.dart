@@ -1,3 +1,5 @@
+import 'club_api_messages.dart';
+import '../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
@@ -34,7 +36,7 @@ class ClubFeedPage extends ConsumerWidget {
     final async = ref.watch(clubFeedProvider);
     return CupertinoPageScaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      navigationBar: const CupertinoNavigationBar(middle: Text('俱乐部动态')),
+      navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).clubAuxFeedTitle)),
       child: Material(
         color: Colors.transparent,
         child: SafeArea(
@@ -42,8 +44,8 @@ class ClubFeedPage extends ConsumerWidget {
           child: async.when(
             loading: () => const Center(child: CupertinoActivityIndicator()),
             error: (Object e, _) => StatusView(
-              message: '圈子动态没能加载出来',
-              sub: e.toString().replaceFirst('Exception: ', ''),
+              message: stringsOf(context).clubAuxFeedError,
+              sub: clubApiErrorMessage(context, e),
               large: true,
               onRetry: () => ref.invalidate(clubFeedProvider),
             ),
@@ -52,17 +54,17 @@ class ClubFeedPage extends ConsumerWidget {
               //   前者给去俱乐部的入口,后者只说这里还没动静。
               if (feed.hasNoClub) {
                 return StatusView(
-                  message: '先加入一个俱乐部',
-                  sub: '加入后,俱乐部里的动态会出现在这里',
+                  message: stringsOf(context).clubAuxJoinFirst,
+                  sub: stringsOf(context).clubAuxJoinFirstHint,
                   large: true,
                   onRetry: () => context.push('/clubs'),
-                  retryLabel: '去逛俱乐部',
+                  retryLabel: stringsOf(context).clubAuxBrowseClubs,
                 );
               }
               if (feed.rows.isEmpty) {
-                return const StatusView(
-                  message: '这里还没有动静',
-                  sub: '你所在的俱乐部还没有人发帖',
+                return StatusView(
+                  message: stringsOf(context).clubAuxNoActivity,
+                  sub: stringsOf(context).clubAuxNoActivityHint,
                   large: true,
                 );
               }
@@ -127,7 +129,7 @@ class ClubPostTile extends ConsumerWidget {
       if (!context.mounted) return;
       CyNativeNotice.show(
         context,
-        e.toString().replaceFirst('Exception: ', ''),
+        clubApiErrorMessage(context, e),
         isError: true,
       );
     }
@@ -147,39 +149,39 @@ class ClubPostTile extends ConsumerWidget {
         await showCupertinoModalPopup<_ClubPostAction>(
           context: context,
           builder: (BuildContext sheetContext) => CupertinoActionSheet(
-            title: const Text('帖文操作'),
+            title: Text(stringsOf(context).clubAuxPostActions),
             actions: <Widget>[
               if (canEdit)
                 CupertinoActionSheetAction(
                   key: const Key('club-post-edit'),
                   onPressed: () =>
                       Navigator.of(sheetContext).pop(_ClubPostAction.edit),
-                  child: const Text('编辑帖文'),
+                  child: Text(stringsOf(context).clubAuxEditPost),
                 ),
               if (canPin)
                 CupertinoActionSheetAction(
                   key: const Key('club-post-pin'),
                   onPressed: () =>
                       Navigator.of(sheetContext).pop(_ClubPostAction.pin),
-                  child: Text(post.pinned ? '取消置顶' : '置顶公告'),
+                  child: Text(post.pinned ? stringsOf(context).clubAuxUnpin : stringsOf(context).clubAuxPinAnnouncement),
                 ),
               CupertinoActionSheetAction(
                 key: const Key('club-post-history'),
                 onPressed: () =>
                     Navigator.of(sheetContext).pop(_ClubPostAction.history),
-                child: const Text('查看编辑记录'),
+                child: Text(stringsOf(context).clubAuxEditHistory),
               ),
               CupertinoActionSheetAction(
                 isDestructiveAction: mine,
                 onPressed: () => Navigator.of(
                   sheetContext,
                 ).pop(mine ? _ClubPostAction.delete : _ClubPostAction.report),
-                child: Text(mine ? '删除帖文' : '举报帖文'),
+                child: Text(mine ? stringsOf(context).clubAuxDeletePost : stringsOf(context).clubAuxReportPost),
               ),
             ],
             cancelButton: CupertinoActionSheetAction(
               onPressed: () => Navigator.of(sheetContext).pop(),
-              child: const Text('取消'),
+              child: Text(stringsOf(context).cancel),
             ),
           ),
         );
@@ -194,7 +196,7 @@ class ClubPostTile extends ConsumerWidget {
           if (changed == true) _refresh(ref);
           break;
         case _ClubPostAction.pin:
-          final String msg = await ref
+          final String msg = await clubApiAction(context, () => ref
               .read(clubApiProvider)
               .setPostPinned(
                 postId: post.id,
@@ -202,7 +204,7 @@ class ClubPostTile extends ConsumerWidget {
                 version: post.version,
                 requestId:
                     'club-post-${post.pinned ? 'unpin' : 'pin'}-${post.id}-v${post.version}',
-              );
+              ));
           _refresh(ref);
           if (context.mounted) CyNativeNotice.show(context, msg);
           break;
@@ -212,15 +214,15 @@ class ClubPostTile extends ConsumerWidget {
         case _ClubPostAction.delete:
           final bool ok = await cyConfirm(
             context,
-            title: '删除这条动态?',
-            content: '删除后俱乐部成员就看不到了,评论也会一起消失。',
-            confirmText: '删除',
+            title: stringsOf(context).clubAuxDeletePostTitle,
+            content: stringsOf(context).clubAuxDeletePostConfirm,
+            confirmText: stringsOf(context).clubAuxDelete,
             danger: true,
           );
           if (!ok || !context.mounted) return;
-          final String msg = await ref
+          final String msg = await clubApiAction(context, () => ref
               .read(clubApiProvider)
-              .deletePost(post.id);
+              .deletePost(post.id));
           _refresh(ref);
           if (!context.mounted) return;
           CyNativeNotice.show(context, msg);
@@ -228,12 +230,12 @@ class ClubPostTile extends ConsumerWidget {
         case _ClubPostAction.report:
           final String? reason = await showReportSheet(
             context,
-            targetLabel: '这条动态',
+            targetLabel: stringsOf(context).clubAuxThisPost,
           );
           if (reason == null || !context.mounted) return;
-          final String msg = await ref
+          final String msg = await clubApiAction(context, () => ref
               .read(clubApiProvider)
-              .reportPost(post.id);
+              .reportPost(post.id));
           if (!context.mounted) return;
           CyNativeNotice.show(context, msg);
           break;
@@ -242,7 +244,7 @@ class ClubPostTile extends ConsumerWidget {
       if (!context.mounted) return;
       CyNativeNotice.show(
         context,
-        e.toString().replaceFirst('Exception: ', ''),
+        clubApiErrorMessage(context, e),
         isError: true,
       );
     }
@@ -255,13 +257,16 @@ class ClubPostTile extends ConsumerWidget {
     // 走 CyPalette 随主题变 —— 静态 CyTokens 在商家浅底上就是一张黑卡。
     final palette = CyPalette.of(context);
     final body = post.body;
+    final authorName = (post.nickname ?? '').trim().isEmpty
+        ? stringsOf(context).clubAuxAnonymousAuthor
+        : post.authorName;
 
     final VoidCallback? action = onOpenClub;
     return Semantics(
       container: action != null,
       explicitChildNodes: action != null,
       button: action != null,
-      label: action == null ? null : '打开这条动态所属的俱乐部',
+      label: action == null ? null : stringsOf(context).clubAuxOpenPostClub,
       onTap: action,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
@@ -284,8 +289,8 @@ class ClubPostTile extends ConsumerWidget {
                   Semantics(
                     button: post.authorRoute != null,
                     label: post.authorRoute == null
-                        ? post.authorName
-                        : '查看${post.authorName}主页',
+                        ? authorName
+                        : stringsOf(context).clubAuxViewAuthor(authorName),
                     onTap: post.authorRoute == null
                         ? null
                         : () => context.push(post.authorRoute!),
@@ -302,11 +307,11 @@ class ClubPostTile extends ConsumerWidget {
                           children: <Widget>[
                             CyAvatar(
                               url: post.avatar,
-                              fallback: post.authorName.characters.first,
+                              fallback: authorName.characters.first,
                               size: 32,
                             ),
                             const SizedBox(width: CyTokens.space2),
-                            Text(post.authorName, style: textTheme.titleSmall),
+                            Text(authorName, style: textTheme.titleSmall),
                           ],
                         ),
                       ),
@@ -324,7 +329,7 @@ class ClubPostTile extends ConsumerWidget {
                     Padding(
                       padding: const EdgeInsets.only(left: CyTokens.space2),
                       child: Text(
-                        '置顶',
+                        stringsOf(context).clubAuxPinned,
                         key: const Key('club-post-pinned'),
                         style: textTheme.labelSmall?.copyWith(
                           color: palette.textSecondary,
@@ -336,7 +341,7 @@ class ClubPostTile extends ConsumerWidget {
                   // 举报 / 删除。Apple 1.2 要求 UGC 有举报入口 —— 圈子帖此前没有。
                   CyNativeIconButton(
                     key: const Key('club-post-more'),
-                    label: '更多帖子操作',
+                    label: stringsOf(context).clubAuxMorePostActions,
                     icon: const CyNativeButtonIcon(
                       sfSymbol: 'ellipsis',
                       fallback: CupertinoIcons.ellipsis,
@@ -355,7 +360,7 @@ class ClubPostTile extends ConsumerWidget {
                 Padding(
                   padding: const EdgeInsets.only(top: CyTokens.space1),
                   child: Text(
-                    '已编辑 · 可查看记录',
+                    stringsOf(context).clubAuxEdited,
                     style: textTheme.labelSmall?.copyWith(
                       color: palette.textTertiary,
                     ),
@@ -523,7 +528,7 @@ class _PostRefCard extends StatelessWidget {
                 style: textTheme.titleSmall,
               ),
               Text(
-                template ? '主题模板' : '游玩记录',
+                template ? stringsOf(context).clubAuxThemeTemplate : stringsOf(context).clubAuxPlayRecord,
                 style: textTheme.labelSmall?.copyWith(
                   color: palette.textTertiary,
                 ),
@@ -546,7 +551,7 @@ class _PostRefCard extends StatelessWidget {
         children: <Widget>[
           Semantics(
             button: topicRoute != null,
-            label: '查看$title',
+            label: stringsOf(context).clubAuxViewTitle(title),
             child: topicRoute == null
                 ? head
                 : CupertinoButton(
@@ -569,7 +574,7 @@ class _PostRefCard extends StatelessWidget {
                     horizontal: CyTokens.space3,
                   ),
                   onPressed: () => context.push(playRoute),
-                  child: const Text('试玩'),
+                  child: Text(stringsOf(context).clubAuxTryPlay),
                 ),
               ],
             ),

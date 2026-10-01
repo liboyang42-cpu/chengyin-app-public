@@ -1,3 +1,4 @@
+import '../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -124,7 +125,7 @@ class _CupertinoChoiceField<T> extends StatelessWidget {
             .toList(growable: false),
         cancelButton: CupertinoActionSheetAction(
           onPressed: () => Navigator.of(sheetContext).pop(),
-          child: const Text('取消'),
+          child: Text(stringsOf(context).merchantRecruitUiCancel),
         ),
       ),
     );
@@ -156,7 +157,7 @@ class _CupertinoChoiceField<T> extends StatelessWidget {
                       CupertinoButton(
                         minimumSize: const Size(44, 44),
                         onPressed: () => Navigator.of(sheetContext).pop(),
-                        child: const Text('取消'),
+                        child: Text(stringsOf(context).merchantRecruitUiCancel),
                       ),
                       Expanded(
                         child: Text(
@@ -170,7 +171,7 @@ class _CupertinoChoiceField<T> extends StatelessWidget {
                         onPressed: () => Navigator.of(
                           sheetContext,
                         ).pop(options[selectedIndex].value),
-                        child: const Text('完成'),
+                        child: Text(stringsOf(context).merchantRecruitUiDone),
                       ),
                     ],
                   ),
@@ -303,7 +304,7 @@ Future<String?> _showCupertinoTimeRangePicker(
     initialDateTime: initial[0],
     minimumDate: minimum,
     maximumDate: maximum,
-    title: '开始时间',
+    title: stringsOf(context).merchantRecruitUiStart,
   );
   if (start == null || !context.mounted) return null;
   final DateTime? end = await showCySystemDatePicker(
@@ -312,7 +313,7 @@ Future<String?> _showCupertinoTimeRangePicker(
     initialDateTime: initial[1],
     minimumDate: minimum,
     maximumDate: maximum,
-    title: '结束时间',
+    title: stringsOf(context).merchantRecruitUiEnd,
   );
   if (end == null) return null;
   return _formatTimeRange(start, end);
@@ -437,13 +438,13 @@ class _ChapterApplySheetState extends ConsumerState<_ChapterApplySheet> {
       backgroundColor: p.bgPage,
       resizeToAvoidBottomInset: true,
       navigationBar: CupertinoNavigationBar(
-        middle: const Text('申请承接并配置点位'),
+        middle: Text(stringsOf(context).merchantRecruitUiApplyTitle),
         leading: CupertinoButton(
           key: const Key('apply-cancel'),
           minimumSize: const Size(44, 44),
           padding: EdgeInsets.zero,
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('取消'),
+          child: Text(stringsOf(context).merchantRecruitUiCancel),
         ),
       ),
       child: SafeArea(
@@ -467,45 +468,45 @@ class _ChapterApplySheetState extends ConsumerState<_ChapterApplySheet> {
               ),
               const SizedBox(height: CyTokens.space4),
               CyField(
-                label: '申请说明(选填)',
+                label: stringsOf(context).merchantRecruitUiMessage,
                 child: _CupertinoFormTextField(
                   fieldKey: const Key('apply-message'),
-                  label: '申请说明，选填',
+                  label: stringsOf(context).merchantRecruitUiMessageSemantics,
                   controller: _message,
-                  placeholder: '想承接的理由',
+                  placeholder: stringsOf(context).merchantRecruitUiMessageHint,
                   textInputAction: TextInputAction.next,
                   textCapitalization: TextCapitalization.sentences,
                 ),
               ),
               CyField(
-                label: '点位名称(必填)',
+                label: stringsOf(context).merchantRecruitUiName,
                 child: _CupertinoFormTextField(
                   fieldKey: const Key('apply-node-name'),
-                  label: '点位名称，必填',
+                  label: stringsOf(context).merchantRecruitUiNameSemantics,
                   controller: _name,
-                  placeholder: '玩家在路线上看到的名字',
+                  placeholder: stringsOf(context).merchantRecruitUiNameHint,
                   textInputAction: TextInputAction.next,
                   textCapitalization: TextCapitalization.words,
                   onChanged: (_) => setState(() {}),
                 ),
               ),
               CyField(
-                label: '到店地址',
+                label: stringsOf(context).merchantRecruitUiAddress,
                 child: _CupertinoFormTextField(
                   fieldKey: const Key('apply-node-address'),
-                  label: '到店地址',
+                  label: stringsOf(context).merchantRecruitUiAddress,
                   controller: _address,
-                  placeholder: '默认取店铺资料,可修改',
+                  placeholder: stringsOf(context).merchantRecruitUiAddressHint,
                   textInputAction: TextInputAction.done,
                   autofillHints: const <String>[
                     AutofillHints.streetAddressLine1,
                   ],
                 ),
               ),
-              CyField(label: '玩法模板(必填)', child: _templatePicker(p, t)),
+              CyField(label: stringsOf(context).merchantRecruitUiTemplate, child: _templatePicker(p, t)),
               const SizedBox(height: CyTokens.space2),
               Text(
-                '提交后回到待审 —— 改一版就要重审一版,通过前玩家看不到这个点位。',
+                stringsOf(context).merchantRecruitUiReviewHint,
                 style: t.bodySmall?.copyWith(color: p.textTertiary),
               ),
               const SizedBox(height: CyTokens.space4),
@@ -531,7 +532,7 @@ class _ChapterApplySheetState extends ConsumerState<_ChapterApplySheet> {
                         ),
                       )
                     : null,
-                child: const Text('提交申请与点位'),
+                child: Text(stringsOf(context).merchantRecruitUiSubmit),
               ),
             ],
           ),
@@ -543,7 +544,7 @@ class _ChapterApplySheetState extends ConsumerState<_ChapterApplySheet> {
   Widget _templatePicker(CyPalette p, TextTheme t) {
     if (_templateError != null) {
       return Text(
-        '玩法列表没读出来:$_templateError',
+        stringsOf(context).merchantRecruitUiTemplatesError(_templateError!),
         key: const Key('apply-template-error'),
         style: t.bodySmall?.copyWith(color: CyPalette.of(context).statusWarning),
       );
@@ -551,22 +552,22 @@ class _ChapterApplySheetState extends ConsumerState<_ChapterApplySheet> {
     final List<PlayTemplate>? rows = _templates;
     if (rows == null) {
       return Text(
-        '正在读你已发布的玩法…',
+        stringsOf(context).merchantRecruitUiTemplatesLoading,
         style: t.bodySmall?.copyWith(color: p.textSecondary),
       );
     }
     if (rows.isEmpty) {
       return Text(
-        '你还没有已发布的玩法 —— 先去玩法模板里做一个再回来申请',
+        stringsOf(context).merchantRecruitUiTemplatesEmpty,
         key: const Key('apply-template-empty'),
         style: t.bodySmall?.copyWith(color: p.textSecondary),
       );
     }
     return _CupertinoChoiceField<int>(
       key: const Key('apply-template-picker'),
-      title: '选择玩法模板',
+      title: stringsOf(context).merchantRecruitUiChooseTemplate,
       value: _templateId,
-      hint: '选择我已发布的玩法',
+      hint: stringsOf(context).merchantRecruitUiTemplateHint,
       options: rows
           .map(
             (PlayTemplate x) =>
@@ -702,13 +703,13 @@ class _ChapterOfferSheetState extends ConsumerState<_ChapterOfferSheet> {
       backgroundColor: p.bgPage,
       resizeToAvoidBottomInset: true,
       navigationBar: CupertinoNavigationBar(
-        middle: const Text('填写实际供给'),
+        middle: Text(stringsOf(context).merchantRecruitUiOfferTitle),
         leading: CupertinoButton(
           key: const Key('offer-cancel'),
           minimumSize: const Size(44, 44),
           padding: EdgeInsets.zero,
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('取消'),
+          child: Text(stringsOf(context).merchantRecruitUiCancel),
         ),
       ),
       child: SafeArea(
@@ -727,19 +728,19 @@ class _ChapterOfferSheetState extends ConsumerState<_ChapterOfferSheet> {
             children: <Widget>[
               const SizedBox(height: CyTokens.space1),
               Text(
-                '${widget.chapterName} · ${termsModeLabel(widget.termsMode) ?? '档位未知'}',
+                '${widget.chapterName} · ${termsModeLabel(widget.termsMode) ?? stringsOf(context).merchantRecruitUiUnknownTerms}',
                 style: t.bodySmall?.copyWith(color: p.textSecondary),
               ),
               const SizedBox(height: CyTokens.space4),
               if (_isPerk) ...<Widget>[
-                CyField(label: '常备权益(必填)', child: _perkPicker(p, t)),
+                CyField(label: stringsOf(context).merchantRecruitUiPerk, child: _perkPicker(p, t)),
                 CyField(
-                  label: '核销额度(必填)',
+                  label: stringsOf(context).merchantRecruitUiQuota,
                   child: _CupertinoFormTextField(
                     fieldKey: const Key('offer-quota'),
-                    label: '核销额度，必填',
+                    label: stringsOf(context).merchantRecruitUiQuotaSemantics,
                     controller: _quota,
-                    placeholder: '至少 1 人次',
+                    placeholder: stringsOf(context).merchantRecruitUiQuotaHint,
                     keyboardType: TextInputType.number,
                     textInputAction: TextInputAction.done,
                     inputFormatters: <TextInputFormatter>[
@@ -751,12 +752,12 @@ class _ChapterOfferSheetState extends ConsumerState<_ChapterOfferSheet> {
               ],
               if (_isRevshare)
                 CyField(
-                  label: '每人次计酬(必填)',
+                  label: stringsOf(context).merchantRecruitUiFee,
                   child: _CupertinoFormTextField(
                     fieldKey: const Key('offer-fee'),
-                    label: '每人次计酬，必填',
+                    label: stringsOf(context).merchantRecruitUiFeeSemantics,
                     controller: _fee,
-                    placeholder: '平台每核销 1 人次支付的金额',
+                    placeholder: stringsOf(context).merchantResidualPolicyFeeHint,
                     keyboardType: const TextInputType.numberWithOptions(
                       decimal: true,
                     ),
@@ -766,12 +767,12 @@ class _ChapterOfferSheetState extends ConsumerState<_ChapterOfferSheet> {
                 ),
               if (widget.termsMode == 'TRAFFIC')
                 Text(
-                  '引流档不需要填金额或额度,确认后即刻生效。',
+                  stringsOf(context).merchantResidualPolicyTraffic,
                   style: t.bodySmall?.copyWith(color: p.textSecondary),
                 ),
               const SizedBox(height: CyTokens.space2),
               Text(
-                '供给一旦生效就不能就地改 —— 要改得先撤回承接申请再重来。',
+                stringsOf(context).merchantResidualPolicySupplyChange,
                 style: t.bodySmall?.copyWith(color: p.textTertiary),
               ),
               const SizedBox(height: CyTokens.space4),
@@ -786,7 +787,7 @@ class _ChapterOfferSheetState extends ConsumerState<_ChapterOfferSheet> {
                 onPressed: _canSubmit
                     ? () => Navigator.of(context).pop(_payload())
                     : null,
-                child: const Text('确认实际供给'),
+                child: Text(stringsOf(context).merchantRecruitUiOfferConfirm),
               ),
             ],
           ),
@@ -798,7 +799,7 @@ class _ChapterOfferSheetState extends ConsumerState<_ChapterOfferSheet> {
   Widget _perkPicker(CyPalette p, TextTheme t) {
     if (_perkError != null) {
       return Text(
-        '常备权益没读出来:$_perkError',
+        stringsOf(context).merchantRecruitUiPerksError(_perkError!),
         key: const Key('offer-perk-error'),
         style: t.bodySmall?.copyWith(color: CyPalette.of(context).statusWarning),
       );
@@ -806,27 +807,27 @@ class _ChapterOfferSheetState extends ConsumerState<_ChapterOfferSheet> {
     final List<Map<String, dynamic>>? rows = _perks;
     if (rows == null) {
       return Text(
-        '正在读常备权益…',
+        stringsOf(context).merchantRecruitUiPerksLoading,
         style: t.bodySmall?.copyWith(color: p.textSecondary),
       );
     }
     if (rows.isEmpty) {
       return Text(
-        '还没有可用的常备权益 —— 先建一个再回来选',
+        stringsOf(context).merchantRecruitUiPerksEmpty,
         key: const Key('offer-perk-empty'),
         style: t.bodySmall?.copyWith(color: p.textSecondary),
       );
     }
     return _CupertinoChoiceField<int>(
       key: const Key('offer-perk-picker'),
-      title: '选择常备权益',
+      title: stringsOf(context).merchantRecruitUiChoosePerk,
       value: _perkTemplateId,
-      hint: '选择常备权益',
+      hint: stringsOf(context).merchantRecruitUiChoosePerk,
       options: rows
           .map(
             (Map<String, dynamic> r) => _CupertinoChoice<int>(
               value: (r['id'] as num?)?.toInt() ?? 0,
-              label: (r['name'] ?? '未命名权益').toString(),
+              label: (r['name'] ?? stringsOf(context).merchantRecruitUiUnnamedPerk).toString(),
             ),
           )
           .toList(),
@@ -925,13 +926,13 @@ class _NodeRegistrationSheetState
       backgroundColor: p.bgPage,
       resizeToAvoidBottomInset: true,
       navigationBar: CupertinoNavigationBar(
-        middle: const Text('报名承接一个站点'),
+        middle: Text(stringsOf(context).merchantRecruitUiRegisterTitle),
         leading: CupertinoButton(
           key: const Key('register-cancel'),
           minimumSize: const Size(44, 44),
           padding: EdgeInsets.zero,
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('取消'),
+          child: Text(stringsOf(context).merchantRecruitUiCancel),
         ),
       ),
       child: SafeArea(
@@ -950,22 +951,22 @@ class _NodeRegistrationSheetState
             children: <Widget>[
               const SizedBox(height: CyTokens.space1),
               Text(
-                '提交的是意向,不含条款 —— 平台择优调配后才谈合作条件。',
+                stringsOf(context).merchantResidualPolicyIntent,
                 style: t.bodySmall?.copyWith(color: p.textSecondary),
               ),
               const SizedBox(height: CyTokens.space4),
               CyField(
-                label: '选择站点(必填)',
+                label: stringsOf(context).merchantRecruitUiNode,
                 child: _CupertinoChoiceField<int>(
                   key: const Key('register-node-picker'),
-                  title: '选择站点',
+                  title: stringsOf(context).merchantRecruitUiChooseNode,
                   value: _nodeId,
-                  hint: '选择你想承接的站点',
+                  hint: stringsOf(context).merchantRecruitUiNodeHint,
                   options: widget.nodes
                       .map(
                         (TopicNode n) => _CupertinoChoice<int>(
                           value: n.id,
-                          label: n.name.trim().isEmpty ? '未命名站点' : n.name,
+                          label: n.name.trim().isEmpty ? stringsOf(context).merchantRecruitUiUnnamedNode : n.name,
                         ),
                       )
                       .toList(),
@@ -973,7 +974,7 @@ class _NodeRegistrationSheetState
                 ),
               ),
               CyField(
-                label: '可配合时间',
+                label: stringsOf(context).merchantRecruitUiAvailable,
                 child: CupertinoButton(
                   key: const Key('register-cooperate-date'),
                   minimumSize: const Size.fromHeight(44),
@@ -994,7 +995,7 @@ class _NodeRegistrationSheetState
                     alignment: Alignment.centerLeft,
                     child: Text(
                       _cooperate.text.isEmpty
-                          ? '例如 09:00-18:00'
+                          ? stringsOf(context).merchantRecruitUiAvailableHint
                           : _cooperate.text,
                       style: TextStyle(
                         color: _cooperate.text.isEmpty
@@ -1008,7 +1009,7 @@ class _NodeRegistrationSheetState
               ..._form.fields(context, ref),
               const SizedBox(height: CyTokens.space2),
               Text(
-                '可配合时间建好之后就改不了了,先想清楚再提交。',
+                stringsOf(context).merchantRecruitUiAvailableWarning,
                 style: t.bodySmall?.copyWith(color: p.textTertiary),
               ),
               const SizedBox(height: CyTokens.space4),
@@ -1032,7 +1033,7 @@ class _NodeRegistrationSheetState
                           'cooperateDate': _cooperate.text.trim(),
                       })
                     : null,
-                child: const Text('提交报名'),
+                child: Text(stringsOf(context).merchantRecruitUiRegisterSubmit),
               ),
             ],
           ),
@@ -1152,36 +1153,36 @@ class MerchantRegistrationFormState extends ChangeNotifier {
     final TextTheme t = Theme.of(context).textTheme;
     return <Widget>[
       CyField(
-        label: '场地名称(必填)',
+        label: stringsOf(context).merchantCatalogVenueName,
         child: _CupertinoFormTextField(
           fieldKey: const Key('reg-address-name'),
-          label: '场地名称，必填',
+          label: stringsOf(context).merchantCatalogVenueNameSemantics,
           controller: addressName,
-          placeholder: '玩家看到的到店名字',
+          placeholder: stringsOf(context).merchantCatalogVenueNameHint,
           textInputAction: TextInputAction.next,
           textCapitalization: TextCapitalization.words,
           onChanged: (_) => notifyListeners(),
         ),
       ),
       CyField(
-        label: '承接地点(必填)',
+        label: stringsOf(context).merchantCatalogAddress,
         child: _CupertinoFormTextField(
           fieldKey: const Key('reg-address'),
-          label: '承接地点，必填',
+          label: stringsOf(context).merchantCatalogAddressSemantics,
           controller: address,
-          placeholder: '详细到门牌号',
+          placeholder: stringsOf(context).merchantCatalogAddressHint,
           textInputAction: TextInputAction.next,
           autofillHints: const <String>[AutofillHints.streetAddressLine1],
           onChanged: (_) => notifyListeners(),
         ),
       ),
       CyField(
-        label: '承接说明(必填)',
+        label: stringsOf(context).merchantCatalogDescription,
         child: _CupertinoFormTextField(
           fieldKey: const Key('reg-activity-desc'),
-          label: '承接说明，必填',
+          label: stringsOf(context).merchantCatalogDescriptionSemantics,
           controller: activityDesc,
-          placeholder: '可用空间、接待条件、拍摄许可、现场能配合的物料',
+          placeholder: stringsOf(context).merchantCatalogDescriptionHint,
           maxLines: 4,
           maxLength: 500,
           keyboardType: TextInputType.multiline,
@@ -1191,12 +1192,12 @@ class MerchantRegistrationFormState extends ChangeNotifier {
         ),
       ),
       CyField(
-        label: '限定人数',
+        label: stringsOf(context).merchantCatalogCapacity,
         child: _CupertinoFormTextField(
           fieldKey: const Key('reg-limit-num'),
-          label: '限定人数',
+          label: stringsOf(context).merchantCatalogCapacity,
           controller: limitNum,
-          placeholder: '留空 = 不限人数',
+          placeholder: stringsOf(context).merchantCatalogCapacityHint,
           keyboardType: TextInputType.number,
           textInputAction: TextInputAction.next,
           inputFormatters: <TextInputFormatter>[
@@ -1206,12 +1207,12 @@ class MerchantRegistrationFormState extends ChangeNotifier {
         ),
       ),
       CyField(
-        label: '经度',
+        label: stringsOf(context).merchantCatalogLongitude,
         child: _CupertinoFormTextField(
           fieldKey: const Key('reg-longitude'),
-          label: '经度',
+          label: stringsOf(context).merchantCatalogLongitude,
           controller: longitude,
-          placeholder: '默认取店铺资料里的坐标',
+          placeholder: stringsOf(context).merchantCatalogCoordinatesHint,
           keyboardType: const TextInputType.numberWithOptions(
             decimal: true,
             signed: true,
@@ -1220,12 +1221,12 @@ class MerchantRegistrationFormState extends ChangeNotifier {
         ),
       ),
       CyField(
-        label: '纬度',
+        label: stringsOf(context).merchantCatalogLatitude,
         child: _CupertinoFormTextField(
           fieldKey: const Key('reg-latitude'),
-          label: '纬度',
+          label: stringsOf(context).merchantCatalogLatitude,
           controller: latitude,
-          placeholder: '默认取店铺资料里的坐标',
+          placeholder: stringsOf(context).merchantCatalogCoordinatesHint,
           keyboardType: const TextInputType.numberWithOptions(
             decimal: true,
             signed: true,
@@ -1234,18 +1235,18 @@ class MerchantRegistrationFormState extends ChangeNotifier {
         ),
       ),
       CyField(
-        label: '场地实拍(最多 9 张)',
+        label: stringsOf(context).merchantCatalogPhotos,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             if (pics.isEmpty)
               Text(
-                '还没有上传照片',
+                stringsOf(context).merchantCatalogPhotosEmpty,
                 style: t.bodySmall?.copyWith(color: p.textSecondary),
               )
             else
               Text(
-                '已上传 ${pics.length} 张',
+                stringsOf(context).merchantCatalogPhotoCount(pics.length),
                 key: const Key('reg-pic-count'),
                 style: t.bodySmall?.copyWith(color: p.textSecondary),
               ),
@@ -1260,7 +1261,7 @@ class MerchantRegistrationFormState extends ChangeNotifier {
                     onPressed: _uploading || pics.length >= 9
                         ? null
                         : () => pickPics(context, ref),
-                    child: Text(_uploading ? '上传中…' : '添加照片'),
+                    child: Text(_uploading ? stringsOf(context).merchantCatalogUploading : stringsOf(context).merchantCatalogAddPhotos),
                   ),
                 ),
                 if (pics.isNotEmpty) ...<Widget>[
@@ -1275,7 +1276,7 @@ class MerchantRegistrationFormState extends ChangeNotifier {
                               pics.clear();
                               notifyListeners();
                             },
-                      child: const Text('全部移除'),
+                      child: Text(stringsOf(context).merchantCatalogRemovePhotos),
                     ),
                   ),
                 ],

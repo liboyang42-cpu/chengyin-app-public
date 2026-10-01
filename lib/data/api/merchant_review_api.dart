@@ -66,7 +66,7 @@ class MerchantReviewApi
     required int pageNum,
     required int pageSize,
   }) async {
-    if (merchantRowId <= 0) throw ArgumentError('merchantRowId 不合法');
+    if (merchantRowId <= 0) throw MerchantReviewLocalArgumentError('merchantRowId 不合法');
     final Map<String, dynamic> data = await _postObject(
       '/api/merchant/reviews/public',
       queryParameters: <String, dynamic>{
@@ -157,7 +157,7 @@ class MerchantReviewApi
     required String requestId,
   }) async {
     if (reviewId <= 0 || expectedVersion < 0) {
-      throw ArgumentError('评价状态已失效，请刷新');
+      throw MerchantReviewLocalArgumentError('评价状态已失效，请刷新');
     }
     await _postObject(
       '/api/merchant/reviews/reply/delete',
@@ -194,7 +194,7 @@ class MerchantReviewApi
     required String requestId,
   }) async {
     if (merchantOwnerMemberId <= 0) {
-      throw ArgumentError('商家主体信息不完整');
+      throw MerchantReviewLocalArgumentError('商家主体信息不完整');
     }
     final Map<String, dynamic> body = draft.toJson(requestId: requestId)
       ..['merchantMemberId'] = merchantOwnerMemberId;
@@ -213,7 +213,7 @@ class MerchantReviewApi
   int _requireReviewId(Map<String, dynamic> data) {
     final Object? value = data['reviewId'];
     if (value is! int || value <= 0) {
-      throw const FormatException('评价提交回执不完整');
+      throw const MerchantReviewLocalFormatException('评价提交回执不完整');
     }
     return value;
   }
@@ -243,6 +243,7 @@ class MerchantReviewApi
       throw MerchantReviewApiException(
         (body?['msg'] ?? fallback).toString(),
         code: code,
+        isLocalFallback: body?['msg'] == null,
       );
     }
   }
@@ -256,11 +257,12 @@ class MerchantReviewApi
       throw MerchantReviewApiException(
         (body['msg'] ?? fallback).toString(),
         code: code,
+        isLocalFallback: body['msg'] == null,
       );
     }
     final Object? data = body['data'];
     if (data is! Map<String, dynamic>) {
-      throw const MerchantReviewApiException('评价服务回执不完整');
+      throw const MerchantReviewApiException('评价服务回执不完整', isLocalFallback: true);
     }
     return data;
   }
@@ -273,10 +275,11 @@ class MerchantReviewApi
 }
 
 class MerchantReviewApiException implements Exception {
-  const MerchantReviewApiException(this.message, {this.code});
+  const MerchantReviewApiException(this.message, {this.code, this.isLocalFallback = false});
 
   final String message;
   final int? code;
+  final bool isLocalFallback;
 
   bool get isUnauthorized => code == 401;
   bool get isForbidden => code == 403;

@@ -1,9 +1,11 @@
-import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/widgets/status_view.dart';
+import '../../core/widgets/localized_error_status.dart';
+import '../../l10n/error_presentation.dart';
 import '../../data/api/merchant_api.dart';
+import '../../l10n/strings.dart';
 
 /// 商家域的错误分流 —— **四种态,界面各不相同**。
 ///
@@ -26,49 +28,35 @@ Widget merchantErrorView(
   ///   所以名字由调用方给。不给的话退回「内容」,仍然比只说
   ///   「加载失败」强:一屏上常有多块内容各自加载,不说是哪一块,
   ///   用户不知道现在看到的还能不能信。
-  String what = '内容',
+  String? what,
 }) {
   if (error is MerchantApiException) {
     if (error.isClubLeaderConflict) {
-      return StatusView(message: '这个账户不能成为商家', sub: error.message, large: true);
+      return StatusView(message: stringsOf(context).merchantHomeConflict, sub: error.message, large: true);
     }
     if (error.isPendingReview) {
-      return const StatusView(
-        message: '商家资质审核中',
-        sub: '审核通过后即可使用这里的功能',
+      return StatusView(
+        message: stringsOf(context).merchantHomeReview,
+        sub: stringsOf(context).merchantHomeReviewHint,
         large: true,
       );
     }
     if (error.isNotMerchant) {
       return StatusView(
-        message: '你还不是商家',
-        sub: '申请入驻通过后,这里会显示你的经营数据',
+        message: stringsOf(context).merchantHomeNotMerchant,
+        sub: stringsOf(context).merchantHomeApplyHint,
         large: true,
         onRetry: () => context.push('/merchant/apply'),
-        retryLabel: '去申请入驻',
+        retryLabel: stringsOf(context).merchantHomeApply,
       );
     }
   }
-  return StatusView(
-    message: '$what没能加载出来',
-    sub: _readableError(error),
-    large: true,
+  return LocalizedErrorStatus(
+    error: error,
+    fallback: stringsOf(context).merchantHomeLoadError(what ?? stringsOf(context).merchantHomeContent),
+    originalApiMessage: error is MerchantApiException ? error.message : legacyApiMessage(error),
     onRetry: onRetry,
   );
-}
-
-/// 后端原话(Exception(msg) 由 api 层透传)可以给用户;
-/// DioException 的英文原文(`DioException [bad response] …`)不能糊上屏
-/// (b1-sim 券/设置线 S6 同型)—— 网络类给真源文案。
-String _readableError(Object error) {
-  if (error is DioException) {
-    final data = error.response?.data;
-    final msg = data is Map ? data['msg'] : null;
-    return (msg is String && msg.trim().isNotEmpty)
-        ? msg.trim()
-        : '网络异常，请检查网络后重试。';
-  }
-  return error.toString().replaceFirst('Exception: ', '');
 }
 
 /// 岗位没有这项权限 —— 说清是哪项权限,以及**出路在哪**。
@@ -80,14 +68,16 @@ String _readableError(Object error) {
 ///   / sub「请联系店主开通」/ action「重新确认」。
 Widget merchantDeniedView({
   required String title,
-  String sub = '请联系店主开通',
-  String retryLabel = '重新确认',
+  String? sub,
+  String? retryLabel,
   VoidCallback? onRetry,
-}) => StatusView(
-  icon: CupertinoIcons.lock,
-  message: title,
-  sub: sub,
-  large: true,
-  onRetry: onRetry,
-  retryLabel: retryLabel,
+}) => Builder(
+  builder: (context) => StatusView(
+    icon: CupertinoIcons.lock,
+    message: title,
+    sub: sub ?? stringsOf(context).merchantHomeContactOwner,
+    large: true,
+    onRetry: onRetry,
+    retryLabel: retryLabel ?? stringsOf(context).merchantHomeRecheck,
+  ),
 );

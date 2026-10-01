@@ -1,3 +1,4 @@
+import '../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -75,7 +76,7 @@ class _MerchantCoopProfilePageState
         ? null
         : int.tryParse(capacityText);
     if (capacityText.isNotEmpty && (capacity == null || capacity < 0)) {
-      setState(() => _error = '可容纳人数要填数字');
+      setState(() => _error = stringsOf(context).merchantDirectoryCapacityInvalid);
       return;
     }
 
@@ -113,7 +114,7 @@ class _MerchantCoopProfilePageState
     final async = ref.watch(coopProfileProvider);
     return CupertinoPageScaffold(
       backgroundColor: CyPalette.of(context).bgPage,
-      navigationBar: const CupertinoNavigationBar(middle: Text('承接设置')),
+      navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).merchantDirectorySettings)),
       child: Material(
         color: Colors.transparent,
         child: SafeArea(
@@ -122,20 +123,20 @@ class _MerchantCoopProfilePageState
             loading: () => const CySkeleton(),
             error: (Object e, StackTrace st) => StatusView(
               icon: CupertinoIcons.exclamationmark_triangle,
-              message: '承接设置加载失败',
+              message: stringsOf(context).merchantDirectorySettingsFailed,
               sub: e.toString().replaceFirst('Exception: ', ''),
               large: true,
               onRetry: () => ref.invalidate(coopProfileProvider),
-              retryLabel: '重新载入',
+              retryLabel: stringsOf(context).merchantDirectoryReload,
             ),
             data: (Map<String, dynamic> m) {
               if (m.isEmpty) {
                 return StatusView(
-                  message: '暂时无法编辑承接设置',
-                  sub: '这个账号还没有店铺，先完成商家入驻拿到店铺，再回来设置承接能力。',
+                  message: stringsOf(context).merchantDirectorySettingsUnavailable,
+                  sub: stringsOf(context).merchantDirectorySettingsNoStore,
                   large: true,
                   onRetry: () => context.push('/merchant/apply'),
-                  retryLabel: '去商家入驻',
+                  retryLabel: stringsOf(context).merchantDirectoryApply,
                 );
               }
               _fill(m);
@@ -178,13 +179,13 @@ class _MerchantCoopProfilePageState
               children: <Widget>[
                 _field(
                   _capacity,
-                  '可容纳人数',
-                  hint: '如 30',
+                  stringsOf(context).merchantDirectoryCapacity,
+                  hint: stringsOf(context).merchantDirectoryCapacityHint,
                   keyboard: TextInputType.number,
                 ),
-                _field(_availableTime, '可承接时段', hint: '如 周末 / 工作日晚间'),
+                _field(_availableTime, stringsOf(context).merchantDirectoryAvailability, hint: stringsOf(context).merchantDirectoryAvailabilityHint),
                 _chargeTypeField(palette, textTheme),
-                _field(_demand, '合作诉求', hint: '想要什么样的合作'),
+                _field(_demand, stringsOf(context).merchantDirectoryGoals, hint: stringsOf(context).merchantDirectoryGoalsHint),
               ],
             ),
           ),
@@ -205,7 +206,7 @@ class _MerchantCoopProfilePageState
               key: const Key('merchant-coop-save'),
               onPressed: _saving ? null : _save,
               padding: EdgeInsets.zero,
-              child: Text(_saving ? '保存中…' : '保存承接设置'),
+              child: Text(_saving ? stringsOf(context).merchantDirectorySaving : stringsOf(context).merchantDirectorySaveSettings),
             ),
           ),
         ],
@@ -220,7 +221,7 @@ class _MerchantCoopProfilePageState
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           Text(
-            '收费方式',
+            stringsOf(context).merchantDirectoryChargeType,
             style: textTheme.bodySmall?.copyWith(color: palette.textSecondary),
           ),
           const SizedBox(height: CyTokens.space1_5),
@@ -228,9 +229,9 @@ class _MerchantCoopProfilePageState
             height: 44,
             child: CupertinoSlidingSegmentedControl<int>(
               groupValue: _chargeType,
-              children: const <int, Widget>{
-                0: Center(child: Text('免费承接')),
-                1: Center(child: Text('收费承接')),
+              children: <int, Widget>{
+                0: Center(child: Text(stringsOf(context).merchantDirectoryFreeHosting)),
+                1: Center(child: Text(stringsOf(context).merchantDirectoryPaidHosting)),
               },
               onValueChanged: (int? value) {
                 if (value != null) setState(() => _chargeType = value);

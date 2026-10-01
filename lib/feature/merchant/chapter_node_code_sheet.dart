@@ -1,3 +1,4 @@
+import '../../l10n/strings.dart';
 import 'dart:async';
 import 'dart:typed_data';
 
@@ -58,6 +59,7 @@ class _ChapterNodeCodeSheet extends ConsumerStatefulWidget {
 class _ChapterNodeCodeSheetState extends ConsumerState<_ChapterNodeCodeSheet> {
   bool _loading = true;
   String? _error;
+  bool _hasLocalCodeError = false;
 
   /// 图片地址(后端直接给图,客户端不生成二维码)。
   String _qrUrl = '';
@@ -96,6 +98,7 @@ class _ChapterNodeCodeSheetState extends ConsumerState<_ChapterNodeCodeSheet> {
     setState(() {
       _loading = true;
       _error = null;
+      _hasLocalCodeError = false;
       _qrUrl = '';
       _code = '';
       _ttlSeconds = 0;
@@ -112,6 +115,7 @@ class _ChapterNodeCodeSheetState extends ConsumerState<_ChapterNodeCodeSheet> {
         setState(() {
           _loading = false;
           _error = '打卡码暂时没能生成';
+          _hasLocalCodeError = true;
         });
         return;
       }
@@ -154,17 +158,18 @@ class _ChapterNodeCodeSheetState extends ConsumerState<_ChapterNodeCodeSheet> {
 
   Future<void> _saveToAlbum() async {
     if (_qrUrl.isEmpty) {
-      CyNativeNotice.show(context, '打卡码还没生成', isError: true);
+      CyNativeNotice.show(context, stringsOf(context).merchantChapterCodeNotReady, isError: true);
       return;
     }
+    final imageName = _isLive ? stringsOf(context).merchantChapterCodeLive : stringsOf(context).merchantChapterCodeStore;
     setState(() => _saving = true);
     try {
       final Uint8List bytes = await ref
           .read(merchantApiProvider)
           .fetchImageBytes(_qrUrl);
-      await saveQrImageToAlbum(bytes, _isLive ? '现场打卡码' : '店内打卡码');
+      await saveQrImageToAlbum(bytes, imageName);
       if (!mounted) return;
-      CyNativeNotice.show(context, '已保存到相册');
+      CyNativeNotice.show(context, stringsOf(context).merchantChapterCodeSaved);
     } catch (e) {
       if (!mounted) return;
       CyNativeNotice.show(
@@ -198,15 +203,15 @@ class _ChapterNodeCodeSheetState extends ConsumerState<_ChapterNodeCodeSheet> {
               const Center(child: CySheetGrab()),
               const SizedBox(height: CyTokens.space3),
               Text(
-                _isLive ? '现场打卡码' : '本站打卡码',
+                _isLive ? stringsOf(context).merchantChapterCodeLive : stringsOf(context).merchantChapterCodeStation,
                 textAlign: TextAlign.center,
                 style: t.titleMedium,
               ),
               const SizedBox(height: CyTokens.space1),
               Text(
                 _isLive
-                    ? '请让玩家扫这一张。码会定时自动换新,不用手动刷新。'
-                    : '请让玩家扫这一张。可以保存到相册,贴在店里长期使用。',
+                    ? stringsOf(context).merchantChapterCodeLiveHint
+                    : stringsOf(context).merchantChapterCodePosterHint,
                 textAlign: TextAlign.center,
                 style: t.bodySmall?.copyWith(color: p.textSecondary),
               ),
@@ -216,7 +221,7 @@ class _ChapterNodeCodeSheetState extends ConsumerState<_ChapterNodeCodeSheet> {
               if (!_isLive)
                 CyNativeButton(
                   key: const Key('chapter-node-code-save'),
-                  label: _saving ? '保存中…' : '保存到相册',
+                  label: _saving ? stringsOf(context).merchantChapterCodeSaving : stringsOf(context).merchantChapterCodeSave,
                   role: CyNativeButtonRole.secondary,
                   loading: _saving,
                   onPressed: _loading || _error != null || _saving
@@ -226,7 +231,7 @@ class _ChapterNodeCodeSheetState extends ConsumerState<_ChapterNodeCodeSheet> {
               if (_isLive) ...<Widget>[
                 if (_ttlSeconds > 0)
                   Text(
-                    '$_ttlSeconds 秒后自动换新',
+                    stringsOf(context).merchantChapterCodeCountdown(_ttlSeconds),
                     key: const Key('chapter-node-code-countdown'),
                     textAlign: TextAlign.center,
                     style: t.bodySmall?.copyWith(color: p.textTertiary),
@@ -234,7 +239,7 @@ class _ChapterNodeCodeSheetState extends ConsumerState<_ChapterNodeCodeSheet> {
                 const SizedBox(height: CyTokens.space2),
                 CyNativeButton(
                   key: const Key('chapter-node-code-refresh'),
-                  label: '立即换一张',
+                  label: stringsOf(context).merchantChapterCodeRefresh,
                   role: CyNativeButtonRole.secondary,
                   onPressed: _loading ? null : _load,
                 ),
@@ -245,7 +250,7 @@ class _ChapterNodeCodeSheetState extends ConsumerState<_ChapterNodeCodeSheet> {
                 padding: EdgeInsets.zero,
                 minimumSize: const Size(44, 44),
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('关闭'),
+                child: Text(stringsOf(context).merchantChapterCodeClose),
               ),
             ],
           ),
@@ -273,7 +278,7 @@ class _ChapterNodeCodeSheetState extends ConsumerState<_ChapterNodeCodeSheet> {
                   ? const CupertinoActivityIndicator(radius: 14)
                   : _error != null
                   ? Text(
-                      _error!,
+                      _hasLocalCodeError ? stringsOf(context).merchantChapterCodeMissing : _error!,
                       key: const Key('chapter-node-code-error'),
                       textAlign: TextAlign.center,
                       style: t.bodyMedium?.copyWith(color: p.textSecondary),
@@ -301,7 +306,7 @@ class _ChapterNodeCodeSheetState extends ConsumerState<_ChapterNodeCodeSheet> {
               padding: EdgeInsets.zero,
               minimumSize: const Size(88, 44),
               onPressed: _load,
-              child: const Text('重试'),
+              child: Text(stringsOf(context).merchantChapterCodeRetry),
             ),
           ],
         ],

@@ -19,6 +19,24 @@ void main() {
         );
   });
 
+  test('player errors distinguish local fallback from identical server copy', () async {
+    for (final serverMessage in <String?>[null, '请求失败']) {
+      final api = _api(<RequestOptions>[], (_) => <String, dynamic>{
+        'code': 500,
+        if (serverMessage != null) 'msg': serverMessage,
+      });
+      await expectLater(api.loadPlayerView(activityId: 7), throwsA(
+        isA<GameSessionContractException>()
+          .having((error) => error.message, 'message', '请求失败')
+          .having((error) => error.isLocal, 'local provenance', serverMessage == null),
+      ));
+    }
+    final api = _api(<RequestOptions>[], (_) => <String, dynamic>{'code': 200, 'data': null});
+    await expectLater(api.loadPlayerView(activityId: 7), throwsA(
+      isA<GameSessionContractException>().having((error) => error.isLocal, 'local malformed projection', true),
+    ));
+  });
+
   test('商家投影和入口使用后端真实 GET 契约', () async {
     final sent = <RequestOptions>[];
     final api = _api(

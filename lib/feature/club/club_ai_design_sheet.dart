@@ -1,3 +1,5 @@
+import 'club_api_messages.dart';
+import '../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -22,6 +24,7 @@ class ClubAiNode {
   const ClubAiNode({
     required this.order,
     required this.name,
+    this.fallbackNameNumber,
     this.address = '',
     this.longitude = '',
     this.latitude = '',
@@ -30,6 +33,8 @@ class ClubAiNode {
 
   final int order;
   final String name;
+  // Display-only metadata; publishing continues to use the original draft name.
+  final int? fallbackNameNumber;
   final String address;
   final String longitude;
   final String latitude;
@@ -42,6 +47,7 @@ class ClubAiNode {
       name: text('merchantName').isEmpty
           ? '节点${index + 1}'
           : text('merchantName'),
+      fallbackNameNumber: text('merchantName').isEmpty ? index + 1 : null,
       address: text('address'),
       longitude: text('longitude'),
       latitude: text('latitude'),
@@ -65,6 +71,7 @@ class ClubAiDesign {
     required this.plan,
     this.traceId,
     this.title = '',
+    this.titleIsFallback = false,
     this.subtitle,
     this.storyline,
     this.tags = const <String>[],
@@ -79,6 +86,7 @@ class ClubAiDesign {
   final String plan;
   final String? traceId;
   final String title;
+  final bool titleIsFallback;
   final String? subtitle;
   final String? storyline;
   final List<String> tags;
@@ -137,6 +145,7 @@ class ClubAiDesign {
       plan: storyline ?? title,
       traceId: optional(data['traceId']),
       title: title,
+      titleIsFallback: optional(map['title']) == null,
       subtitle: optional(map['subtitle']),
       storyline: storyline,
       tags: strings(map['tags']),
@@ -277,7 +286,7 @@ class _DesignSheetState extends ConsumerState<_DesignSheet> {
       // ② AI 没给方案(静默空成功)—— 和①分开说。
       final ClubAiDesign? parsed = ClubAiDesign.tryParse(data);
       if (parsed == null) {
-        _fail('AI 这次没给出方案,换个说法再试试', retryable: true);
+        _fail(stringsOf(context).clubAuxAiNoPlan, retryable: true);
         return;
       }
       setState(() {
@@ -286,7 +295,7 @@ class _DesignSheetState extends ConsumerState<_DesignSheet> {
       });
     } catch (e) {
       if (!mounted || token != _requestToken) return;
-      final String msg = e.toString().replaceFirst('Exception: ', '');
+      final String msg = clubApiErrorMessage(context, e);
       // ③ 身份 / 配额 / 故障三分。
       _fail(msg, retryable: aiDesignRetryable(msg));
     }
@@ -307,7 +316,7 @@ class _DesignSheetState extends ConsumerState<_DesignSheet> {
     await Clipboard.setData(ClipboardData(text: text));
     if (!mounted) return;
     // 纯告知不弹 alert(S7):页内轻提示,与俱乐部其它「已复制」反馈同一写法。
-    CyNativeNotice.show(context, '已复制宣传文案');
+    CyNativeNotice.show(context, stringsOf(context).clubAuxPromoCopied);
   }
 
   void _adopt() {
@@ -347,7 +356,7 @@ class _DesignSheetState extends ConsumerState<_DesignSheet> {
               children: <Widget>[
                 Expanded(
                   child: Text(
-                    'AI 策划活动',
+                    stringsOf(context).clubAuxAiTitle,
                     style: textTheme.titleLarge?.copyWith(
                       color: p.textPrimary,
                       fontWeight: FontWeight.w700,
@@ -355,7 +364,7 @@ class _DesignSheetState extends ConsumerState<_DesignSheet> {
                   ),
                 ),
                 Semantics(
-                  label: '关闭 AI 策划活动',
+                  label: stringsOf(context).clubAuxCloseAi,
                   button: true,
                   child: CupertinoButton(
                     key: const Key('club-ai-close'),
@@ -371,7 +380,7 @@ class _DesignSheetState extends ConsumerState<_DesignSheet> {
               ],
             ),
             Text(
-              '说说你想办一场什么样的活动,AI 会给出主题骨架、可对接商家和宣传文案。',
+              stringsOf(context).clubAuxAiExplanation,
               style: textTheme.bodySmall?.copyWith(color: p.textSecondary),
             ),
             const SizedBox(height: CyTokens.space3),
@@ -380,8 +389,15 @@ class _DesignSheetState extends ConsumerState<_DesignSheet> {
               runSpacing: CyTokens.space2,
               children: kClubAiIdeaChips
                   .map(
-                    (String chip) => CupertinoButton.tinted(
-                      key: Key('club-ai-chip-$chip'),
+                    (String sourceChip) {
+                      final chip = switch (kClubAiIdeaChips.indexOf(sourceChip)) {
+                        0 => stringsOf(context).clubAuxIdeaJingan,
+                        1 => stringsOf(context).clubAuxIdeaBund,
+                        2 => stringsOf(context).clubAuxIdeaSuzhou,
+                        _ => sourceChip,
+                      };
+                      return CupertinoButton.tinted(
+                      key: Key('club-ai-chip-$sourceChip'),
                       minimumSize: const Size(44, 44),
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       onPressed: _busy
@@ -393,14 +409,15 @@ class _DesignSheetState extends ConsumerState<_DesignSheet> {
                               );
                             },
                       child: Text(chip),
-                    ),
+                    );
+                    },
                   )
                   .toList(growable: false),
             ),
             const SizedBox(height: CyTokens.space3),
             Semantics(
               textField: true,
-              label: '活动想法',
+              label: stringsOf(context).clubAuxIdea,
               child: CupertinoTextField(
                 controller: _idea,
                 minLines: 2,
@@ -408,7 +425,7 @@ class _DesignSheetState extends ConsumerState<_DesignSheet> {
                 maxLength: 200,
                 enabled: !_busy,
                 clearButtonMode: OverlayVisibilityMode.editing,
-                placeholder: '一句话描述想法,如“静安 情侣 夜间 Citywalk 90分钟”',
+                placeholder: stringsOf(context).clubAuxIdeaPlaceholder,
                 padding: const EdgeInsets.all(CyTokens.space3),
                 decoration: BoxDecoration(
                   color: p.bgSurface,
@@ -423,13 +440,13 @@ class _DesignSheetState extends ConsumerState<_DesignSheet> {
                 Expanded(
                   child: Semantics(
                     textField: true,
-                    label: '俱乐部风格,选填',
+                    label: stringsOf(context).clubAuxStyleLabel,
                     child: CupertinoTextField(
                       controller: _style,
                       enabled: !_busy,
                       maxLength: 20,
                       clearButtonMode: OverlayVisibilityMode.editing,
-                      placeholder: '俱乐部风格(选填)',
+                      placeholder: stringsOf(context).clubAuxStylePlaceholder,
                       padding: const EdgeInsets.all(CyTokens.space3),
                       decoration: BoxDecoration(
                         color: p.bgSurface,
@@ -444,13 +461,13 @@ class _DesignSheetState extends ConsumerState<_DesignSheet> {
                   width: 124,
                   child: Semantics(
                     textField: true,
-                    label: '目标时长,分钟',
+                    label: stringsOf(context).clubAuxDurationLabel,
                     child: CupertinoTextField(
                       controller: _duration,
                       enabled: !_busy,
                       maxLength: 4,
                       keyboardType: TextInputType.number,
-                      placeholder: '时长(分钟)',
+                      placeholder: stringsOf(context).clubAuxDurationPlaceholder,
                       padding: const EdgeInsets.all(CyTokens.space3),
                       decoration: BoxDecoration(
                         color: p.bgSurface,
@@ -479,15 +496,15 @@ class _DesignSheetState extends ConsumerState<_DesignSheet> {
                         ? null
                         : _generate,
                     child: _busy
-                        ? const Row(
+                        ? Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: <Widget>[
-                              CupertinoActivityIndicator(),
-                              SizedBox(width: CyTokens.space2),
-                              Text('生成中…'),
+                              const CupertinoActivityIndicator(),
+                              const SizedBox(width: CyTokens.space2),
+                              Text(stringsOf(context).clubAuxGenerating),
                             ],
                           )
-                        : Text(_result == null ? '生成方案' : '换一版'),
+                        : Text(_result == null ? stringsOf(context).clubAuxGenerate : stringsOf(context).clubAuxRegenerate),
                   ),
                 ),
                 if (_busy) ...<Widget>[
@@ -496,7 +513,7 @@ class _DesignSheetState extends ConsumerState<_DesignSheet> {
                     key: const Key('club-ai-cancel'),
                     minimumSize: const Size(44, 44),
                     onPressed: _cancelGeneration,
-                    child: const Text('取消'),
+                    child: Text(stringsOf(context).cancel),
                   ),
                 ],
               ],
@@ -519,7 +536,7 @@ class _DesignSheetState extends ConsumerState<_DesignSheet> {
                   key: const Key('club-ai-retry'),
                   minimumSize: const Size(44, 44),
                   onPressed: _generate,
-                  child: const Text('重试'),
+                  child: Text(stringsOf(context).retry),
                 ),
               ],
             ],
@@ -528,14 +545,14 @@ class _DesignSheetState extends ConsumerState<_DesignSheet> {
               _ResultCard(result: _result!, onCopy: _copyPromo),
               if (_result!.merchantSuggestions.isNotEmpty)
                 _Block(
-                  '可对接商家建议',
+                  stringsOf(context).clubAuxMerchantSuggestions,
                   _result!.merchantSuggestions
                       .map((String item) => '· $item')
                       .join('\n'),
                 ),
               const SizedBox(height: CyTokens.space3),
               Text(
-                '这只是一份草稿；它不会自动创建活动。',
+                stringsOf(context).clubAuxDraftOnly,
                 style: textTheme.labelSmall?.copyWith(color: p.textTertiary),
               ),
               const SizedBox(height: CyTokens.space2),
@@ -546,11 +563,11 @@ class _DesignSheetState extends ConsumerState<_DesignSheet> {
                 foregroundColor: p.actionPrimaryFg,
                 borderRadius: BorderRadius.circular(CyTokens.radiusPill),
                 onPressed: _adopt,
-                child: const Text('用这个方案去发布'),
+                child: Text(stringsOf(context).clubAuxUsePlan),
               ),
               const SizedBox(height: CyTokens.space1),
               Text(
-                '采用后仍需手动补齐封面图和活动分类才能发布。',
+                stringsOf(context).clubAuxCompletePlanHint,
                 style: textTheme.labelSmall?.copyWith(color: p.textTertiary),
               ),
             ],
@@ -582,7 +599,12 @@ class _ResultCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Text(result.title, style: textTheme.titleLarge),
+            Text(
+              result.titleIsFallback
+                  ? stringsOf(context).clubAuxUnnamedPlan
+                  : result.title,
+              style: textTheme.titleLarge,
+            ),
             if (result.subtitle != null) ...<Widget>[
               const SizedBox(height: CyTokens.space1),
               Text(result.subtitle!, style: textTheme.bodyMedium),
@@ -596,16 +618,16 @@ class _ResultCard extends StatelessWidget {
                 children: <Widget>[
                   ...result.tags.map((String tag) => _ResultTag(tag)),
                   if (result.estDurationMin != null)
-                    _ResultTag('约 ${result.estDurationMin} 分钟'),
+                    _ResultTag(stringsOf(context).clubAuxMinutes(result.estDurationMin!)),
                 ],
               ),
             ],
-            if (result.storyline != null) _Block('活动故事', result.storyline!),
+            if (result.storyline != null) _Block(stringsOf(context).clubAuxStory, result.storyline!),
             if (result.fitReason != null)
-              _Block('为什么适合', '为什么适合:${result.fitReason!}'),
+              _Block(stringsOf(context).clubAuxFitReason, stringsOf(context).clubAuxFitReasonBody(result.fitReason!)),
             if (result.nodes.isNotEmpty) ...<Widget>[
               Text(
-                '路线节点 · ${result.nodes.length}',
+                stringsOf(context).clubAuxNodeCount(result.nodes.length),
                 style: textTheme.labelLarge,
               ),
               const SizedBox(height: CyTokens.space1),
@@ -622,7 +644,12 @@ class _ResultCard extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: <Widget>[
-                            Text(node.name, style: textTheme.titleSmall),
+                            Text(
+                              node.fallbackNameNumber == null
+                                  ? node.name
+                                  : stringsOf(context).clubAuxFallbackNode(node.fallbackNameNumber!),
+                              style: textTheme.titleSmall,
+                            ),
                             if (node.address.isNotEmpty)
                               Text(
                                 node.address,
@@ -640,19 +667,19 @@ class _ResultCard extends StatelessWidget {
             ],
             if (result.risks.isNotEmpty)
               _Block(
-                '风险提示',
+                stringsOf(context).clubAuxRisks,
                 result.risks.map((String item) => '· $item').join('\n'),
               ),
             if (result.promoCopy != null) ...<Widget>[
               Row(
                 children: <Widget>[
-                  Expanded(child: Text('宣传文案', style: textTheme.labelLarge)),
+                  Expanded(child: Text(stringsOf(context).clubAuxPromoCopy, style: textTheme.labelLarge)),
                   CupertinoButton(
                     key: const Key('club-ai-copy'),
                     minimumSize: const Size(44, 44),
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                     onPressed: onCopy,
-                    child: const Text('复制'),
+                    child: Text(stringsOf(context).clubAuxCopy),
                   ),
                 ],
               ),

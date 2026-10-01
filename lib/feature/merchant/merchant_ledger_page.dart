@@ -1,4 +1,6 @@
 import 'package:flutter/cupertino.dart';
+import '../../l10n/strings.dart';
+import 'merchant_operations_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -74,7 +76,7 @@ class _MerchantLedgerPageState extends ConsumerState<MerchantLedgerPage> {
 
     return CupertinoPageScaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      navigationBar: const CupertinoNavigationBar(middle: Text('台账')),
+      navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).merchantOperationsLedger)),
       child: Material(
         color: Colors.transparent,
         child: SafeArea(
@@ -89,9 +91,9 @@ class _MerchantLedgerPageState extends ConsumerState<MerchantLedgerPage> {
                   0,
                 ),
                 child: CyTabs(
-                  tabs: const <CyTab>[
-                    CyTab(key: 'redemption', label: '核销记录'),
-                    CyTab(key: 'settlement', label: '结算'),
+                  tabs: <CyTab>[
+                    CyTab(key: 'redemption', label: stringsOf(context).merchantOperationsRedemptionRecords),
+                    CyTab(key: 'settlement', label: stringsOf(context).merchantOperationsSettlement),
                   ],
                   active: _view,
                   onChanged: (String k) => setState(() => _view = k),
@@ -112,8 +114,8 @@ class _MerchantLedgerPageState extends ConsumerState<MerchantLedgerPage> {
                     ),
                     child: CyCell(
                       key: const Key('merchant-aftercare-entry'),
-                      title: '退款售后',
-                      subtitle: '查询退款申请，追加商家意见与凭证',
+                      title: stringsOf(context).merchantOperationsRefundsAndAfterSales,
+                      subtitle: stringsOf(context).merchantOperationsViewRefundRequestsAndAddMerchantResponsesOrEvidence,
                       minHeight: 64,
                       onTap: () => context.push('/merchant/aftercare'),
                     ),
@@ -132,7 +134,7 @@ class _MerchantLedgerPageState extends ConsumerState<MerchantLedgerPage> {
                     variant: CyTabsVariant.chip,
                     tabs: kLedgerFilters
                         .map(
-                          ((String, String) f) => CyTab(key: f.$1, label: f.$2),
+                          ((String, String) f) => CyTab(key: f.$1, label: merchantOperationModelText(context, f.$2)),
                         )
                         .toList(),
                     active: filter,
@@ -148,7 +150,7 @@ class _MerchantLedgerPageState extends ConsumerState<MerchantLedgerPage> {
                         error: (Object e, _) => merchantErrorView(
                           context,
                           e,
-                          what: '结算',
+                          what: stringsOf(context).merchantOperationsSettlement,
                           onRetry: () => ref.invalidate(
                             merchantRedemptionsProvider(filter),
                           ),
@@ -164,9 +166,9 @@ class _MerchantLedgerPageState extends ConsumerState<MerchantLedgerPage> {
                                   _SummaryBar(summary: page.summary),
                                   const SizedBox(height: CyTokens.space3),
                                   if (page.rows.isEmpty)
-                                    const StatusView(
-                                      message: '这个筛选下没有记录',
-                                      sub: '换个筛选,或等有顾客到店核销后再来看',
+                                    StatusView(
+                                      message: stringsOf(context).merchantOperationsNoRecordsMatchThisFilter,
+                                      sub: stringsOf(context).merchantOperationsTryAnotherFilterOrCheckAfterACustomerRedeemsInStore,
                                     )
                                   else
                                     ...page.rows.map(
@@ -221,7 +223,7 @@ class _SummaryBar extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Text(
-            '本月',
+            stringsOf(context).merchantOperationsThisMonth,
             style: textTheme.bodySmall?.copyWith(
               color: CyPalette.of(context).textSecondary,
             ),
@@ -229,10 +231,10 @@ class _SummaryBar extends StatelessWidget {
           const SizedBox(height: CyTokens.space2),
           Row(
             children: <Widget>[
-              kv('核销', '${summary.count} 单'),
+              kv(stringsOf(context).merchantOperationsRedemptions, stringsOf(context).merchantOperationsOrderCount(summary.count.toString())),
               // 两个金额都走 summaryMoney:后端没下发就显破折号,不冒充 ¥0.00。
-              kv('待结算', summary.pendingDisplay),
-              kv('已到账', summary.arrivedDisplay),
+              kv(stringsOf(context).merchantOperationsAwaitingSettlement, summary.pendingDisplay),
+              kv(stringsOf(context).merchantOperationsReceived, summary.arrivedDisplay),
             ],
           ),
         ],
@@ -275,12 +277,14 @@ class _RedemptionTile extends StatelessWidget {
             children: <Widget>[
               Expanded(
                 child: Text(
-                  title.isEmpty ? '核销记录' : title,
+                  title.isEmpty ? stringsOf(context).merchantOperationsRedemptionRecords : title,
                   style: textTheme.titleSmall,
                 ),
               ),
               Text(
-                row.amountDisplay,
+                row.amountDisplay == '待定'
+                    ? stringsOf(context).merchantOperationsAmountPending
+                    : row.amountDisplay,
                 style: textTheme.titleMedium?.copyWith(
                   color: switch (row.amountTone) {
                     AmountTone.positive => AppColors.success,
@@ -310,7 +314,7 @@ class _RedemptionTile extends StatelessWidget {
                     row.storeName,
                     row.customerDisplayName,
                     if ((row.verificationCodeTail ?? '').isNotEmpty)
-                      '码尾 ${row.verificationCodeTail}',
+                      stringsOf(context).merchantOperationsCodeTail(row.verificationCodeTail.toString()),
                   ].where((String? s) => s != null && s.isNotEmpty).join(' · '),
                   style: textTheme.bodySmall?.copyWith(
                     color: CyPalette.of(context).textSecondary,
@@ -319,7 +323,7 @@ class _RedemptionTile extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              CyTag(label: row.stateText),
+              CyTag(label: localizedMerchantLedgerState(context, row)),
             ],
           ),
           // ★ 退款中必须显著标出 —— 不标的话商家会把已退的算进收入。
@@ -327,7 +331,7 @@ class _RedemptionTile extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(top: CyTokens.space1),
               child: Text(
-                '退款处理中',
+                stringsOf(context).merchantOperationsRefundProcessing,
                 style: textTheme.bodySmall?.copyWith(
                   color: CyPalette.of(context).statusWarning,
                 ),
@@ -342,9 +346,9 @@ class _RedemptionTile extends StatelessWidget {
     return Semantics(
       button: true,
       label: <String>[
-        title.isEmpty ? '核销记录' : title,
+        title.isEmpty ? stringsOf(context).merchantOperationsRedemptionRecords : title,
         row.amountDisplay,
-        row.stateText,
+        localizedMerchantLedgerState(context, row),
       ].join('，'),
       onTap: open,
       excludeSemantics: true,

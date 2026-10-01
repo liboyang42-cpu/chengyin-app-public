@@ -1,3 +1,4 @@
+import '../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,6 +15,8 @@ import '../../core/widgets/cy_widgets.dart';
 import '../../core/widgets/status_view.dart';
 import '../../data/api/club_api.dart' show ClubApiException;
 import '../../data/models/club_topic_ops.dart';
+import '../../data/models/topic.dart' show TopicChapter;
+import 'club_story_labels.dart';
 import 'club_login_gate.dart';
 import 'club_ops_access.dart';
 import 'club_ops_sections.dart';
@@ -45,7 +48,8 @@ enum _StoryTab { route, play }
 
 class _ClubTopicStoryPageState extends ConsumerState<ClubTopicStoryPage> {
   ClubOpsLoadState _stage = ClubOpsLoadState.loading;
-  List<TopicStoryChapter> _chapters = const <TopicStoryChapter>[];
+  List<TopicChapter> _sourceChapters = const <TopicChapter>[];
+  List<TopicStoryChapter> get _chapters => localizedClubStoryChapters(context, _sourceChapters);
   String _error = '';
   _StoryTab _tab = _StoryTab.route;
   int _activeChapter = 0;
@@ -70,7 +74,7 @@ class _ClubTopicStoryPageState extends ConsumerState<ClubTopicStoryPage> {
           .overview(widget.topicId);
       if (!mounted) return;
       setState(() {
-        _chapters = buildTopicStoryChapters(overview.chapters);
+        _sourceChapters = overview.chapters;
         _activeChapter = 0;
         _stage = ClubOpsLoadState.ready;
       });
@@ -79,7 +83,7 @@ class _ClubTopicStoryPageState extends ConsumerState<ClubTopicStoryPage> {
       setState(() {
         _loginRequired = clubLoginRequired(error);
         _stage = clubOpsFailureState(error);
-        _error = clubOpsErrorMessage(error, '剧情与玩法加载失败，请重试');
+        _error = clubOpsErrorMessage(error, stringsOf(context).clubStoryLoadFailed);
       });
     }
   }
@@ -92,7 +96,7 @@ class _ClubTopicStoryPageState extends ConsumerState<ClubTopicStoryPage> {
   Future<void> _openAnswer(TopicStoryPlay play) async {
     final int? clubId = widget.clubId;
     if (clubId == null || clubId <= 0) {
-      CyNativeNotice.show(context, '要从俱乐部里进来才能看答案', isError: true);
+      CyNativeNotice.show(context, stringsOf(context).clubStoryAnswerAccess, isError: true);
       return;
     }
     await showCupertinoModalPopup<void>(
@@ -101,7 +105,7 @@ class _ClubTopicStoryPageState extends ConsumerState<ClubTopicStoryPage> {
         clubId: clubId,
         topicId: widget.topicId,
         nodeId: play.nodeId,
-        title: '${play.title} · 答案',
+        title: stringsOf(context).clubStoryNamedAnswer(play.title),
       ),
     );
   }
@@ -119,7 +123,7 @@ class _ClubTopicStoryPageState extends ConsumerState<ClubTopicStoryPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              const CyPageTitle('剧情与玩法'),
+              CyPageTitle(stringsOf(context).clubStoryTitle),
               if (_stage == ClubOpsLoadState.ready)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(
@@ -131,9 +135,9 @@ class _ClubTopicStoryPageState extends ConsumerState<ClubTopicStoryPage> {
                   // 分段走共用层:iOS 26+ 是原生分段,旧系统回退 Cupertino
                   // 分段控件(与自绘那版同长相,另补齐 44pt 触达区)。
                   child: CyTabs(
-                    tabs: const <CyTab>[
-                      CyTab(key: 'route', label: '路线'),
-                      CyTab(key: 'play', label: '玩法'),
+                    tabs: <CyTab>[
+                      CyTab(key: 'route', label: stringsOf(context).clubStoryRoute),
+                      CyTab(key: 'play', label: stringsOf(context).clubStoryPlay),
                     ],
                     active: _tab.name,
                     onChanged: (String key) {
@@ -159,25 +163,25 @@ class _ClubTopicStoryPageState extends ConsumerState<ClubTopicStoryPage> {
     // 401 排在四态之前:登录过期不是「看不到」,重试/返回都出不去 ——
     // 就地给登录门(#258 同型,topic-detail 已修,本页当时漏了)。
     if (_loginRequired) {
-      return ClubLoginGate(message: '登录后查看剧情与玩法', onSignedIn: _load);
+      return ClubLoginGate(message: stringsOf(context).clubStoryLogin, onSignedIn: _load);
     }
     switch (_stage) {
       case ClubOpsLoadState.loading:
-        return const CySkeleton(
+        return CySkeleton(
           type: CySkeletonType.card,
           count: 3,
-          label: '正在加载剧情与玩法',
+          label: stringsOf(context).clubStoryLoading,
         );
       case ClubOpsLoadState.noPermission:
         return StatusView(
-          message: '你看不到这条路线',
-          sub: _error.isEmpty ? '这条主题可能只对成员可见。' : _error,
+          message: stringsOf(context).clubStoryDenied,
+          sub: _error.isEmpty ? stringsOf(context).clubStoryDeniedBody : _error,
           icon: CupertinoIcons.lock,
           large: true,
         );
       case ClubOpsLoadState.networkError:
         return StatusView(
-          message: '网络连接失败',
+          message: stringsOf(context).clubStoryNetworkFailed,
           sub: _error,
           icon: CupertinoIcons.exclamationmark_triangle,
           large: true,
@@ -185,7 +189,7 @@ class _ClubTopicStoryPageState extends ConsumerState<ClubTopicStoryPage> {
         );
       case ClubOpsLoadState.error:
         return StatusView(
-          message: '剧情与玩法打不开',
+          message: stringsOf(context).clubStoryUnavailable,
           sub: _error,
           icon: CupertinoIcons.exclamationmark_triangle,
           large: true,
@@ -193,9 +197,9 @@ class _ClubTopicStoryPageState extends ConsumerState<ClubTopicStoryPage> {
         );
       case ClubOpsLoadState.ready:
         if (_chapters.isEmpty) {
-          return const StatusView(
-            message: '还没有章节',
-            sub: '这个团还没有排出路线。',
+          return StatusView(
+            message: stringsOf(context).clubStoryNoChapters,
+            sub: stringsOf(context).clubStoryNoChaptersBody,
             icon: CupertinoIcons.map,
             large: true,
           );
@@ -215,19 +219,19 @@ class _ClubTopicStoryPageState extends ConsumerState<ClubTopicStoryPage> {
             caption: chapter.meta,
             children: <Widget>[
               if (chapter.stops.isEmpty)
-                const ClubOpsCard(
+                ClubOpsCard(
                   children: <Widget>[
                     Padding(
-                      padding: EdgeInsets.symmetric(
+                      padding: const EdgeInsets.symmetric(
                         horizontal: CyTokens.space4,
                         vertical: CyTokens.space4,
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
-                          Text('这一章还没有站点'),
-                          SizedBox(height: CyTokens.space1),
-                          _EmptyHint('开放商家承接后，由承接商家补齐站点与玩法。'),
+                          Text(stringsOf(context).clubStoryNoStops),
+                          const SizedBox(height: CyTokens.space1),
+                          _EmptyHint(stringsOf(context).clubStoryNoStopsBody),
                         ],
                       ),
                     ),
@@ -269,7 +273,7 @@ class _ClubTopicStoryPageState extends ConsumerState<ClubTopicStoryPage> {
           child: ClubOpsCard(
             children: <Widget>[
               ClubOpsRow(
-                title: stop.name.isEmpty ? '未命名站点' : stop.name,
+                title: stop.name.isEmpty ? stringsOf(context).clubStoryUnnamedStop : stop.name,
                 meta: <String>[
                   stop.time,
                   stop.address,
@@ -377,7 +381,7 @@ class _ClubTopicStoryPageState extends ConsumerState<ClubTopicStoryPage> {
           const SizedBox.shrink()
         else ...<Widget>[
           ClubOpsSection(
-            title: '本章剧情',
+            title: stringsOf(context).clubStoryChapterStory,
             caption: chapter.title,
             children: <Widget>[
               ClubOpsCard(
@@ -393,7 +397,7 @@ class _ClubTopicStoryPageState extends ConsumerState<ClubTopicStoryPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
                         Text(
-                          chapter.story.isEmpty ? '这一章还没有写剧情。' : chapter.story,
+                          chapter.story.isEmpty ? stringsOf(context).clubStoryNoStory : chapter.story,
                           key: const Key('topic-story-story-text'),
                           maxLines: _storyExpanded ? null : 3,
                           overflow: _storyExpanded
@@ -416,7 +420,7 @@ class _ClubTopicStoryPageState extends ConsumerState<ClubTopicStoryPage> {
                               () => _storyExpanded = !_storyExpanded,
                             ),
                             child: Text(
-                              _storyExpanded ? '收起 ▴' : '展开全文 ▾',
+                              _storyExpanded ? stringsOf(context).clubStoryCollapse : stringsOf(context).clubStoryExpand,
                               style: TextStyle(
                                 fontSize: CyTokens.typeLabel,
                                 color: palette.brand,
@@ -432,23 +436,23 @@ class _ClubTopicStoryPageState extends ConsumerState<ClubTopicStoryPage> {
             ],
           ),
           ClubOpsSection(
-            title: '本章玩法',
-            caption: '${chapter.plays.length} 个',
+            title: stringsOf(context).clubStoryChapterPlay,
+            caption: stringsOf(context).clubStoryPlayCount(chapter.plays.length),
             children: <Widget>[
               if (chapter.plays.isEmpty)
-                const ClubOpsCard(
+                ClubOpsCard(
                   children: <Widget>[
                     Padding(
-                      padding: EdgeInsets.symmetric(
+                      padding: const EdgeInsets.symmetric(
                         horizontal: CyTokens.space4,
                         vertical: CyTokens.space4,
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
-                          Text('这一章还没有玩法'),
-                          SizedBox(height: CyTokens.space1),
-                          _EmptyHint('承接商家补齐模板后会出现在这里。'),
+                          Text(stringsOf(context).clubStoryNoPlay),
+                          const SizedBox(height: CyTokens.space1),
+                          _EmptyHint(stringsOf(context).clubStoryNoPlayBody),
                         ],
                       ),
                     ),
@@ -556,7 +560,7 @@ class _ClubTopicStoryPageState extends ConsumerState<ClubTopicStoryPage> {
                     Row(
                       children: <Widget>[
                         CyNativeButton(
-                          label: '看看模板',
+                          label: stringsOf(context).clubStoryViewTemplate,
                           role: CyNativeButtonRole.secondary,
                           onPressed: () =>
                               context.push('/template/${play.templateId}'),
@@ -565,7 +569,7 @@ class _ClubTopicStoryPageState extends ConsumerState<ClubTopicStoryPage> {
                           const SizedBox(width: CyTokens.space2),
                           CyNativeButton(
                             key: Key('topic-story-answer-${play.nodeId}'),
-                            label: '查看答案',
+                            label: stringsOf(context).clubStoryViewAnswer,
                             onPressed: () => _openAnswer(play),
                           ),
                         ],
@@ -656,7 +660,7 @@ class _AnswerSheetState extends ConsumerState<_AnswerSheet> {
         _loading = false;
         _error = error is ClubApiException && error.message.trim().isNotEmpty
             ? error.message
-            : '答案暂时取不到，请稍后再试';
+            : stringsOf(context).clubStoryAnswerUnavailable;
       });
     }
   }
@@ -680,7 +684,7 @@ class _AnswerSheetState extends ConsumerState<_AnswerSheet> {
             const CupertinoActivityIndicator(),
             const SizedBox(height: CyTokens.space2),
             Text(
-              '正在取答案…',
+              stringsOf(context).clubStoryAnswerLoading,
               style: TextStyle(
                 fontSize: CyTokens.typeBody,
                 color: CyPalette.of(context).textTertiary,
@@ -697,10 +701,10 @@ class _AnswerSheetState extends ConsumerState<_AnswerSheet> {
           vertical: CyTokens.space5,
         ),
         child: StatusView(
-          message: '答案没取到',
+          message: stringsOf(context).clubStoryAnswerFailed,
           sub: _error,
           icon: CupertinoIcons.exclamationmark_triangle,
-          retryLabel: '重试',
+          retryLabel: stringsOf(context).clubStoryRetry,
           onRetry: _fetch,
         ),
       );
@@ -718,7 +722,7 @@ class _AnswerSheetState extends ConsumerState<_AnswerSheet> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           if (answer.question.isNotEmpty) ...<Widget>[
-            _answerLabel('题面'),
+            _answerLabel(stringsOf(context).clubStoryQuestion),
             _answerBlock(
               palette,
               Text(
@@ -731,11 +735,11 @@ class _AnswerSheetState extends ConsumerState<_AnswerSheet> {
               ),
             ),
           ],
-          _answerLabel('答案'),
+          _answerLabel(stringsOf(context).clubStoryAnswer),
           _answerBlock(
             palette,
             Text(
-              answer.answerReveal.isEmpty ? '这道题没有配答案' : answer.answerReveal,
+              answer.answerReveal.isEmpty ? stringsOf(context).clubStoryNoAnswer : answer.answerReveal,
               key: const Key('topic-story-answer-reveal'),
               style: TextStyle(
                 fontSize: CyTokens.typeBody,
@@ -746,7 +750,7 @@ class _AnswerSheetState extends ConsumerState<_AnswerSheet> {
             ),
           ),
           if (answer.hints.isNotEmpty) ...<Widget>[
-            _answerLabel('提示'),
+            _answerLabel(stringsOf(context).clubStoryHint),
             _answerBlock(
               palette,
               Column(
@@ -769,7 +773,7 @@ class _AnswerSheetState extends ConsumerState<_AnswerSheet> {
             ),
           ],
           if (answer.feedbackText.isNotEmpty) ...<Widget>[
-            _answerLabel('玩家答错时的反馈'),
+            _answerLabel(stringsOf(context).clubStoryIncorrectFeedback),
             _answerBlock(
               palette,
               Text(
@@ -785,7 +789,7 @@ class _AnswerSheetState extends ConsumerState<_AnswerSheet> {
           Padding(
             padding: const EdgeInsets.only(top: CyTokens.space3),
             child: Text(
-              '答案只对俱乐部开放，用于现场判定玩家能否通过。玩家端接口不下发这一段。',
+              stringsOf(context).clubStoryAnswerScope,
               style: TextStyle(
                 fontSize: CyTokens.typeCaption,
                 height: 1.45,

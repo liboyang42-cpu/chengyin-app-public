@@ -4,6 +4,7 @@ class CoopPoolItem {
   const CoopPoolItem({
     required this.topicId,
     required this.name,
+    this.hasCustomName = true,
     this.cover,
     this.subtitle,
     this.startDate,
@@ -16,6 +17,7 @@ class CoopPoolItem {
 
   final int topicId;
   final String name;
+  final bool hasCustomName;
   final String? cover;
   final String? subtitle;
   final String? startDate;
@@ -69,6 +71,7 @@ class CoopPoolItem {
     return CoopPoolItem(
       topicId: (json['topicId'] as num?)?.toInt() ?? 0,
       name: (json['name'] as String?) ?? '未命名主题',
+      hasCustomName: json['name'] != null,
       cover: json['cover'] as String?,
       subtitle: json['subtitle'] as String?,
       startDate: json['startDate']?.toString(),

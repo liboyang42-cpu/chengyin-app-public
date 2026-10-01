@@ -1,3 +1,5 @@
+import 'club_api_messages.dart';
+import '../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -104,7 +106,7 @@ class _ClubPostEditSheetState extends ConsumerState<_ClubPostEditSheet> {
       if (!mounted) return;
       setState(() {
         _sending = false;
-        _error = error.toString().replaceFirst('Exception: ', '');
+        _error = clubApiErrorMessage(context, error);
       });
     }
   }
@@ -127,12 +129,12 @@ class _ClubPostEditSheetState extends ConsumerState<_ClubPostEditSheet> {
               minimumSize: const Size(44, 44),
               padding: EdgeInsets.zero,
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('取消'),
+              child: Text(stringsOf(context).clubPostEditCancel),
             ),
             const SizedBox(width: CyTokens.space2),
             Expanded(
               child: Text(
-                '编辑帖文',
+                stringsOf(context).clubPostEditTitle,
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.titleLarge,
               ),
@@ -140,7 +142,7 @@ class _ClubPostEditSheetState extends ConsumerState<_ClubPostEditSheet> {
             CupertinoButton(
               key: const Key('club-post-edit-submit'),
               onPressed: canSubmit ? _submit : null,
-              child: Text(_sending ? '保存中…' : '保存'),
+              child: Text(_sending ? stringsOf(context).clubPostEditSaving : stringsOf(context).clubPostEditSave),
             ),
           ],
         ),
@@ -150,7 +152,7 @@ class _ClubPostEditSheetState extends ConsumerState<_ClubPostEditSheet> {
           maxLength: 300,
           minLines: 5,
           maxLines: 10,
-          placeholder: '写下俱乐部近况',
+          placeholder: stringsOf(context).clubPostEditPlaceholder,
         ),
         if (_error != null)
           Padding(
@@ -176,7 +178,7 @@ class _ClubPostEditSheetState extends ConsumerState<_ClubPostEditSheet> {
                     // 与发布器同款:24pt 图标钮必须有 44×44 命中区 + 语义标签
                     // (L9/§9.4-1;正例 club_posts_section 移除钮)。
                     child: Semantics(
-                      label: '移除第 ${index + 1} 张图片',
+                      label: stringsOf(context).clubPostEditRemoveImage(index + 1),
                       button: true,
                       child: CupertinoButton(
                         minimumSize: const Size(44, 44),
@@ -194,7 +196,7 @@ class _ClubPostEditSheetState extends ConsumerState<_ClubPostEditSheet> {
           ),
         CupertinoButton(
           onPressed: _images.length < 9 && !_sending ? _pick : null,
-          child: Text(_picking ? '上传中…' : '添加图片 (${_images.length}/9)'),
+          child: Text(_picking ? stringsOf(context).clubPostEditUploading : stringsOf(context).clubPostEditAddImages(_images.length)),
         ),
       ],
     );
@@ -255,12 +257,12 @@ class _ClubPostHistorySheetState extends ConsumerState<_ClubPostHistorySheet> {
           children: <Widget>[
             Expanded(
               child: Text(
-                '编辑记录',
+                stringsOf(context).clubPostHistoryTitle,
                 style: Theme.of(context).textTheme.titleLarge,
               ),
             ),
             Semantics(
-              label: '关闭编辑记录',
+              label: stringsOf(context).clubPostHistoryClose,
               button: true,
               child: CupertinoButton(
                 key: const Key('club-post-history-close'),
@@ -289,18 +291,18 @@ class _ClubPostHistorySheetState extends ConsumerState<_ClubPostHistorySheet> {
                 if (snap.hasError) {
                   return StatusView(
                     key: const Key('club-post-history-error'),
-                    message: '编辑记录加载失败',
-                    sub: snap.error.toString().replaceFirst('Exception: ', ''),
+                    message: stringsOf(context).clubPostHistoryFailed,
+                    sub: clubApiErrorMessage(context, snap.error!),
                     onRetry: _retry,
                   );
                 }
                 final List<ClubPostRevision> rows =
                     snap.data ?? const <ClubPostRevision>[];
                 if (rows.isEmpty) {
-                  return const StatusView(
+                  return StatusView(
                     key: Key('club-post-history-empty'),
-                    message: '还没有编辑记录',
-                    sub: '每次保存前的版本会保留在这里',
+                    message: stringsOf(context).clubPostHistoryEmpty,
+                    sub: stringsOf(context).clubPostHistoryEmptyBody,
                   );
                 }
                 return ListView.separated(
@@ -332,9 +334,9 @@ class _ClubPostHistorySheetState extends ConsumerState<_ClubPostHistorySheet> {
                         children: <Widget>[
                           Row(
                             children: <Widget>[
-                              Text('版本 ${row.snapshotVersion}', style: meta),
+                              Text(stringsOf(context).clubPostHistoryVersion(row.snapshotVersion), style: meta),
                               const Spacer(),
-                              Text(row.createTime ?? '时间未知', style: meta),
+                              Text(row.createTime ?? stringsOf(context).clubPostHistoryUnknownTime, style: meta),
                             ],
                           ),
                           if ((row.content ?? '').trim().isNotEmpty)
@@ -350,7 +352,7 @@ class _ClubPostHistorySheetState extends ConsumerState<_ClubPostHistorySheet> {
                                 top: CyTokens.space1,
                               ),
                               child: Text(
-                                '${row.images.length} 张图片',
+                                stringsOf(context).clubPostHistoryImages(row.images.length),
                                 style: meta,
                               ),
                             ),

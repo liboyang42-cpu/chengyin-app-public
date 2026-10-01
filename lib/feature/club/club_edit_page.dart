@@ -1,3 +1,6 @@
+import 'club_api_messages.dart';
+import '../../l10n/strings.dart';
+import 'club_form_labels.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -19,7 +22,6 @@ import '../../data/api/club_api.dart';
 import '../../data/models/club.dart';
 import 'club_controller.dart';
 import 'club_image_picker.dart';
-import '../../core/widgets/upload_hints.dart';
 import '../../core/widgets/unsaved_guard.dart';
 
 /// 编辑俱乐部资料 + 解散流程。对齐小程序 `components/cy/scene-club-edit`:
@@ -46,13 +48,13 @@ class ClubEditPage extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              const CyPageTitle('编辑俱乐部'),
+              CyPageTitle(stringsOf(context).clubFormEditTitle),
               Expanded(
                 child: detail.when(
                   loading: () => const CySkeleton(type: CySkeletonType.detail),
                   error: (Object err, StackTrace st) => StatusView(
-                    message: '俱乐部加载失败',
-                    sub: '检查网络后重试',
+                    message: stringsOf(context).clubFormLoadError,
+                    sub: stringsOf(context).clubFormRetryNetwork,
                     icon: CupertinoIcons.exclamationmark_triangle,
                     onRetry: () => ref.invalidate(clubDetailProvider(clubId)),
                   ),
@@ -193,7 +195,7 @@ class _EditFormState extends ConsumerState<_EditForm> {
       await ref.read(clubApiProvider).updateMine(payload);
       if (!mounted) return;
       ref.invalidate(clubDetailProvider(club.id));
-      CyNativeNotice.show(context, '已保存');
+      CyNativeNotice.show(context, stringsOf(context).clubFormSaved);
       Navigator.of(context).maybePop();
     } catch (e) {
       if (!mounted) return;
@@ -202,7 +204,7 @@ class _EditFormState extends ConsumerState<_EditForm> {
       debugPrint('[club-edit] 保存失败: $e');
       CyNativeNotice.show(
         context,
-        friendlyOrBackendMessage(e, fallback: '改动没能保存，请稍后重试'),
+        clubApiErrorMessage(context, e, fallback: stringsOf(context).clubFormSaveError),
         isError: true,
       );
     }
@@ -214,18 +216,18 @@ class _EditFormState extends ConsumerState<_EditForm> {
 
     // 第一档确认:解散本身不可逆。
     final confirmed = await _confirm(
-      title: '解散俱乐部',
-      message: '解散后俱乐部及其项目将不可恢复。确定继续吗?',
-      confirmLabel: '继续',
+      title: stringsOf(context).clubFormDissolve,
+      message: stringsOf(context).clubFormDissolveConfirm,
+      confirmLabel: stringsOf(context).clubFormContinue,
     );
     if (!confirmed || !mounted) return;
 
     // 第二档:有非创建者成员时必须确认成员后果。
     if (club.nonOwnerMemberCount > 0) {
       final membersConfirmed = await _confirm(
-        title: '确认成员后果',
-        message: '本俱乐部有 ${club.nonOwnerMemberCount} 位其他成员,解散后他们将失去成员资格。',
-        confirmLabel: '仍要解散',
+        title: stringsOf(context).clubFormMemberConsequences,
+        message: stringsOf(context).clubFormMemberImpact(club.nonOwnerMemberCount),
+        confirmLabel: stringsOf(context).clubFormDissolveAnyway,
         destructive: true,
       );
       if (!membersConfirmed || !mounted) return;
@@ -243,16 +245,16 @@ class _EditFormState extends ConsumerState<_EditForm> {
       ref.invalidate(clubDetailProvider(club.id));
       ref.invalidate(clubMyProvider);
       ref.invalidate(clubListProvider);
-      CyNativeNotice.show(context, '俱乐部已解散');
+      CyNativeNotice.show(context, stringsOf(context).clubFormDissolved);
       context.go('/clubs');
     } on ClubApiException catch (e) {
       if (!mounted) return;
       setState(() => _dissolving = false);
       if (e.message.contains('再次确认成员')) {
         final membersConfirmed = await _confirm(
-          title: '确认成员后果',
-          message: '本俱乐部还有其他成员,解散后他们将失去成员资格。',
-          confirmLabel: '仍要解散',
+          title: stringsOf(context).clubFormMemberConsequences,
+          message: stringsOf(context).clubFormOtherMembersConsequence,
+          confirmLabel: stringsOf(context).clubFormDissolveAnyway,
           destructive: true,
         );
         if (membersConfirmed && mounted) {
@@ -267,7 +269,7 @@ class _EditFormState extends ConsumerState<_EditForm> {
         return;
       }
       if (!mounted) return;
-      CyNativeNotice.show(context, e.message, isError: true);
+      CyNativeNotice.show(context, clubApiErrorMessage(context, e), isError: true);
     } catch (e) {
       if (!mounted) return;
       setState(() => _dissolving = false);
@@ -275,7 +277,7 @@ class _EditFormState extends ConsumerState<_EditForm> {
       debugPrint('[club-edit] 解散失败: $e');
       CyNativeNotice.show(
         context,
-        friendlyOrBackendMessage(e, fallback: '俱乐部没能解散，请稍后重试'),
+        clubApiErrorMessage(context, e, fallback: stringsOf(context).clubFormDissolveError),
         isError: true,
       );
     }
@@ -290,7 +292,7 @@ class _EditFormState extends ConsumerState<_EditForm> {
       ref.invalidate(clubDetailProvider(clubId));
       ref.invalidate(clubMyProvider);
       ref.invalidate(clubListProvider);
-      CyNativeNotice.show(context, '俱乐部已解散');
+      CyNativeNotice.show(context, stringsOf(context).clubFormDissolved);
       context.go('/clubs');
     } catch (e) {
       if (!mounted) return;
@@ -299,7 +301,7 @@ class _EditFormState extends ConsumerState<_EditForm> {
       debugPrint('[club-edit] 解散失败: $e');
       CyNativeNotice.show(
         context,
-        friendlyErrorMessage(e, fallback: '俱乐部没能解散，请稍后重试'),
+        friendlyErrorMessage(e, fallback: stringsOf(context).clubFormDissolveError),
         isError: true,
       );
     }
@@ -310,9 +312,9 @@ class _EditFormState extends ConsumerState<_EditForm> {
     // 跳转放在调用方,弹窗组件不掺业务跳转。
     final bool go = await cyConfirm(
       context,
-      title: '请先处理未了结事项',
-      content: '有资金事实尚未处理,确认终态后才能解散俱乐部。',
-      confirmText: '查看待处理',
+      title: stringsOf(context).clubFormResolveOutstanding,
+      content: stringsOf(context).clubFormFinancialStateRequired,
+      confirmText: stringsOf(context).clubFormViewOutstanding,
     );
     if (go && mounted) {
       context.push('/club/$clubId/dissolution-blockers');
@@ -349,11 +351,11 @@ class _EditFormState extends ConsumerState<_EditForm> {
       child: ListView(
         padding: const EdgeInsets.all(CyTokens.space4),
         children: <Widget>[
-          const CySectionTitle('俱乐部形象'),
+          CySectionTitle(stringsOf(context).clubFormImages),
           const SizedBox(height: CyTokens.space3),
           _ImagePickerTile(
-            label: '头像',
-            accessibilityHint: uploadHint('头像', kHint1x1),
+            label: stringsOf(context).clubFormAvatar,
+            accessibilityHint: stringsOf(context).clubFormAvatarHint,
             url: _logo,
             width: 48,
             height: 48,
@@ -373,8 +375,8 @@ class _EditFormState extends ConsumerState<_EditForm> {
           ),
           const SizedBox(height: CyTokens.space3),
           _ImagePickerTile(
-            label: '封面',
-            accessibilityHint: uploadHint('封面', kHint16x9),
+            label: stringsOf(context).clubFormCover,
+            accessibilityHint: stringsOf(context).clubFormCoverHint,
             url: _cover,
             width: 80,
             height: 45,
@@ -393,66 +395,66 @@ class _EditFormState extends ConsumerState<_EditForm> {
           ),
           const SizedBox(height: CyTokens.space2),
           Text(
-            '头像 1:1 方图 · 封面 16:9 横图,将展示在俱乐部主页与目录中。',
+            stringsOf(context).clubFormImageHint,
             style: textTheme.labelSmall?.copyWith(color: CyTokens.textTertiary),
           ),
           const SizedBox(height: CyTokens.space5),
-          const CySectionTitle('基础信息'),
+          CySectionTitle(stringsOf(context).clubFormBasics),
           const SizedBox(height: CyTokens.space3),
           CyField(
-            label: '名称',
+            label: stringsOf(context).clubFormName,
             child: _input(
               _name,
               key: const ValueKey<String>('club-edit-name'),
-              placeholder: '俱乐部名称',
+              placeholder: stringsOf(context).clubFormClubName,
               keyboardType: TextInputType.name,
               textInputAction: TextInputAction.next,
               autofillHints: const <String>[AutofillHints.organizationName],
             ),
           ),
           CyField(
-            label: '城市',
+            label: stringsOf(context).clubFormCityField,
             child: _input(
               _city,
               key: const ValueKey<String>('club-edit-city'),
-              placeholder: '所在城市',
+              placeholder: clubFormValueLabel(context, '所在城市'),
               textInputAction: TextInputAction.next,
               autofillHints: const <String>[AutofillHints.addressCity],
             ),
           ),
           CyField(
-            label: '关键词',
+            label: stringsOf(context).clubFormKeywords,
             child: _input(
               _keywords,
               key: const ValueKey<String>('club-edit-keywords'),
-              placeholder: '如:城市探索、解谜(选填)',
+              placeholder: stringsOf(context).clubFormKeywordsHint,
               textInputAction: TextInputAction.next,
             ),
           ),
           CyField(
-            label: '风格',
+            label: stringsOf(context).clubFormStyle,
             child: _input(
               _style,
               key: const ValueKey<String>('club-edit-style'),
-              placeholder: '如:轻松、沉浸、硬核(选填)',
+              placeholder: stringsOf(context).clubFormStyleHint,
               textInputAction: TextInputAction.next,
             ),
           ),
 
           const SizedBox(height: CyTokens.space5),
-          const CySectionTitle('俱乐部介绍'),
+          CySectionTitle(stringsOf(context).clubFormIntroductionTitle),
           const SizedBox(height: CyTokens.space3),
           CyField(
-            label: '介绍',
+            label: stringsOf(context).clubFormIntroduction,
             child: _textarea(
               _description,
               key: const ValueKey<String>('club-edit-description'),
-              placeholder: '简单介绍你的俱乐部，以及你希望创造怎样的活动体验。',
+              placeholder: stringsOf(context).clubFormIntroductionHint,
             ),
           ),
 
           const SizedBox(height: CyTokens.space4),
-          const CySectionTitle('俱乐部类型'),
+          CySectionTitle(clubFormValueLabel(context, '俱乐部类型')),
           const SizedBox(height: CyTokens.space3),
           Wrap(
             spacing: CyTokens.space2,
@@ -461,14 +463,14 @@ class _EditFormState extends ConsumerState<_EditForm> {
               for (final opt in _typeOptions)
                 _NativeChoicePill(
                   key: ValueKey<String>('club-edit-type-${opt.val}'),
-                  label: opt.val,
+                  label: clubFormValueLabel(context, opt.val),
                   selected: _clubType == opt.val,
                   onTap: () => setState(() => _clubType = opt.val),
                 ),
             ],
           ),
           const SizedBox(height: CyTokens.space4),
-          const CySectionTitle('活动倾向(最多 3 个)'),
+          CySectionTitle(stringsOf(context).clubFormPreferences),
           const SizedBox(height: CyTokens.space2),
           Wrap(
             spacing: CyTokens.space2,
@@ -477,7 +479,7 @@ class _EditFormState extends ConsumerState<_EditForm> {
               for (final String dir in _dirOptions)
                 _NativeChoicePill(
                   key: ValueKey<String>('club-edit-pref-$dir'),
-                  label: dir,
+                  label: clubFormValueLabel(context, dir),
                   selected: _activityPrefs.contains(dir),
                   onTap: () => setState(() {
                     if (_activityPrefs.contains(dir)) {
@@ -487,23 +489,23 @@ class _EditFormState extends ConsumerState<_EditForm> {
                     } else if (_activityPrefs.length < 3) {
                       _activityPrefs = <String>[..._activityPrefs, dir];
                     } else {
-                      CyNativeNotice.show(context, '最多选 3 个');
+                      CyNativeNotice.show(context, stringsOf(context).clubFormMaxThree);
                     }
                   }),
                 ),
             ],
           ),
           const SizedBox(height: CyTokens.space4),
-          const CySectionTitle('会员经营配置'),
+          CySectionTitle(stringsOf(context).clubFormMembershipSettings),
           const SizedBox(height: CyTokens.space3),
           _switchRow(
-            '成员优先报名',
-            '开启后,成员可优先报名本俱乐部场次',
+            stringsOf(context).clubFormPriorityRegistration,
+            stringsOf(context).clubFormPriorityRegistrationHint,
             _prioritySignupEnabled,
             (bool v) => setState(() => _prioritySignupEnabled = v),
           ),
           CyField(
-            label: '成员保留名额',
+            label: stringsOf(context).clubFormReservedPlaces,
             child: CupertinoTextField(
               key: const ValueKey<String>('club-member-reserved-quota'),
               controller: _memberReservedQuota,
@@ -520,8 +522,8 @@ class _EditFormState extends ConsumerState<_EditForm> {
           ),
           if (club.joinPolicySupported)
             _switchRow(
-              '入会需审批',
-              '开启后,加入俱乐部需要主理人审批',
+              stringsOf(context).clubFormApprovalRequired,
+              stringsOf(context).clubFormApprovalRequiredHint,
               _joinPolicy == 1,
               (bool v) => setState(() => _joinPolicy = v ? 1 : 0),
             ),
@@ -532,15 +534,15 @@ class _EditFormState extends ConsumerState<_EditForm> {
             onPressed: (_canSave && !_saving) ? _save : null,
             child: _saving
                 ? const CupertinoActivityIndicator()
-                : const Text('保存修改'),
+                : Text(stringsOf(context).clubFormSaveChanges),
           ),
 
           if (club.isOwner) ...<Widget>[
             const SizedBox(height: CyTokens.space6),
-            const CySectionTitle('解散俱乐部'),
+            CySectionTitle(stringsOf(context).clubFormDissolve),
             const SizedBox(height: CyTokens.space2),
             Text(
-              '解散前请先处理合作保证金与未打款结算,系统确认终态后才能解散。',
+              stringsOf(context).clubFormDissolveFinancialHint,
               style: textTheme.labelSmall?.copyWith(
                 color: CyTokens.textTertiary,
               ),
@@ -553,14 +555,14 @@ class _EditFormState extends ConsumerState<_EditForm> {
               disabledColor: CyTokens.bgSubtle,
               child: _dissolving
                   ? const CupertinoActivityIndicator()
-                  : const Text('解散俱乐部'),
+                  : Text(stringsOf(context).clubFormDissolve),
             ),
             const SizedBox(height: CyTokens.space3),
             CupertinoButton(
               minimumSize: const Size.fromHeight(44),
               onPressed: () =>
                   context.push('/club/${club.id}/dissolution-blockers'),
-              child: const Text('查看解散前待处理'),
+              child: Text(stringsOf(context).clubFormViewDissolutionBlockers),
             ),
           ],
         ],
@@ -745,7 +747,7 @@ class _ImagePickerTile extends StatelessWidget {
     return Semantics(
       excludeSemantics: true,
       button: true,
-      label: has ? '更换$accessibilityHint' : '添加$accessibilityHint',
+      label: has ? stringsOf(context).clubFormReplaceImage(accessibilityHint) : stringsOf(context).clubFormAddImage(accessibilityHint),
       child: CupertinoButton(
         minimumSize: Size.fromHeight(height < 44 ? 44 : height),
         padding: EdgeInsets.zero,

@@ -1,3 +1,4 @@
+import '../../l10n/strings.dart';
 import '../../core/theme/cy_palette.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -42,7 +43,7 @@ class MerchantMarketingPage extends ConsumerWidget {
         // 无权限不是"页面坏了":说清缺哪项权限、出路在哪(店主调岗),
         // 按钮是「重新确认」——重读 access/me,调完岗一按就真的会变。
         MerchantAccessDeniedException() => merchantDeniedView(
-          title: '你的岗位还没有营销数据权限',
+          title: stringsOf(context).merchantCouponMarketingDenied,
           onRetry: () {
             ref.invalidate(merchantAccessProvider);
             ref.invalidate(merchantMarketingProvider);
@@ -51,7 +52,7 @@ class MerchantMarketingPage extends ConsumerWidget {
         _ => merchantErrorView(
           context,
           e,
-          what: '营销',
+          what: stringsOf(context).merchantCouponMarketing,
           onRetry: () => ref.invalidate(merchantMarketingProvider),
         ),
       },
@@ -64,13 +65,13 @@ class MerchantMarketingPage extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  const CySectionTitle('优惠券'),
+                  CySectionTitle(stringsOf(context).merchantCouponCoupons),
                   const SizedBox(height: CyTokens.space2),
                   Row(
                     children: <Widget>[
-                      _kv(context, '在投', '${m.couponCount}'),
-                      _kv(context, '已领', '${m.couponReceived}'),
-                      _kv(context, '已核销', '${m.couponVerified}'),
+                      _kv(context, stringsOf(context).merchantCouponActive, '${m.couponCount}'),
+                      _kv(context, stringsOf(context).merchantCouponClaimed, '${m.couponReceived}'),
+                      _kv(context, stringsOf(context).merchantCouponRedeemed, '${m.couponVerified}'),
                     ],
                   ),
                   // ★ 没人领过券时**整行不显示** —— 显示「核销率 0%」
@@ -79,7 +80,7 @@ class MerchantMarketingPage extends ConsumerWidget {
                     Padding(
                       padding: const EdgeInsets.only(top: CyTokens.space2),
                       child: Text(
-                        '核销率 ${(m.verifyRate! * 100).toStringAsFixed(0)}%',
+                        stringsOf(context).merchantCouponRedemptionRate((m.verifyRate! * 100).toStringAsFixed(0)),
                         style: textTheme.bodySmall?.copyWith(
                           color: CyPalette.of(context).textSecondary,
                         ),
@@ -89,7 +90,7 @@ class MerchantMarketingPage extends ConsumerWidget {
                   CupertinoButton(
                     onPressed: () => context.push('/merchant/coupons'),
                     padding: EdgeInsets.zero,
-                    child: const Text('我发布的券 ›'),
+                    child: Text(stringsOf(context).merchantCouponMyCouponsLink),
                   ),
                 ],
               ),
@@ -97,24 +98,24 @@ class MerchantMarketingPage extends ConsumerWidget {
             const SizedBox(height: CyTokens.space3),
             _ActionRow(
               // 标题照小程序 `pages/merchant/marketing/index.js` 的入口 tile(店铺参谋)。
-              title: '店铺参谋',
+              title: stringsOf(context).merchantCouponAdvisor,
               onTap: () => context.push('/merchant/marketing/ai-insight'),
             ),
             const SizedBox(height: CyTokens.space3),
             _ActionRow(
-              title: '口碑评价管理',
+              title: stringsOf(context).merchantCouponReviews,
               onTap: () => context.push('/merchant/reviews'),
             ),
             // 真源 tiles「发主题/发自由探索」(marketing/index.js CONTENT_ROUTES):
             // 必须带 scope=MERCHANT,否则发布记到个人名下。
             const SizedBox(height: CyTokens.space3),
             _ActionRow(
-              title: '发主题',
+              title: stringsOf(context).merchantCouponPublishTheme,
               onTap: () => context.push('/publish/pro?scope=MERCHANT'),
             ),
             const SizedBox(height: CyTokens.space3),
             _ActionRow(
-              title: '发自由探索',
+              title: stringsOf(context).merchantCouponPublishExplore,
               onTap: () => context.push('/publish/pro?mode=2&scope=MERCHANT'),
             ),
             const SizedBox(height: CyTokens.space3),
@@ -122,13 +123,13 @@ class MerchantMarketingPage extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  const CySectionTitle('我的内容'),
+                  CySectionTitle(stringsOf(context).merchantCouponMyContent),
                   const SizedBox(height: CyTokens.space2),
                   Row(
                     children: <Widget>[
-                      _kv(context, '主题', '${m.topicCount}'),
-                      _kv(context, '自由探索', '${m.freeExploreCount}'),
-                      _kv(context, '活动', '${m.activityCount}'),
+                      _kv(context, stringsOf(context).merchantCouponThemes, '${m.topicCount}'),
+                      _kv(context, stringsOf(context).merchantCouponExploration, '${m.freeExploreCount}'),
+                      _kv(context, stringsOf(context).merchantCouponActivities, '${m.activityCount}'),
                     ],
                   ),
                 ],
@@ -140,7 +141,7 @@ class MerchantMarketingPage extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    const CySectionTitle('转化漏斗'),
+                    CySectionTitle(stringsOf(context).merchantCouponFunnel),
                     const SizedBox(height: CyTokens.space2),
                     ...m.funnel.map((FunnelStep s) => _FunnelRow(step: s)),
                   ],
@@ -153,7 +154,7 @@ class MerchantMarketingPage extends ConsumerWidget {
     );
     return CupertinoPageScaffold(
       backgroundColor: CyPalette.of(context).bgPage,
-      navigationBar: const CupertinoNavigationBar(middle: Text('营销')),
+      navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).merchantCouponMarketing)),
       child: Material(
         color: Colors.transparent,
         child: SafeArea(bottom: false, child: body),
@@ -274,7 +275,7 @@ class _FunnelRow extends StatelessWidget {
             child: CyNativeProgress(
               progress: step.ratio,
               height: 4,
-              semanticLabel: '${step.step}转化进度',
+              semanticLabel: stringsOf(context).merchantCouponFunnelProgress(step.step),
               trackColor: CyPalette.of(context).bgSurfaceStrong,
             ),
           ),

@@ -1,3 +1,5 @@
+import 'package:chengyin_app/l10n/app_localizations_en.dart';
+import 'package:chengyin_app/data/api/publisher_identity_api.dart';
 // 发布者实名(RUN-52)共用规则门禁:校验顺序、证件自洽、文案逐字、隐私红线。
 //
 // 对齐真源 chengyinhub-xcx/utils/publisher-identity.js + utils/form-state.js。
@@ -41,6 +43,22 @@ PublisherIdentityFormState form({
     );
 
 void main() {
+  test('English local validation never rewrites matching server error text', () async {
+    final strings = AppLocalizationsEn();
+    final invalid = validIdentityForm().copyWith(realName: '');
+    expect(checkIdentityForm(invalid, strings: strings), 'Enter your real name');
+    final api = FakePublisherIdentityApi();
+    final blocked = await registerPublisherIdentity(api, invalid, strings: strings);
+    expect(blocked.ok, isFalse);
+    expect(api.registerCalls, isEmpty);
+    api.registerError = PublisherIdentityException('请填写真实姓名');
+    final server = await registerPublisherIdentity(api, validIdentityForm(), strings: strings);
+    expect(server.message, '请填写真实姓名');
+    api.registerError = PublisherIdentityException('');
+    final missing = await registerPublisherIdentity(api, validIdentityForm(), strings: strings);
+    expect(missing.message, 'Identity registration was not completed. Please try again later.');
+  });
+
   group('isValidIdCard / normalizeIdCard:与后端 IdCardUtils 同口径', () {
     test('真源样例 99000019491231019X 合法', () {
       expect(isValidIdCard('99000019491231019X'), isTrue);

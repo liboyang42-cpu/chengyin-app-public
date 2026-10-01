@@ -26,11 +26,15 @@ import 'package:chengyin_app/data/api/club_ops_api.dart';
 import 'package:chengyin_app/data/models/club_ops.dart';
 import 'package:chengyin_app/feature/club/club_notify_page.dart';
 import 'package:chengyin_app/feature/club/club_ops_access.dart';
+import 'package:chengyin_app/l10n/app_localizations.dart';
 
-Widget _app(Widget home, List<dynamic> overrides) {
+Widget _app(Widget home, List<dynamic> overrides, {Locale? locale}) {
   return ProviderScope(
     overrides: overrides.cast(),
     child: MaterialApp(
+      locale: locale ?? const Locale('zh'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
       theme: ThemeData(useMaterial3: true),
       debugShowCheckedModeBanner: false,
       home: home,
@@ -73,6 +77,18 @@ class _FakeClubOpsApi extends ClubOpsApi {
   final List<Map<String, dynamic>> sends = <Map<String, dynamic>>[];
   int previewCalls = 0;
   int retryCalls = 0;
+  int statusCalls = 0;
+  Object? statusError;
+  NotificationCampaign? statusResult;
+
+  @override
+  Future<NotificationCampaign?> notificationStatus({required int campaignId}) async {
+    expect(campaignId, 88);
+    statusCalls++;
+    if (statusError != null) throw statusError!;
+    return statusResult;
+  }
+
 
   @override
   Future<ClubOpsAccess> access({required int clubId, int? activityId}) async {
@@ -164,6 +180,50 @@ Future<void> _fillDraft(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets('English audience labels and refresh preserve protocol values', (
+    tester,
+  ) async {
+    final fake = _FakeClubOpsApi()
+      ..counts = const AudienceCounts({'ALL_MEMBERS': 1, 'ADMINS': 2})
+      ..preview = const NotificationPreview(
+        recipientCount: 1,
+        phoneIncluded: false,
+        inApp: 'AVAILABLE',
+        wechatSubscription: 'UNAVAILABLE',
+      )
+      ..sendResult = const NotificationCampaign(
+        id: 88, totalCount: 1, successCount: 0, failedCount: 0,
+      )
+      ..statusResult = const NotificationCampaign(
+        id: 88, totalCount: 1, successCount: 1, failedCount: 0,
+      );
+    await tester.pumpWidget(_app(
+      const ClubNotifyPage(clubId: 1),
+      [clubOpsApiProvider.overrideWithValue(fake)],
+      locale: const Locale('en'),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.text('Group notifications'), findsOneWidget);
+    expect(find.text('All members'), findsOneWidget);
+    expect(find.text('1 person'), findsOneWidget);
+    expect(find.text('2 people'), findsOneWidget);
+    await _fillDraft(tester);
+    await _tapVisible(tester, const Key('notify-preview'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('1 recipient ·'), findsOneWidget);
+    await _tapVisible(tester, const Key('notify-send'));
+    await tester.pumpAndSettle();
+    expect(fake.sends.single['audienceType'], 'ALL_MEMBERS');
+    expect(fake.sends.single['title'], '周六集合提醒');
+    await _tapVisible(tester, const Key('notify-refresh'));
+    await tester.pumpAndSettle();
+    expect(fake.statusCalls, 1);
+    expect(fake.sends, hasLength(1));
+    expect(fake.retryCalls, 0);
+    expect(find.text('Delivery status'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   group('notify:权限面', () {
     testWidgets('普通成员(无 notify:send)→ 无权限屏,不给发送入口', (WidgetTester tester) async {
       final fake = _FakeClubOpsApi()
@@ -440,6 +500,23 @@ void main() {
       await tester.pumpAndSettle();
       expect(fake.retryCalls, 1);
       expect(find.byKey(const Key('notify-retry')), findsNothing);
+      // Status refresh is read-only: no second send and no automatic retry.
+      fake.statusResult = const NotificationCampaign(
+        id: 88, totalCount: 12, successCount: 11, failedCount: 1,
+      );
+      await _tapVisible(tester, const Key('notify-refresh'));
+      await tester.pumpAndSettle();
+      expect(fake.statusCalls, 1);
+      expect(fake.sends, hasLength(1));
+      expect(fake.retryCalls, 1);
+      expect(find.byKey(const Key('notify-retry')), findsOneWidget);
+      fake.statusError = StateError('offline');
+      await _tapVisible(tester, const Key('notify-refresh'));
+      await tester.pumpAndSettle();
+      expect(fake.statusCalls, 2);
+      expect(fake.sends, hasLength(1));
+      expect(find.byKey(const Key('notify-retry')), findsOneWidget);
+
     });
 
     testWidgets('发送失败 → 后端原文上屏,不假装已发送', (WidgetTester tester) async {

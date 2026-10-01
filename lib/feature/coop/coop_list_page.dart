@@ -1,3 +1,8 @@
+import 'coop_invite_detail_strings.dart';
+import 'coop_strings.dart';
+import '../../l10n/strings.dart';
+import '../auth/auth_controller.dart';
+import '../../core/network/request_session_scope.dart';
 import '../../core/theme/cy_palette.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -96,8 +101,8 @@ class _CoopListPageState extends ConsumerState<CoopListPage> {
 
   @override
   Widget build(BuildContext context) {
-    const String title = '我的合作';
-    const String needLogin = '登录后查看我的合作';
+    final String title = stringsOf(context).coopMyCooperation;
+    final String needLogin = stringsOf(context).coopLoginMyCooperation;
     final Widget? gate = coopLoginGate(
       context,
       ref,
@@ -109,10 +114,10 @@ class _CoopListPageState extends ConsumerState<CoopListPage> {
     return CupertinoPageScaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       navigationBar: CupertinoNavigationBar(
-        middle: const Text(title),
+        middle: Text(title),
         trailing: Semantics(
           button: true,
-          label: '常备权益',
+          label: stringsOf(context).coopTemplateTitle,
           child: CupertinoButton(
             padding: EdgeInsets.zero,
             minimumSize: const Size(44, 44),
@@ -136,9 +141,9 @@ class _CoopListPageState extends ConsumerState<CoopListPage> {
                 ),
                 child: CyTabs(
                   variant: CyTabsVariant.chip,
-                  tabs: const <CyTab>[
-                    CyTab(key: 'received', label: '收到的'),
-                    CyTab(key: 'sent', label: '我发出的'),
+                  tabs: <CyTab>[
+                    CyTab(key: 'received', label: stringsOf(context).coopReceived),
+                    CyTab(key: 'sent', label: stringsOf(context).coopSent),
                   ],
                   active: _tab,
                   onChanged: (String k) => setState(() => _tab = k),
@@ -156,8 +161,8 @@ class _CoopListPageState extends ConsumerState<CoopListPage> {
                           refetch: () => ref.invalidate(coopInviteListProvider),
                         )
                       : StatusView(
-                          message: '协作邀请没加载出来',
-                          sub: coopErrorSub(e),
+                          message: stringsOf(context).coopInviteLoadFailed,
+                          sub: coopErrorSub(e, context: context),
                           large: true,
                           onRetry: () => ref.invalidate(coopInviteListProvider),
                         ),
@@ -207,10 +212,10 @@ class _CoopListPageState extends ConsumerState<CoopListPage> {
                         !officialLoading &&
                         !officialFailed) {
                       return StatusView(
-                        message: received ? '还没有收到协作邀请' : '还没有发出协作邀请',
+                        message: received ? stringsOf(context).coopNoReceived : stringsOf(context).coopNoSent,
                         sub: received
-                            ? '别的商家或俱乐部发来的协作邀请、对你主题的带队申请会显示在这里'
-                            : '你向商家或俱乐部发出的协作邀请、带队申请会显示在这里',
+                            ? stringsOf(context).coopReceivedHint
+                            : stringsOf(context).coopSentHint,
                         large: true,
                       );
                     }
@@ -235,18 +240,18 @@ class _CoopListPageState extends ConsumerState<CoopListPage> {
                             )
                           else if (appliesFailed)
                             _InlineLoadFailed(
-                              message: received ? '带队申请没加载出来' : '我发出的申请没加载出来',
+                              message: received ? stringsOf(context).coopApplicationsLoadFailed : stringsOf(context).coopSentApplicationsLoadFailed,
                               keyPrefix: 'coop-applies',
                               onRetry: () =>
                                   ref.invalidate(coopPoolAppliesProvider(_tab)),
                             )
                           else if (applies.isNotEmpty) ...<Widget>[
-                            const Padding(
+                            Padding(
                               padding: EdgeInsets.only(
                                 top: CyTokens.space3,
                                 bottom: CyTokens.space2,
                               ),
-                              child: CySectionTitle('带队申请'),
+                              child: CySectionTitle(stringsOf(context).coopApplications),
                             ),
                             for (final CoopPoolApply apply in applies)
                               _ApplyTile(
@@ -271,18 +276,18 @@ class _CoopListPageState extends ConsumerState<CoopListPage> {
                             //   只留一排过期的报名,人会以为自己看到的是当前状态。
                             if (regsFailed)
                               _InlineLoadFailed(
-                                message: '承接报名没加载出来',
+                                message: stringsOf(context).coopRegistrationsLoadFailed,
                                 keyPrefix: 'coop-regs',
                                 onRetry: () =>
                                     ref.invalidate(coopReceivedRegsProvider),
                               ),
                             if (regs.isNotEmpty) ...<Widget>[
-                              const Padding(
+                              Padding(
                                 padding: EdgeInsets.only(
                                   top: CyTokens.space3,
                                   bottom: CyTokens.space2,
                                 ),
-                                child: CySectionTitle('承接报名'),
+                                child: CySectionTitle(stringsOf(context).coopRegistrations),
                               ),
                               for (final CoopReceivedRegistration reg in regs)
                                 _RegTile(
@@ -303,18 +308,18 @@ class _CoopListPageState extends ConsumerState<CoopListPage> {
                               ),
                             if (officialFailed)
                               _InlineLoadFailed(
-                                message: '官方邀约没加载出来',
+                                message: stringsOf(context).coopOfficialLoadFailed,
                                 keyPrefix: 'coop-official',
                                 onRetry: () =>
                                     ref.invalidate(merchantInvitesProvider),
                               ),
                             if (official.isNotEmpty) ...<Widget>[
-                              const Padding(
+                              Padding(
                                 padding: EdgeInsets.only(
                                   top: CyTokens.space3,
                                   bottom: CyTokens.space2,
                                 ),
-                                child: CySectionTitle('官方邀约'),
+                                child: CySectionTitle(stringsOf(context).coopOfficialInvites),
                               ),
                               for (final MerchantInvite invite in official)
                                 MerchantInviteTile(
@@ -375,7 +380,7 @@ class _InlineLoadFailed extends StatelessWidget {
             padding: EdgeInsets.zero,
             minimumSize: const Size(88, 44),
             onPressed: onRetry,
-            child: const Text('重试'),
+            child: Text(stringsOf(context).retry),
           ),
         ],
       ),
@@ -404,9 +409,24 @@ class _ApplyTile extends ConsumerStatefulWidget {
 }
 
 class _ApplyTileState extends ConsumerState<_ApplyTile> {
+  @override
+  void initState() {
+    super.initState();
+    _requestScope = ref.read(authControllerProvider.notifier).requestScope(
+      ref.read(authControllerProvider).user?.id ?? 0,
+    );
+  }
+
+  late final RequestSessionScope _requestScope;
+
   bool _busy = false;
 
-  Future<void> _run(Future<void> Function() body, String done) async {
+  Future<void> _run(Future<void> Function() body, String done) => RequestSessionScope.run(
+    _requestScope,
+    () => _runScoped(body, done),
+  );
+
+  Future<void> _runScoped(Future<void> Function() body, String done) async {
     setState(() => _busy = true);
     try {
       await body();
@@ -417,7 +437,7 @@ class _ApplyTileState extends ConsumerState<_ApplyTile> {
       if (!mounted) return;
       CyNativeNotice.show(
         context,
-        e.toString().replaceFirst('Exception: ', ''),
+        coopErrorSub(e, context: context),
         isError: true,
       );
       // 结果未知就回读一次:不让人对着旧状态再点一次。
@@ -432,17 +452,17 @@ class _ApplyTileState extends ConsumerState<_ApplyTile> {
     final String name = (a.clubName ?? '').trim();
     final bool ok = await cyConfirm(
       context,
-      title: '拒绝「${name.isEmpty ? '该俱乐部' : name}」的带队申请?',
-      content: '对方会收到通知,之后仍可重新申请。',
-      confirmText: '拒绝',
-      cancelText: '再想想',
+      title: stringsOf(context).coopRejectApplicationName(name.isEmpty ? stringsOf(context).coopClubFallback : name),
+      content: stringsOf(context).coopRejectNotifyHint,
+      confirmText: stringsOf(context).coopReject,
+      cancelText: stringsOf(context).coopThinkAgain,
       danger: true,
     );
     if (!ok || !mounted) return;
     // ⚠️ 键是 applyId,且商家员工处理 owner 主题时要带上行上的 scope。
     await _run(
       () => ref.read(coopApiProvider).declineApply(a.applyId, scope: a.scope),
-      '已拒绝的申请对方可以再发一次',
+      stringsOf(context).coopRejectedCanReapply,
     );
   }
 
@@ -464,13 +484,13 @@ class _ApplyTileState extends ConsumerState<_ApplyTile> {
     final CoopPoolApply a = widget.apply;
     final bool ok = await cyConfirm(
       context,
-      title: '撤回「${a.titleText}」的带队申请?',
-      content: '撤回后商家将不再看到这条申请,之后可以重新申请。',
-      confirmText: '撤回',
+      title: stringsOf(context).coopWithdrawApplicationName(coopApplyTitle(context, a)),
+      content: stringsOf(context).coopWithdrawHint,
+      confirmText: stringsOf(context).coopWithdraw,
     );
     if (!ok || !mounted) return;
     // ⚠️ 撤回的键是 **topicId**(后端按主题撤),不是 applyId。
-    await _run(() => ref.read(coopApiProvider).withdraw(a.topicId), '已撤回');
+    await _run(() => ref.read(coopApiProvider).withdraw(a.topicId), stringsOf(context).coopWithdrawn);
   }
 
   @override
@@ -478,9 +498,9 @@ class _ApplyTileState extends ConsumerState<_ApplyTile> {
     final CoopPoolApply a = widget.apply;
     final CyPalette p = CyPalette.of(context);
     final TextTheme t = Theme.of(context).textTheme;
-    final String peer = a.peerText(received: widget.received);
+    final String peer = coopApplyPeer(context, a, received: widget.received);
     final String date = a.dateText;
-    final String sub = a.subText(received: widget.received);
+    final String sub = coopApplySub(context, a, received: widget.received);
 
     return Container(
       margin: const EdgeInsets.only(bottom: CyTokens.space3),
@@ -495,7 +515,7 @@ class _ApplyTileState extends ConsumerState<_ApplyTile> {
         children: <Widget>[
           Row(
             children: <Widget>[
-              CyTag(label: a.statusText),
+              CyTag(label: coopApplicationStatus(context, a.status)),
               const Spacer(),
               if (peer.isNotEmpty)
                 Text(peer, style: t.bodySmall?.copyWith(color: p.textTertiary)),
@@ -504,7 +524,7 @@ class _ApplyTileState extends ConsumerState<_ApplyTile> {
           const SizedBox(height: CyTokens.space1),
           Row(
             children: <Widget>[
-              Expanded(child: Text(a.titleText, style: t.titleSmall)),
+              Expanded(child: Text(coopApplyTitle(context, a), style: t.titleSmall)),
               if (date.isNotEmpty)
                 Text(date, style: t.bodySmall?.copyWith(color: p.textTertiary)),
             ],
@@ -519,7 +539,7 @@ class _ApplyTileState extends ConsumerState<_ApplyTile> {
           Padding(
             padding: const EdgeInsets.only(top: CyTokens.space1),
             child: Text(
-              a.termsText,
+              coopApplyTerms(context, a),
               style: t.bodySmall?.copyWith(color: p.textTertiary),
             ),
           ),
@@ -531,7 +551,7 @@ class _ApplyTileState extends ConsumerState<_ApplyTile> {
                   Expanded(
                     child: CyNativeButton(
                       key: Key('coop-apply-decline-${a.applyId}'),
-                      label: '拒绝',
+                      label: stringsOf(context).coopReject,
                       role: CyNativeButtonRole.secondary,
                       loading: _busy,
                       onPressed: _busy ? null : _decline,
@@ -541,7 +561,7 @@ class _ApplyTileState extends ConsumerState<_ApplyTile> {
                   Expanded(
                     child: CyNativeButton(
                       key: Key('coop-apply-reply-${a.applyId}'),
-                      label: '回邀约',
+                      label: stringsOf(context).coopBackToInvite,
                       onPressed: _busy || a.clubId == null
                           ? null
                           : () => context.push(_replyLocation),
@@ -551,7 +571,7 @@ class _ApplyTileState extends ConsumerState<_ApplyTile> {
                   Expanded(
                     child: CyNativeButton(
                       key: Key('coop-apply-withdraw-${a.applyId}'),
-                      label: '撤回申请',
+                      label: stringsOf(context).coopWithdrawApplication,
                       role: CyNativeButtonRole.secondary,
                       loading: _busy,
                       onPressed: _busy ? null : _withdraw,
@@ -586,12 +606,27 @@ class _RegTile extends ConsumerStatefulWidget {
 }
 
 class _RegTileState extends ConsumerState<_RegTile> {
+  @override
+  void initState() {
+    super.initState();
+    _requestScope = ref.read(authControllerProvider.notifier).requestScope(
+      ref.read(authControllerProvider).user?.id ?? 0,
+    );
+  }
+
+  late final RequestSessionScope _requestScope;
+
   bool _busy = false;
 
   /// 动作统一收口:成功报结果、失败透传后端原话,两种情况都回读列表 ——
   /// 结果未知时让人对着旧状态再点一次,是最容易点出重复操作的一种。
   /// ★ 回到 false 时忙态已经收掉,调用方可以接着开下一个弹层(不会一直转着)。
-  Future<bool> _run(Future<void> Function() body, String done) async {
+  Future<bool> _run(Future<void> Function() body, String done) => RequestSessionScope.run(
+    _requestScope,
+    () => _runScoped(body, done),
+  );
+
+  Future<bool> _runScoped(Future<void> Function() body, String done) async {
     setState(() => _busy = true);
     try {
       await body();
@@ -603,7 +638,7 @@ class _RegTileState extends ConsumerState<_RegTile> {
       if (mounted) {
         CyNativeNotice.show(
           context,
-          e.toString().replaceFirst('Exception: ', ''),
+          coopErrorSub(e, context: context),
           isError: true,
         );
       }
@@ -618,16 +653,16 @@ class _RegTileState extends ConsumerState<_RegTile> {
     final CoopReceivedRegistration reg = widget.reg;
     final bool ok = await cyConfirm(
       context,
-      title: '婉拒「${reg.name}」的承接报名?',
-      content: '对方会收到通知,可修改后重新报名。',
-      confirmText: '婉拒',
-      cancelText: '再想想',
+      title: stringsOf(context).coopDeclineRegistrationName(reg.name),
+      content: stringsOf(context).coopRejectRegistrationHint,
+      confirmText: stringsOf(context).coopDecline,
+      cancelText: stringsOf(context).coopThinkAgain,
       danger: true,
     );
     if (!ok || !mounted) return;
     await _run(
       () => ref.read(coopApiProvider).rejectCandidate(reg.id),
-      '已婉拒「${reg.name}」',
+      stringsOf(context).coopDeclinedName(reg.name),
     );
   }
 
@@ -637,22 +672,22 @@ class _RegTileState extends ConsumerState<_RegTile> {
     final CoopReceivedRegistration reg = widget.reg;
     final bool ok = await cyConfirm(
       context,
-      title: '确认「${reg.name}」占住这个候选位置?',
-      content: '同地点其他待调配报名将自动落选。\n确认后需再向他发出带条款的合作邀约,他接受后才成合作单。',
-      confirmText: '确认',
+      title: stringsOf(context).coopConfirmPlaceName(reg.name),
+      content: stringsOf(context).coopConfirmCandidateTerms,
+      confirmText: stringsOf(context).coopConfirm,
     );
     if (!ok || !mounted) return;
     final bool done = await _run(
       () => ref.read(coopApiProvider).confirmCandidate(reg.id),
-      '已确认「${reg.name}」占住候选位置',
+      stringsOf(context).coopConfirmedPlaceName(reg.name),
     );
     if (!done || !mounted || reg.memberId == null) return;
     final bool go = await cyConfirm(
       context,
-      title: '已占位,接着发邀约',
-      content: '现在给「${reg.name}」发一张带分账条款的邀约,他接受后才成合作单。',
-      confirmText: '去发邀约',
-      cancelText: '稍后',
+      title: stringsOf(context).coopSendInviteNext,
+      content: stringsOf(context).coopSendTermsInvitation(reg.name),
+      confirmText: stringsOf(context).coopSendInvite,
+      cancelText: stringsOf(context).coopLater,
     );
     if (!go || !mounted) return;
     context.push(
@@ -685,7 +720,7 @@ class _RegTileState extends ConsumerState<_RegTile> {
           children: <Widget>[
             Row(
               children: <Widget>[
-                CyTag(label: reg.auditText),
+                CyTag(label: coopAuditStatus(context, reg.auditStatus)),
                 const Spacer(),
                 Flexible(
                   child: Text(
@@ -734,7 +769,7 @@ class _RegTileState extends ConsumerState<_RegTile> {
                   Expanded(
                     child: CyNativeButton(
                       key: Key('coop-reg-reject-${reg.id}'),
-                      label: '婉拒',
+                      label: stringsOf(context).coopDecline,
                       role: CyNativeButtonRole.secondary,
                       loading: _busy,
                       onPressed: _busy ? null : _reject,
@@ -744,7 +779,7 @@ class _RegTileState extends ConsumerState<_RegTile> {
                   Expanded(
                     child: CyNativeButton(
                       key: Key('coop-reg-confirm-${reg.id}'),
-                      label: '确认占槽',
+                      label: stringsOf(context).coopConfirmPlace,
                       loading: _busy,
                       onPressed: _busy ? null : _confirm,
                     ),
@@ -775,14 +810,14 @@ class _TappableInviteTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
-      label: '查看 ${row.topicText.isEmpty ? '这条邀约' : row.topicText} 的协作详情',
+      label: stringsOf(context).coopViewDetailName(row.topicText.isEmpty ? stringsOf(context).coopThisInvitation : row.topicText),
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () {
           if (row.id <= 0) {
             // 编号没解析出来时**不要**跳:详情是拿编号去服务端问的,
             // 跳到一页只会说「打不开」比就地说明更绕。
-            CyNativeNotice.show(context, '邀约标识无法确认，请刷新后重试', isError: true);
+            CyNativeNotice.show(context, stringsOf(context).coopInvalidInviteId, isError: true);
             return;
           }
           context.push(
@@ -808,17 +843,29 @@ class _InviteTile extends ConsumerStatefulWidget {
 }
 
 class _InviteTileState extends ConsumerState<_InviteTile> {
+  @override
+  void initState() {
+    super.initState();
+    _requestScope = ref.read(authControllerProvider.notifier).requestScope(
+      ref.read(authControllerProvider).user?.id ?? 0,
+    );
+  }
+
+  late final RequestSessionScope _requestScope;
+
   bool _busy = false;
 
-  Future<void> _payDeposit() async {
-    if (_busy) return;
+  Future<void> _payDeposit() => RequestSessionScope.run(_requestScope, _payDepositScoped);
+
+  Future<void> _payDepositScoped() async {
+    if (_busy || !_requestScope.isCurrent()) return;
     if (!ref.read(coopDepositPaymentConfiguredProvider)) {
-      CyNativeNotice.show(context, '微信支付尚未配置，请稍后再试', isError: true);
+      CyNativeNotice.show(context, stringsOf(context).coopPaymentUnconfigured, isError: true);
       return;
     }
     final WechatPaymentGate gate = ref.read(coopDepositPaymentGateProvider);
     if (!gate.tryAcquire()) {
-      CyNativeNotice.show(context, '已有一笔支付正在处理中，请完成后再试', isError: true);
+      CyNativeNotice.show(context, stringsOf(context).coopPaymentBusy, isError: true);
       return;
     }
     setState(() => _busy = true);
@@ -827,27 +874,27 @@ class _InviteTileState extends ConsumerState<_InviteTile> {
           .read(coopApiProvider)
           .createDeposit(widget.row.id);
       if (!WechatPayment.hasCompleteAppParams(params)) {
-        if (!mounted) return;
-        CyNativeNotice.show(context, '支付参数不完整，请稍后重试', isError: true);
+        if (!mounted || !_requestScope.isCurrent()) return;
+        CyNativeNotice.show(context, stringsOf(context).coopPaymentIncomplete, isError: true);
         return;
       }
 
       await ref.read(coopDepositPayProvider)(params);
-      if (!mounted) return;
+      if (!mounted || !_requestScope.isCurrent()) return;
 
       final String paymentStatus = await ref
           .read(coopApiProvider)
           .depositStatus(widget.row.id);
-      if (!mounted) return;
+      if (!mounted || !_requestScope.isCurrent()) return;
       switch (paymentStatus) {
         case 'success':
-          CyNativeNotice.show(context, '保证金已到账');
+          CyNativeNotice.show(context, stringsOf(context).coopDepositReceived);
         case 'pending':
-          CyNativeNotice.show(context, '保证金支付处理中，请稍后刷新');
+          CyNativeNotice.show(context, stringsOf(context).coopDepositPending);
         case 'failed':
-          CyNativeNotice.show(context, '保证金支付未完成，可稍后重试', isError: true);
+          CyNativeNotice.show(context, stringsOf(context).coopDepositFailed, isError: true);
         default:
-          CyNativeNotice.show(context, '保证金状态待确认，请稍后刷新', isError: true);
+          CyNativeNotice.show(context, stringsOf(context).coopDepositUnknown, isError: true);
       }
 
       // 微信回执不是入账真源。四种 SDK 结果全部先回读
@@ -859,15 +906,15 @@ class _InviteTileState extends ConsumerState<_InviteTile> {
         // 刷新失败由列表的 error state 接管，不篡改支付回执。
       }
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || !_requestScope.isCurrent()) return;
       CyNativeNotice.show(
         context,
-        e.toString().replaceFirst('Exception: ', ''),
+        coopErrorSub(e, context: context),
         isError: true,
       );
     } finally {
       gate.release();
-      if (mounted) setState(() => _busy = false);
+      if (mounted && _requestScope.isCurrent()) setState(() => _busy = false);
     }
   }
 
@@ -895,7 +942,7 @@ class _InviteTileState extends ConsumerState<_InviteTile> {
       if (!mounted) return;
       CyNativeNotice.show(
         context,
-        e.toString().replaceFirst('Exception: ', ''),
+        coopErrorSub(e, context: context),
         isError: true,
       );
     } finally {
@@ -903,7 +950,12 @@ class _InviteTileState extends ConsumerState<_InviteTile> {
     }
   }
 
-  Future<void> _contact() async {
+  Future<void> _contact() => RequestSessionScope.run(
+    _requestScope,
+    () => _contactScoped(),
+  );
+
+  Future<void> _contactScoped() async {
     setState(() => _busy = true);
     try {
       final conversationId = await ref
@@ -915,7 +967,7 @@ class _InviteTileState extends ConsumerState<_InviteTile> {
       if (!mounted) return;
       CyNativeNotice.show(
         context,
-        e.toString().replaceFirst('Exception: ', ''),
+        coopErrorSub(e, context: context),
         isError: true,
       );
     } finally {
@@ -932,7 +984,12 @@ class _InviteTileState extends ConsumerState<_InviteTile> {
   ///
   /// ★ 只有「取消一个**已接受**的合作」要填理由(后端拒空)。
   ///   对所有取消都强制填,会让「撤回一个还没人理的邀请」变得很重。
-  Future<void> _handle(CoopHandleAction action) async {
+  Future<void> _handle(CoopHandleAction action) => RequestSessionScope.run(
+    _requestScope,
+    () => _handleScoped(action),
+  );
+
+  Future<void> _handleScoped(CoopHandleAction action) async {
     String? reason;
     if (CoopHandleAction.needsReason(action, widget.row.status)) {
       reason = await showCupertinoDialog<String>(
@@ -945,9 +1002,9 @@ class _InviteTileState extends ConsumerState<_InviteTile> {
       // 纯文本确认走 cyConfirm(门禁 no_plain_alert_dialog 拦着裸 AlertDialog)。
       final bool ok = await cyConfirm(
         context,
-        title: '${action.label}这条合作邀约?',
-        confirmText: action.label,
-        cancelText: '再想想',
+        title: stringsOf(context).coopActionInvite(coopActionLabel(context, action)),
+        confirmText: coopActionLabel(context, action),
+        cancelText: stringsOf(context).coopThinkAgain,
         danger: action != CoopHandleAction.accept,
       );
       if (!ok) return;
@@ -964,13 +1021,13 @@ class _InviteTileState extends ConsumerState<_InviteTile> {
           );
       ref.invalidate(coopInviteListProvider);
       if (!mounted) return;
-      CyNativeNotice.show(context, '已${action.label}');
+      CyNativeNotice.show(context, stringsOf(context).coopActionDone(coopActionLabel(context, action)));
     } catch (e) {
       if (!mounted) return;
       // 后端的话原样透出 —— 「该邀请无法取消」这类判据由它说。
       CyNativeNotice.show(
         context,
-        e.toString().replaceFirst('Exception: ', ''),
+        coopErrorSub(e, context: context),
         isError: true,
       );
     } finally {
@@ -1001,7 +1058,7 @@ class _InviteTileState extends ConsumerState<_InviteTile> {
         : widget.row.fromId;
     final int? topicId = widget.row.topicId;
     if (toId == null || topicId == null) {
-      CyNativeNotice.show(context, '该合作暂不可评价');
+      CyNativeNotice.show(context, stringsOf(context).coopReviewUnavailable);
       return;
     }
     await showCupertinoSheet<void>(
@@ -1041,8 +1098,8 @@ class _InviteTileState extends ConsumerState<_InviteTile> {
           children: <Widget>[
             Row(
               children: <Widget>[
-                Expanded(child: Text(r.typeText, style: textTheme.titleSmall)),
-                CyTag(label: r.statusText),
+                Expanded(child: Text(coopDetailInviteType(context, r), style: textTheme.titleSmall)),
+                CyTag(label: coopInvitationStatus(context, r.status)),
               ],
             ),
             if ((r.partnerName ?? '').isNotEmpty)
@@ -1050,11 +1107,11 @@ class _InviteTileState extends ConsumerState<_InviteTile> {
                 padding: const EdgeInsets.only(top: CyTokens.space1),
                 child: Text(r.partnerName!, style: textTheme.bodyMedium),
               ),
-            if (r.topicText.isNotEmpty)
+            if (coopDetailTopic(context, r).isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 2),
                 child: Text(
-                  r.topicText,
+                  coopDetailTopic(context, r),
                   style: textTheme.bodySmall?.copyWith(
                     color: CyPalette.of(context).textSecondary,
                   ),
@@ -1070,11 +1127,11 @@ class _InviteTileState extends ConsumerState<_InviteTile> {
                   ),
                 ),
               ),
-            if (r.termsText != null)
+            if (coopDetailTerms(context, r) != null)
               Padding(
                 padding: const EdgeInsets.only(top: 2),
                 child: Text(
-                  r.termsText!,
+                  coopDetailTerms(context, r)!,
                   style: textTheme.bodySmall?.copyWith(
                     color: CyPalette.of(context).textTertiary,
                   ),
@@ -1092,7 +1149,7 @@ class _InviteTileState extends ConsumerState<_InviteTile> {
               Padding(
                 padding: const EdgeInsets.only(top: CyTokens.space2),
                 child: Text(
-                  '对方已拒绝，可再邀其他商家。',
+                  stringsOf(context).coopPeerRejected,
                   style: textTheme.bodySmall?.copyWith(
                     color: CyPalette.of(context).textTertiary,
                   ),
@@ -1102,7 +1159,7 @@ class _InviteTileState extends ConsumerState<_InviteTile> {
               Padding(
                 padding: const EdgeInsets.only(top: CyTokens.space2),
                 child: Text(
-                  '邀请信息不完整,缺少邀请方、主题或合作条款,暂不能处理',
+                  stringsOf(context).coopInviteIncomplete,
                   style: textTheme.bodySmall?.copyWith(
                     color: CyPalette.of(context).statusWarning,
                   ),
@@ -1125,7 +1182,7 @@ class _InviteTileState extends ConsumerState<_InviteTile> {
                       ))
                     CyNativeButton(
                       key: Key('coop-action-${a.name}-${r.id}'),
-                      label: a.label,
+                      label: coopActionLabel(context, a),
                       role: a == CoopHandleAction.accept
                           ? CyNativeButtonRole.primary
                           : (a == CoopHandleAction.reject
@@ -1145,12 +1202,12 @@ class _InviteTileState extends ConsumerState<_InviteTile> {
                   if (r.depositOwed)
                     CyNativeButton(
                       key: Key('coop-deposit-${r.id}'),
-                      label: '缴纳保证金',
+                      label: stringsOf(context).coopPayDeposit,
                       loading: _busy,
                       onPressed: _busy ? null : _payDeposit,
                     ),
                   CyNativeButton(
-                    label: '联系合作方',
+                    label: stringsOf(context).coopContactPartner,
                     role: CyNativeButtonRole.secondary,
                     loading: _busy,
                     onPressed: _busy ? null : _contact,
@@ -1158,14 +1215,14 @@ class _InviteTileState extends ConsumerState<_InviteTile> {
                   // 供给申报是受邀方(接单一方)的动作:我收到的邀约 = 我是受邀方。
                   if (!widget.mine)
                     CyNativeButton(
-                      label: '申报供给',
+                      label: stringsOf(context).coopDeclareSupply,
                       role: CyNativeButtonRole.secondary,
                       loading: _busy,
                       onPressed: _busy ? null : _openPerkPick,
                     ),
                   if (canReview)
                     CyNativeButton(
-                      label: '评价',
+                      label: stringsOf(context).coopReview,
                       role: CyNativeButtonRole.secondary,
                       loading: _busy,
                       onPressed: _busy ? null : _review,
@@ -1178,7 +1235,7 @@ class _InviteTileState extends ConsumerState<_InviteTile> {
                   ))
                     CyNativeButton(
                       key: Key('coop-action-cancel-${r.id}'),
-                      label: '取消合作',
+                      label: stringsOf(context).coopCancelCooperation,
                       role: CyNativeButtonRole.destructive,
                       loading: _busy,
                       onPressed: _busy
@@ -1201,7 +1258,7 @@ class _InviteTileState extends ConsumerState<_InviteTile> {
                 children: <Widget>[
                   CyNativeButton(
                     key: Key('coop-retry-refund-${r.id}'),
-                    label: _busy ? '退款重试中…' : '重试保证金退款',
+                    label: _busy ? stringsOf(context).coopRefundRetryBusy : stringsOf(context).coopRetryDepositRefund,
                     role: CyNativeButtonRole.secondary,
                     loading: _busy,
                     onPressed: _busy ? null : _retryDepositRefund,
@@ -1226,7 +1283,7 @@ class _InviteTileState extends ConsumerState<_InviteTile> {
                 children: <Widget>[
                   CyNativeButton(
                     key: Key('coop-reinvite-${r.id}'),
-                    label: '再邀别人',
+                    label: stringsOf(context).coopInviteOthers,
                     role: CyNativeButtonRole.secondary,
                     onPressed: () =>
                         context.push('/coop/nearby?topicId=${r.topicId}'),
@@ -1257,6 +1314,8 @@ class CoopPerkPickSheet extends ConsumerStatefulWidget {
 }
 
 class _PerkPickSheetState extends ConsumerState<CoopPerkPickSheet> {
+  late final RequestSessionScope _requestScope;
+
   bool _loading = true;
   bool _saving = false;
   String? _error;
@@ -1266,6 +1325,9 @@ class _PerkPickSheetState extends ConsumerState<CoopPerkPickSheet> {
   @override
   void initState() {
     super.initState();
+    _requestScope = ref.read(authControllerProvider.notifier).requestScope(
+      ref.read(authControllerProvider).user?.id ?? 0,
+    );
     _load();
   }
 
@@ -1303,13 +1365,18 @@ class _PerkPickSheetState extends ConsumerState<CoopPerkPickSheet> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString().replaceFirst('Exception: ', '');
+        _error = coopErrorSub(e, context: context);
         _loading = false;
       });
     }
   }
 
-  Future<void> _submit() async {
+  Future<void> _submit() => RequestSessionScope.run(
+    _requestScope,
+    () => _submitScoped(),
+  );
+
+  Future<void> _submitScoped() async {
     setState(() => _saving = true);
     try {
       final count = await ref
@@ -1319,12 +1386,12 @@ class _PerkPickSheetState extends ConsumerState<CoopPerkPickSheet> {
             templateIds: _checked.toList(),
           );
       if (!mounted) return;
-      CyNativeNotice.show(context, '已申报 $count 项');
+      CyNativeNotice.show(context, stringsOf(context).coopDeclaredCount(count));
       Navigator.of(context).pop();
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString().replaceFirst('Exception: ', '');
+        _error = coopErrorSub(e, context: context);
         _saving = false;
       });
     }
@@ -1336,13 +1403,13 @@ class _PerkPickSheetState extends ConsumerState<CoopPerkPickSheet> {
     return CupertinoPageScaffold(
       backgroundColor: palette.bgPage,
       navigationBar: CupertinoNavigationBar(
-        middle: const Text('申报本次供给'),
+        middle: Text(stringsOf(context).coopDeclareCurrentSupply),
         leading: CupertinoButton(
           key: const Key('coop-perk-pick-cancel'),
           minimumSize: const Size(44, 44),
           padding: EdgeInsets.zero,
           onPressed: _saving ? null : () => Navigator.of(context).pop(),
-          child: const Text('取消'),
+          child: Text(stringsOf(context).cancel),
         ),
       ),
       child: SafeArea(
@@ -1353,7 +1420,7 @@ class _PerkPickSheetState extends ConsumerState<CoopPerkPickSheet> {
           children: <Widget>[
             const SizedBox(height: CyTokens.space1),
             Text(
-              '勾选本次合作提供的礼品/券/折扣(来自你的常备权益)。到店玩家可领,成本按核销人头计入结算。',
+              stringsOf(context).coopSupplyPurpose,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: CyPalette.of(context).textSecondary,
               ),
@@ -1365,20 +1432,21 @@ class _PerkPickSheetState extends ConsumerState<CoopPerkPickSheet> {
                 child: Center(child: CupertinoActivityIndicator()),
               )
             else if (_templates.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: CyTokens.space4),
-                child: Text('还没有常备权益,去「常备权益」维护后再来'),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: CyTokens.space4),
+                child: Text(stringsOf(context).coopSupplyEmpty),
               )
             else
               ..._templates.map((CoopPerkTemplate t) {
                 final selected = _checked.contains(t.id);
-                final meta = t.unitCost != null
-                    ? '成本 ¥${t.unitCost!.toStringAsFixed(2)}${t.quota != null ? ' · 配额 ${t.quota}' : ''}'
-                    : (t.quota != null ? '配额 ${t.quota}' : '');
+                final meta = <String>[
+                  if (t.unitCost != null) stringsOf(context).coopTemplateCost(t.unitCost!.toStringAsFixed(2)),
+                  if (t.quota != null) stringsOf(context).coopSupplyQuota(t.quota!),
+                ].join(' · ');
                 return Semantics(
                   selected: selected,
                   button: true,
-                  label: '${t.typeText} · ${t.name}',
+                  label: '${coopPerkType(context, t.perkType)} · ${t.name}',
                   child: CupertinoButton(
                     key: Key('coop-perk-pick-${t.id}'),
                     minimumSize: const Size.fromHeight(52),
@@ -1408,7 +1476,7 @@ class _PerkPickSheetState extends ConsumerState<CoopPerkPickSheet> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: <Widget>[
-                              Text('${t.typeText} · ${t.name}'),
+                              Text('${coopPerkType(context, t.perkType)} · ${t.name}'),
                               if (meta.isNotEmpty)
                                 Text(
                                   meta,
@@ -1444,7 +1512,7 @@ class _PerkPickSheetState extends ConsumerState<CoopPerkPickSheet> {
                         height: 18,
                         child: CupertinoActivityIndicator(),
                       )
-                    : const Text('确认申报'),
+                    : Text(stringsOf(context).coopConfirmSupply),
               ),
             ),
           ],
@@ -1471,6 +1539,16 @@ class CoopReviewSheet extends ConsumerStatefulWidget {
 }
 
 class _ReviewSheetState extends ConsumerState<CoopReviewSheet> {
+  @override
+  void initState() {
+    super.initState();
+    _requestScope = ref.read(authControllerProvider.notifier).requestScope(
+      ref.read(authControllerProvider).user?.id ?? 0,
+    );
+  }
+
+  late final RequestSessionScope _requestScope;
+
   int _rating = 5;
   final _commentCtrl = TextEditingController();
   bool _saving = false;
@@ -1482,7 +1560,12 @@ class _ReviewSheetState extends ConsumerState<CoopReviewSheet> {
     super.dispose();
   }
 
-  Future<void> _submit() async {
+  Future<void> _submit() => RequestSessionScope.run(
+    _requestScope,
+    () => _submitScoped(),
+  );
+
+  Future<void> _submitScoped() async {
     setState(() {
       _saving = true;
       _error = null;
@@ -1499,12 +1582,12 @@ class _ReviewSheetState extends ConsumerState<CoopReviewSheet> {
                 : _commentCtrl.text.trim(),
           );
       if (!mounted) return;
-      CyNativeNotice.show(context, '已评价');
+      CyNativeNotice.show(context, stringsOf(context).coopReviewed);
       Navigator.of(context).pop();
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString().replaceFirst('Exception: ', '');
+        _error = coopErrorSub(e, context: context);
         _saving = false;
       });
     }
@@ -1516,13 +1599,13 @@ class _ReviewSheetState extends ConsumerState<CoopReviewSheet> {
     return CupertinoPageScaffold(
       backgroundColor: palette.bgPage,
       navigationBar: CupertinoNavigationBar(
-        middle: const Text('评价这次合作'),
+        middle: Text(stringsOf(context).coopReviewTitle),
         leading: CupertinoButton(
           key: const Key('coop-review-cancel'),
           minimumSize: const Size(44, 44),
           padding: EdgeInsets.zero,
           onPressed: _saving ? null : () => Navigator.of(context).pop(),
-          child: const Text('取消'),
+          child: Text(stringsOf(context).cancel),
         ),
       ),
       child: SafeArea(
@@ -1538,8 +1621,8 @@ class _ReviewSheetState extends ConsumerState<CoopReviewSheet> {
                 void select() => setState(() => _rating = star);
                 return Semantics(
                   button: true,
-                  label: '$star 星',
-                  value: star == _rating ? '已选择' : '未选择',
+                  label: stringsOf(context).coopStarCount(star),
+                  value: star == _rating ? stringsOf(context).coopSelected : stringsOf(context).coopNotSelected,
                   selected: star == _rating,
                   onTap: select,
                   child: ExcludeSemantics(
@@ -1564,7 +1647,7 @@ class _ReviewSheetState extends ConsumerState<CoopReviewSheet> {
               key: const Key('coop-review-comment'),
               controller: _commentCtrl,
               maxLines: 3,
-              placeholder: '说说这次合作…（选填）',
+              placeholder: stringsOf(context).coopReviewPlaceholder,
               textInputAction: TextInputAction.done,
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
@@ -1592,7 +1675,7 @@ class _ReviewSheetState extends ConsumerState<CoopReviewSheet> {
                       height: 16,
                       child: CupertinoActivityIndicator(),
                     )
-                  : const Text('提交'),
+                  : Text(stringsOf(context).coopSubmit),
             ),
           ],
         ),
@@ -1607,7 +1690,7 @@ class CoopReasonDialog extends StatefulWidget {
     super.key,
     required this.action,
     this.content,
-    this.placeholder = '说明原因',
+    this.placeholder,
     this.confirmText,
   });
 
@@ -1617,7 +1700,7 @@ class CoopReasonDialog extends StatefulWidget {
   /// (列表撤回:「对方还没处理,取消后这条邀约作废。」)
   final String? content;
 
-  final String placeholder;
+  final String? placeholder;
 
   /// 确认键文案。默认用动作名(「取消」)。
   final String? confirmText;
@@ -1639,7 +1722,7 @@ class _ReasonDialogState extends State<CoopReasonDialog> {
   Widget build(BuildContext context) {
     final bool empty = _c.text.trim().isEmpty;
     return CupertinoAlertDialog(
-      title: Text('${widget.action.label}合作'),
+      title: Text(stringsOf(context).coopActionCollaboration(coopActionLabel(context, widget.action))),
       content: Padding(
         padding: const EdgeInsets.only(top: CyTokens.space2),
         child: Column(
@@ -1650,25 +1733,25 @@ class _ReasonDialogState extends State<CoopReasonDialog> {
               autofocus: true,
               maxLines: 3,
               onChanged: (_) => setState(() {}),
-              placeholder: widget.placeholder,
+              placeholder: widget.placeholder ?? stringsOf(context).coopReasonPlaceholder,
               textInputAction: TextInputAction.done,
             ),
             const SizedBox(height: CyTokens.space1),
-            Text(widget.content ?? '对方会看到这段说明'),
+            Text(widget.content ?? stringsOf(context).coopReasonVisible),
           ],
         ),
       ),
       actions: <Widget>[
         CupertinoDialogAction(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('再想想'),
+          child: Text(stringsOf(context).coopThinkAgain),
         ),
         CupertinoDialogAction(
           key: const Key('coop-cancel-confirm'),
           isDestructiveAction: widget.action != CoopHandleAction.accept,
           // 空理由直接按不动 —— 提交了也是被后端拒,不如当场说清。
           onPressed: empty ? null : () => Navigator.of(context).pop(_c.text),
-          child: Text(widget.confirmText ?? widget.action.label),
+          child: Text(widget.confirmText ?? coopActionLabel(context, widget.action)),
         ),
       ],
     );

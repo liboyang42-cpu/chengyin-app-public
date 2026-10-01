@@ -1,3 +1,7 @@
+import 'coop_strings.dart';
+import '../../l10n/strings.dart';
+import '../auth/auth_controller.dart';
+import '../../core/network/request_session_scope.dart';
 import '../../core/theme/cy_palette.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -23,8 +27,8 @@ class CoopPoolPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    const String title = '合作池';
-    const String needLogin = '登录后查看合作池';
+    final String title = stringsOf(context).coopPool;
+    final String needLogin = stringsOf(context).coopLoginPool;
     final Widget? gate = coopLoginGate(
       context,
       ref,
@@ -37,7 +41,7 @@ class CoopPoolPage extends ConsumerWidget {
       // 显式给浅色底:根 CupertinoTheme 恒暗、Material `Theme` 换不动它,
       // 不传的话这里就是黑底配浅色盘的黑字(见 coop_guard.dart)。
       backgroundColor: CyPalette.of(context).bgPage,
-      navigationBar: const CupertinoNavigationBar(middle: Text(title)),
+      navigationBar: CupertinoNavigationBar(middle: Text(title)),
       child: async.when(
         loading: () => const Center(child: CupertinoActivityIndicator()),
         error: (Object e, _) => isCoopUnauthorized(e)
@@ -49,8 +53,8 @@ class CoopPoolPage extends ConsumerWidget {
                 refetch: () => ref.invalidate(coopPoolProvider),
               )
             : StatusView(
-                message: '合作池没能加载出来',
-                sub: coopErrorSub(e),
+                message: stringsOf(context).coopPoolLoadFailed,
+                sub: coopErrorSub(e, context: context),
                 large: true,
                 onRetry: () => ref.invalidate(coopPoolProvider),
               ),
@@ -59,17 +63,17 @@ class CoopPoolPage extends ConsumerWidget {
           //   「暂时没有可承接的主题」,其实是他还没有俱乐部。
           if (!pool.hasClub) {
             return StatusView(
-              message: '先创建一个俱乐部',
-              sub: '承接主题需要以俱乐部身份申请',
+              message: stringsOf(context).coopCreateClub,
+              sub: stringsOf(context).coopApplyAsClub,
               large: true,
               onRetry: () => context.push('/clubs'),
-              retryLabel: '去俱乐部',
+              retryLabel: stringsOf(context).coopGoToClubs,
             );
           }
           if (pool.rows.isEmpty) {
-            return const StatusView(
-              message: '暂时没有可承接的主题',
-              sub: '商家开放新的承接机会时会出现在这里',
+            return StatusView(
+              message: stringsOf(context).coopNoThemes,
+              sub: stringsOf(context).coopNoThemesHint,
               large: true,
             );
           }
@@ -96,9 +100,24 @@ class _PoolTile extends ConsumerStatefulWidget {
 }
 
 class _PoolTileState extends ConsumerState<_PoolTile> {
+  @override
+  void initState() {
+    super.initState();
+    _requestScope = ref.read(authControllerProvider.notifier).requestScope(
+      ref.read(authControllerProvider).user?.id ?? 0,
+    );
+  }
+
+  late final RequestSessionScope _requestScope;
+
   bool _busy = false;
 
-  Future<void> _run(Future<void> Function() action, String done) async {
+  Future<void> _run(Future<void> Function() action, String done) => RequestSessionScope.run(
+    _requestScope,
+    () => _runScoped(action, done),
+  );
+
+  Future<void> _runScoped(Future<void> Function() action, String done) async {
     setState(() => _busy = true);
     try {
       await action();
@@ -109,7 +128,7 @@ class _PoolTileState extends ConsumerState<_PoolTile> {
       if (!mounted) return;
       CyNativeNotice.show(
         context,
-        e.toString().replaceFirst('Exception: ', ''),
+        coopErrorSub(e, context: context),
         isError: true,
       );
     } finally {
@@ -136,8 +155,8 @@ class _PoolTileState extends ConsumerState<_PoolTile> {
         children: <Widget>[
           Row(
             children: <Widget>[
-              Expanded(child: Text(it.name, style: textTheme.titleMedium)),
-              CyTag(label: it.stateText),
+              Expanded(child: Text(coopPoolName(context, it), style: textTheme.titleMedium)),
+              CyTag(label: coopPoolStatus(context, it.state)),
             ],
           ),
           if ((it.subtitle ?? '').isNotEmpty)
@@ -154,7 +173,7 @@ class _PoolTileState extends ConsumerState<_PoolTile> {
             Padding(
               padding: const EdgeInsets.only(top: 2),
               child: Text(
-                '发起方 ${it.merchantNick}',
+                stringsOf(context).coopInitiatorName(it.merchantNick!),
                 style: textTheme.bodySmall?.copyWith(
                   color: CyPalette.of(context).textTertiary,
                 ),
@@ -168,11 +187,11 @@ class _PoolTileState extends ConsumerState<_PoolTile> {
             SizedBox(
               width: double.infinity,
               child: CyNativeButton(
-                label: '申请承接',
+                label: stringsOf(context).coopApply,
                 loading: _busy,
                 onPressed: _busy
                     ? null
-                    : () => _run(() => api.apply(it.topicId), '申请已提交'),
+                    : () => _run(() => api.apply(it.topicId), stringsOf(context).coopApplied),
               ),
             )
           // ⚠️ 撤回键是 **topicId**(后端按主题撤,不按申请 id):
@@ -181,12 +200,12 @@ class _PoolTileState extends ConsumerState<_PoolTile> {
             SizedBox(
               width: double.infinity,
               child: CyNativeButton(
-                label: '撤回申请',
+                label: stringsOf(context).coopWithdrawApplication,
                 role: CyNativeButtonRole.secondary,
                 loading: _busy,
                 onPressed: _busy
                     ? null
-                    : () => _run(() => api.withdraw(it.topicId), '已撤回'),
+                    : () => _run(() => api.withdraw(it.topicId), stringsOf(context).coopWithdrawn),
               ),
             )
           else
@@ -202,18 +221,18 @@ class _PoolTileState extends ConsumerState<_PoolTile> {
     );
   }
 
-  static String _waitingHint(String state) {
+  String _waitingHint(String state) {
     switch (state) {
       case 'invited':
-        return '去「邀约」里确认条款即可开始合作';
+        return stringsOf(context).coopPoolConfirmTerms;
       case 'converted':
-        return '已通过,邀约已生成,去「邀约」里确认';
+        return stringsOf(context).coopPoolApprovedInvite;
       case 'cooped':
-        return '合作进行中';
+        return stringsOf(context).coopInProgress;
       case 'taken':
-        return '这个主题已被其他俱乐部承接';
+        return stringsOf(context).coopAssignedElsewhere;
       default:
-        return '等待对方处理';
+        return stringsOf(context).coopWaitingPartner;
     }
   }
 }

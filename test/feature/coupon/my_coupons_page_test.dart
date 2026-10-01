@@ -1,3 +1,4 @@
+import 'package:chengyin_app/l10n/app_localizations.dart';
 // 券包页(scene-game-coupon-wallet 口径)。
 //
 // ★ 盯两件事:
@@ -80,7 +81,7 @@ final List<CouponRecord> _records = <CouponRecord>[
   ),
 ];
 
-Future<_FakeCouponApi> _pump(WidgetTester t, {bool signedIn = true}) async {
+Future<_FakeCouponApi> _pump(WidgetTester t, {bool signedIn = true, Locale locale = const Locale('zh'), TextScaler textScaler = TextScaler.noScaling}) async {
   final api = _FakeCouponApi();
   await t.pumpWidget(
     ProviderScope(
@@ -92,7 +93,12 @@ Future<_FakeCouponApi> _pump(WidgetTester t, {bool signedIn = true}) async {
           ),
         ),
       ].cast(),
-      child: MaterialApp(home: const MyCouponsPage()),
+      child: MaterialApp(
+        locale: locale,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        builder: (context, child) => MediaQuery(data: MediaQuery.of(context).copyWith(textScaler: textScaler), child: child!),
+        home: const MyCouponsPage()),
     ),
   );
   await t.pump();
@@ -101,6 +107,19 @@ Future<_FakeCouponApi> _pump(WidgetTester t, {bool signedIn = true}) async {
 }
 
 void main() {
+  testWidgets('English coupon wallet preserves names and filter state at large text', (t) async {
+    await t.binding.setSurfaceSize(const Size(390, 1100));
+    addTearDown(() => t.binding.setSurfaceSize(null));
+    await _pump(t, locale: const Locale('en'), textScaler: const TextScaler.linear(2));
+    expect(find.text('My coupons'), findsOneWidget);
+    expect(find.text('已到期的待使用券'), findsOneWidget);
+    expect(t.takeException(), isNull);
+    await t.tap(find.text('Expired').first);
+    await t.pump();
+    expect(find.text('No coupons match this filter'), findsOneWidget);
+    expect(t.takeException(), isNull);
+  });
+
   testWidgets('★★ 游客:页内登录门,不发 myrecvlist 请求(P1-1)', (WidgetTester t) async {
     final api = await _pump(t, signedIn: false);
     expect(find.byKey(const Key('coupons-login-gate')), findsOneWidget);

@@ -1,18 +1,21 @@
+import '../../core/network/request_session_scope.dart';
 import '../../core/network/dio_client.dart';
 import '../models/club_director.dart';
 import '../models/game_session.dart';
 export '../models/game_session.dart';
 
 class GameSessionContractException implements Exception {
-  const GameSessionContractException(this.message, {this.reasonCode});
+  const GameSessionContractException(this.message, {this.reasonCode, this.isLocal = false});
   final String message;
   final String? reasonCode;
+  /// True only for client-authored validation/fallback text, never inferred from text.
+  final bool isLocal;
   @override
   String toString() => message;
 }
 
 class GameSessionRejectedException extends GameSessionContractException {
-  const GameSessionRejectedException(super.message);
+  const GameSessionRejectedException(super.message, {super.isLocal});
 }
 
 abstract interface class GameSessionGateway {
@@ -77,13 +80,13 @@ class GameSessionApi
   Future<List<MerchantGameEntry>> loadMerchantEntries() async {
     final body = await _get('/api/game/session/merchant/entries');
     final raw = body['data'];
-    if (raw is! List) throw const GameSessionContractException('本站入口不可用');
+    if (raw is! List) throw const GameSessionContractException('本站入口不可用', isLocal: true);
     final entries = raw
         .whereType<Map<String, dynamic>>()
         .map(MerchantGameEntry.fromJson)
         .toList();
     if (entries.length != raw.length || entries.any((entry) => !entry.valid)) {
-      throw const GameSessionContractException('本站入口数据无效');
+      throw const GameSessionContractException('本站入口数据无效', isLocal: true);
     }
     return entries;
   }
@@ -92,7 +95,7 @@ class GameSessionApi
   Future<MerchantGameProjection> loadMerchantView({
     required int activityId,
   }) async {
-    if (activityId <= 0) throw const GameSessionContractException('活动参数无效');
+    if (activityId <= 0) throw const GameSessionContractException('活动参数无效', isLocal: true);
     final body = await _get(
       '/api/game/session/view',
       query: <String, dynamic>{
@@ -103,13 +106,13 @@ class GameSessionApi
     try {
       return MerchantGameProjection.fromJson(_object(body['data']));
     } on FormatException {
-      throw const GameSessionContractException('本站状态不可用');
+      throw const GameSessionContractException('本站状态不可用', isLocal: true);
     }
   }
 
   @override
   Future<PlayerGameProjection> loadPlayerView({required int activityId}) async {
-    if (activityId <= 0) throw const GameSessionContractException('活动参数无效');
+    if (activityId <= 0) throw const GameSessionContractException('活动参数无效', isLocal: true);
     final body = await _get(
       '/api/game/session/view',
       query: <String, dynamic>{
@@ -120,13 +123,13 @@ class GameSessionApi
     try {
       return PlayerGameProjection.fromJson(_object(body['data']));
     } on FormatException {
-      throw const GameSessionContractException('本局玩家状态不可用');
+      throw const GameSessionContractException('本局玩家状态不可用', isLocal: true);
     }
   }
 
   @override
   Future<ClubRecapState> loadClubView({required int activityId}) async {
-    if (activityId <= 0) throw const GameSessionContractException('活动参数无效');
+    if (activityId <= 0) throw const GameSessionContractException('活动参数无效', isLocal: true);
     final body = await _get(
       '/api/game/session/view',
       query: <String, dynamic>{'activityId': activityId, 'perspective': 'CLUB'},
@@ -143,7 +146,7 @@ class GameSessionApi
         revision == null ||
         revision < 0 ||
         (_safePositiveInteger(raw['sessionId']) == null && !notPrepared)) {
-      throw const GameSessionContractException('本局复盘状态不可用');
+      throw const GameSessionContractException('本局复盘状态不可用', isLocal: true);
     }
     final Object? recap = raw['recap'];
     return ClubRecapState(
@@ -157,7 +160,7 @@ class GameSessionApi
   Future<Map<String, dynamic>> loadClubRecapExport({
     required int activityId,
   }) async {
-    if (activityId <= 0) throw const GameSessionContractException('活动参数无效');
+    if (activityId <= 0) throw const GameSessionContractException('活动参数无效', isLocal: true);
     final body = await _get(
       '/api/game/session/recap/export',
       query: <String, dynamic>{'activityId': activityId},
@@ -169,7 +172,7 @@ class GameSessionApi
       activityId: activityId,
     );
     if (normalized == null) {
-      throw const GameSessionContractException('复盘导出数据无效');
+      throw const GameSessionContractException('复盘导出数据无效', isLocal: true);
     }
     return normalized;
   }
@@ -178,7 +181,7 @@ class GameSessionApi
   Future<ClubDirectorProjection> loadClubProjection({
     required int activityId,
   }) async {
-    if (activityId <= 0) throw const GameSessionContractException('活动参数无效');
+    if (activityId <= 0) throw const GameSessionContractException('活动参数无效', isLocal: true);
     final body = await _get(
       '/api/game/session/view',
       query: <String, dynamic>{'activityId': activityId, 'perspective': 'CLUB'},
@@ -187,12 +190,13 @@ class GameSessionApi
     try {
       projection = ClubDirectorProjection.fromJson(_object(body['data']));
     } on ClubDirectorFormatException catch (error) {
-      throw GameSessionContractException(error.message, reasonCode: error.code);
+      throw GameSessionContractException(error.message, reasonCode: error.code, isLocal: true);
     }
     // 适配器同款闸:别场的投影不许画进这一页(拿错场比报错更危险)。
     if (projection.activityId != activityId) {
       throw const GameSessionContractException(
         '活动导演数据与当前活动不匹配',
+        isLocal: true,
         reasonCode: 'PROJECTION_MISMATCH',
       );
     }
@@ -204,7 +208,7 @@ class GameSessionApi
     GameSessionCommand command,
   ) async {
     if (!clubDirectorActions.contains(command.action)) {
-      throw const GameSessionContractException('导演操作无效');
+      throw const GameSessionContractException('导演操作无效', isLocal: true);
     }
     final body = await _post('/api/game/session/command', command.toJson());
     // 与玩家那条同形:回执身份核不上会在这里抛,由控制器一律按「结果待核对」收。
@@ -238,7 +242,7 @@ class GameSessionApi
       'PLAYER_HINT',
       'PLAYER_REVEAL',
     }.contains(command.action)) {
-      throw const GameSessionContractException('玩家操作无效');
+      throw const GameSessionContractException('玩家操作无效', isLocal: true);
     }
     final body = await _post('/api/game/session/command', command.toJson());
     return _playerReceipt(
@@ -332,13 +336,13 @@ class GameSessionApi
               ).hasMatch(rawReason)
           ? rawReason
           : '';
-      throw GameSessionRejectedException(reason.isEmpty ? '操作未能完成' : reason);
+      throw GameSessionRejectedException(reason.isEmpty ? '操作未能完成' : reason, isLocal: reason.isEmpty);
     }
     if (!identityMatches ||
         receipt.outcome != GameReceiptOutcome.applied ||
         receipt.receiptId.isEmpty ||
         receipt.revision < 0) {
-      throw const GameSessionContractException('操作结果尚未确认，请刷新本站状态');
+      throw const GameSessionContractException('操作结果尚未确认，请刷新本站状态', isLocal: true);
     }
     return receipt;
   }
@@ -365,7 +369,7 @@ class GameSessionApi
         rawActivityId == null ||
         rawRevision == null ||
         (rawReceiptId != null && receiptId == null)) {
-      throw const GameSessionContractException('操作结果身份无法确认');
+      throw const GameSessionContractException('操作结果身份无法确认', isLocal: true);
     }
     final receipt = GameSessionReceipt(
       activityId: rawActivityId,
@@ -386,7 +390,7 @@ class GameSessionApi
         receipt.revision < 0 ||
         (receipt.outcome != GameReceiptOutcome.pending &&
             receipt.receiptId.isEmpty)) {
-      throw const GameSessionContractException('操作结果身份无法确认');
+      throw const GameSessionContractException('操作结果身份无法确认', isLocal: true);
     }
     return receipt;
   }
@@ -408,6 +412,7 @@ class GameSessionApi
     final response = await _client.dio.get<Map<String, dynamic>>(
       path,
       queryParameters: query,
+      options: RequestSessionScope.options(),
     );
     return _success(response.data);
   }
@@ -419,6 +424,7 @@ class GameSessionApi
     final response = await _client.dio.post<Map<String, dynamic>>(
       path,
       data: data,
+      options: RequestSessionScope.options(),
     );
     return _success(response.data);
   }
@@ -436,6 +442,7 @@ class GameSessionApi
           : null;
       throw GameSessionContractException(
         (value['msg'] ?? '请求失败').toString(),
+        isLocal: value['msg'] == null,
         reasonCode: reasonCode,
       );
     }
@@ -444,7 +451,7 @@ class GameSessionApi
 
   Map<String, dynamic> _object(Object? value) => value is Map<String, dynamic>
       ? value
-      : throw const GameSessionContractException('服务端返回不完整');
+      : throw const GameSessionContractException('服务端返回不完整', isLocal: true);
 
   String _text(Object? value) => value is String ? value.trim() : '';
 }

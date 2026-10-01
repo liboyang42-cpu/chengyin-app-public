@@ -1,3 +1,5 @@
+import '../../l10n/strings.dart';
+import 'merchant_node_strings.dart';
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
@@ -158,8 +160,8 @@ class _MerchantNpcAvatarPageState extends ConsumerState<MerchantNpcAvatarPage> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const CupertinoPageScaffold(
-        navigationBar: CupertinoNavigationBar(middle: Text('生成 3D 形象')),
+      return CupertinoPageScaffold(
+        navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).merchantNodeGenerate3d)),
         child: Material(
           color: Colors.transparent,
           child: SafeArea(bottom: false, child: CySkeleton()),
@@ -172,7 +174,7 @@ class _MerchantNpcAvatarPageState extends ConsumerState<MerchantNpcAvatarPage> {
 
     return CupertinoPageScaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      navigationBar: const CupertinoNavigationBar(middle: Text('生成 3D 形象')),
+      navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).merchantNodeGenerate3d)),
       child: Material(
         color: Colors.transparent,
         child: SafeArea(
@@ -180,15 +182,15 @@ class _MerchantNpcAvatarPageState extends ConsumerState<MerchantNpcAvatarPage> {
           child: _loadFailed
               ? merchantErrorView(
                   context,
-                  '没能读到生成状态',
+                  stringsOf(context).merchantNodeGenerationReadFailed,
                   onRetry: _load,
-                  what: '3D 形象',
+                  what: stringsOf(context).merchantNodeCharacter3d,
                 )
               // ★ ① 供应商没接就直说,不给生成入口。
               : !_status.available
-              ? const StatusView(
-                  message: '3D 形象生成还没开放',
-                  sub: '开放后你可以拍一张照片,让店铺形象长得像你。',
+              ? StatusView(
+                  message: stringsOf(context).merchantNodeGenerationUnavailable,
+                  sub: stringsOf(context).merchantNodeGenerationUnavailableHint,
                   icon: CupertinoIcons.cube,
                   large: true,
                 )
@@ -196,17 +198,16 @@ class _MerchantNpcAvatarPageState extends ConsumerState<MerchantNpcAvatarPage> {
                   padding: const EdgeInsets.all(CyTokens.space4),
                   children: <Widget>[
                     Text(
-                      '拍一张正面、光线均匀的照片,选一种风格,'
-                      '生成的形象会跟店铺形象一起审核。',
+                      stringsOf(context).merchantNodePhotoHint,
                       style: t.bodySmall?.copyWith(color: p.textSecondary),
                     ),
                     const SizedBox(height: CyTokens.space4),
-                    const CySectionTitle('风格'),
+                    CySectionTitle(stringsOf(context).merchantNodeStyle),
                     const SizedBox(height: CyTokens.space2),
                     _styleRow(p, t),
                     const SizedBox(height: CyTokens.space4),
                     if (_status.job != null) ...<Widget>[
-                      const CySectionTitle('上次生成'),
+                      CySectionTitle(stringsOf(context).merchantNodeLastGeneration),
                       const SizedBox(height: CyTokens.space2),
                       _jobCard(_status.job!, p, t),
                       const SizedBox(height: CyTokens.space4),
@@ -218,10 +219,10 @@ class _MerchantNpcAvatarPageState extends ConsumerState<MerchantNpcAvatarPage> {
                           ? null
                           : _generate,
                       label: _submitting
-                          ? '提交中…'
+                          ? stringsOf(context).merchantNodeSubmitting
                           : (_status.job?.pending ?? false)
-                          ? '正在生成…'
-                          : '选照片并生成',
+                          ? stringsOf(context).merchantNodeGenerating
+                          : stringsOf(context).merchantNodeChooseGenerate,
                       loading: _submitting,
                     ),
                     const SizedBox(height: CyTokens.space6),
@@ -247,7 +248,7 @@ class _MerchantNpcAvatarPageState extends ConsumerState<MerchantNpcAvatarPage> {
             child: Text(
               // 认不出的风格显示原值,不编一个中文名 —— 后端加了新风格时
               // 至少还能选,而不是显示成一个空按钮。
-              _styleLabels[style] ?? style,
+              _styleLabels.containsKey(style) ? merchantNodeLocalText(context, _styleLabels[style]!) : style,
               style: t.bodySmall?.copyWith(
                 color: _style == style ? p.textPrimary : p.textSecondary,
               ),
@@ -290,17 +291,17 @@ class _MerchantNpcAvatarPageState extends ConsumerState<MerchantNpcAvatarPage> {
               children: <Widget>[
                 Text(
                   job.pending
-                      ? '正在生成,通常要一两分钟'
+                      ? stringsOf(context).merchantNodeGeneratingHint
                       : job.succeeded
-                      ? '已生成,正在审核'
-                      : '这次没成',
+                      ? stringsOf(context).merchantNodeGeneratedReview
+                      : stringsOf(context).merchantNodeGenerationFailed,
                   style: t.bodyMedium,
                 ),
                 if (!job.pending && !job.succeeded) ...<Widget>[
                   const SizedBox(height: 2),
                   Text(
                     // failReason 是后端给的安全文案,可以直接显示。
-                    job.failReason ?? '换一张更清楚的正面照片再试试',
+                    job.failReason ?? stringsOf(context).merchantNodeClearerPhoto,
                     style: t.bodySmall?.copyWith(color: p.textSecondary),
                   ),
                 ],
@@ -309,7 +310,7 @@ class _MerchantNpcAvatarPageState extends ConsumerState<MerchantNpcAvatarPage> {
                   // ★★ 诚实地说清现在只能看缩略图,3D 预览还没做 ——
                   //   不说的话商家会以为「生成了但看不到转的」是个 bug。
                   Text(
-                    '3D 预览还在做,现在先看这张缩略图。',
+                    stringsOf(context).merchantNodePreviewUnavailable,
                     style: t.bodySmall?.copyWith(color: p.textSecondary),
                   ),
                 ],

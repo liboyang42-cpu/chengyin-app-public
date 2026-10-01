@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:chengyin_app/l10n/app_localizations_zh.dart';
 
 void main() {
   test('据点认领和打卡码使用 Cupertino 富内容 Sheet', () {
@@ -33,11 +34,13 @@ void main() {
     final String source = File(
       'lib/feature/merchant/merchant_city_node_page.dart',
     ).readAsStringSync();
-    expect(source, contains("middle: const Text('成为节点')"));
-    expect(source, contains('把门店变成漫游地图上的互动据点'));
-    expect(source, contains("child: const Text('认领节点')"));
-    expect(source, contains("child: const Text('+ 投放据点')"));
-    expect(source, contains("middle: Text('认领平台节点')"));
+    expect(source, contains('merchantNodeBecomeNode'));
+    expect(AppLocalizationsZh().merchantNodeBecomeNode, '成为节点');
+    expect(AppLocalizationsZh().merchantNodeClaimPlatform, '认领平台节点');
+    expect(source, contains('merchantNodeNodeIntro'));
+    expect(source, contains('merchantNodeClaim'));
+    expect(source, contains('merchantNodePlace'));
+    expect(source, contains('merchantNodeClaimPlatform'));
     expect(
       source.indexOf('...home.applications.map'),
       lessThan(source.indexOf('...home.nodes.map')),

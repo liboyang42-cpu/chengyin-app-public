@@ -10,6 +10,7 @@
 //   但指的那个选项是空的,玩家怎么选都不对。
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:chengyin_app/l10n/app_localizations_zh.dart';
 
 import 'package:chengyin_app/data/models/node_template.dart';
 import '../../support/source_text.dart';
@@ -221,7 +222,7 @@ void main() {
     });
 
     test('★★ 说清"指到空选项等于没答案"', () {
-      expect(page.contains('指到空的等于没答案'), isTrue,
+      expect(page.contains('merchantNodeCorrectAnswerHint'), isTrue,
           reason: '那是最容易犯又最难发现的错 —— 不说的话商家看不出问题在哪');
     });
 
@@ -232,7 +233,9 @@ void main() {
     });
 
     test('★ 免人工审要说清 —— 免得商家一直等审核', () {
-      expect(page.contains('保存后即刻生效'), isTrue);
+      expect(page.contains('merchantNodeImmediateEffect'), isTrue);
+      expect(AppLocalizationsZh().merchantNodeImmediateEffect, contains('保存后即刻生效'));
+      expect(AppLocalizationsZh().merchantNodeCorrectAnswerHint, contains('指到空的等于没答案'));
     });
 
     test('五种方式各带一句说明', () {

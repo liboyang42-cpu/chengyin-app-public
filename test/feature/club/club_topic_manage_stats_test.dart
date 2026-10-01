@@ -1,3 +1,4 @@
+import '../../support/fixed_auth.dart';
 // 主题详情的**管理向统计**(拍板1,2026-09-17)与 HO-26 改集合时间的行为门。
 //
 // 判据对齐小程序 pages/club/topic-detail(@7bdeb58de):
@@ -204,6 +205,7 @@ Future<void> _pumpPage(
   await tester.pumpWidget(
     ProviderScope(
       overrides: <dynamic>[
+        signedInAuthOverride(),
         clubTopicOpsApiProvider.overrideWithValue(fake),
         clubDirectorApiProvider.overrideWithValue(
           director ?? _ReadyDirector(_directorProjection()),

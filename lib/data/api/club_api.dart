@@ -1,8 +1,9 @@
+import 'dart:async';
 import 'package:dio/dio.dart';
 import '../../core/network/dio_client.dart';
 import '../../core/network/request_session_scope.dart';
-import '../models/registration_cancellation_outcome.dart';
 import '../models/club.dart';
+import '../models/registration_cancellation_outcome.dart';
 import '../models/club_comment.dart';
 import '../models/club_post.dart';
 import '../models/club_manage.dart';
@@ -18,6 +19,28 @@ class ClubApiException implements Exception {
 
   @override
   String toString() => message;
+}
+
+/// Explicitly local fallback; server messages never acquire this marker.
+class ClubLocalApiFailure implements Exception {
+  const ClubLocalApiFailure(this.code, this.message);
+  final String code;
+  final String message;
+  @override
+  String toString() => 'Exception: $message';
+}
+
+Exception clubApiResponseFailure(String? message, String code, String fallback) =>
+    message == null ? ClubLocalApiFailure(code, fallback) : ClubApiException(message);
+
+/// Per-action presentation catalog. Never stored in providers or sent on wire.
+/// Absence of a server message is the sole trigger for local success copy.
+class ClubApiLocalCopy {
+  static final Object _zoneKey = Object();
+  static Future<T> run<T>(Map<String, String> copy, Future<T> Function() action) =>
+      runZoned(action, zoneValues: <Object, Object>{_zoneKey: copy});
+  static String text(String key, String original) =>
+      (Zone.current[_zoneKey] as Map<String, String>?)?[key] ?? original;
 }
 
 /// 俱乐部(社群)接口。对齐后端 `ApiClubController`(/api/club)。
@@ -308,9 +331,9 @@ class ClubApi {
       'memberId': memberId,
     });
     if ((body['code'] as num?)?.toInt() != 200) {
-      throw Exception((body['msg'] as String?) ?? '移除失败');
+      throw clubApiResponseFailure(body['msg'] as String?, 'remove', '移除失败');
     }
-    return (body['msg'] as String?) ?? '已移除成员';
+    return (body['msg'] as String?) ?? ClubApiLocalCopy.text('removed', '已移除成员');
   }
 
   /// 设为 / 取消管理员:`POST /api/club/set-member-role`(role: 1 管理员 / 0 普通)。
@@ -329,9 +352,9 @@ class ClubApi {
       'role': admin ? 1 : 0,
     });
     if ((body['code'] as num?)?.toInt() != 200) {
-      throw Exception((body['msg'] as String?) ?? '设置失败');
+      throw clubApiResponseFailure(body['msg'] as String?, 'role', '设置失败');
     }
-    return (body['msg'] as String?) ?? (admin ? '已设为管理员' : '已取消管理员');
+    return (body['msg'] as String?) ?? (admin ? ClubApiLocalCopy.text('adminSet', '已设为管理员') : ClubApiLocalCopy.text('adminRemoved', '已取消管理员'));
   }
 
   /// 某条动态的评论列表:`POST /api/club/post/comment/list`(公开)。
@@ -349,7 +372,7 @@ class ClubApi {
       },
     );
     if ((body['code'] as num?)?.toInt() != 200) {
-      throw Exception((body['msg'] as String?) ?? '加载失败');
+      throw clubApiResponseFailure(body['msg'] as String?, 'load', '加载失败');
     }
     final Object? data = body['data'];
     // 后端有时下发 {rows:[...]},有时直接是数组 —— 两种都收。
@@ -373,7 +396,7 @@ class ClubApi {
       <String, dynamic>{'postId': postId, 'content': content},
     );
     if ((body['code'] as num?)?.toInt() != 200) {
-      throw Exception((body['msg'] as String?) ?? '发送失败');
+      throw clubApiResponseFailure(body['msg'] as String?, 'send', '发送失败');
     }
   }
 
@@ -387,9 +410,9 @@ class ClubApi {
       <String, dynamic>{'id': commentId},
     );
     if ((body['code'] as num?)?.toInt() != 200) {
-      throw Exception((body['msg'] as String?) ?? '删除失败');
+      throw clubApiResponseFailure(body['msg'] as String?, 'delete', '删除失败');
     }
-    return (body['msg'] as String?) ?? '已删除';
+    return (body['msg'] as String?) ?? ClubApiLocalCopy.text('deleted', '已删除');
   }
 
   /// 举报一条评论。⚠️ 只入审核队列,**不立即删** —— 提示别说「已删除」。
@@ -399,9 +422,9 @@ class ClubApi {
       <String, dynamic>{'id': commentId},
     );
     if ((body['code'] as num?)?.toInt() != 200) {
-      throw Exception((body['msg'] as String?) ?? '举报失败');
+      throw clubApiResponseFailure(body['msg'] as String?, 'report', '举报失败');
     }
-    return (body['msg'] as String?) ?? '举报已提交,将进入审核';
+    return (body['msg'] as String?) ?? ClubApiLocalCopy.text('reported', '举报已提交,将进入审核');
   }
 
   /// 单个俱乐部的动态列表(不是聚合流):`POST /api/club/post/list`。
@@ -416,7 +439,7 @@ class ClubApi {
       'pageSize': pageSize,
     });
     if ((body['code'] as num?)?.toInt() != 200) {
-      throw Exception((body['msg'] as String?) ?? '加载失败');
+      throw clubApiResponseFailure(body['msg'] as String?, 'load', '加载失败');
     }
     final Object? data = body['data'];
     final List<dynamic> rows = data is List
@@ -437,7 +460,7 @@ class ClubApi {
       'postId': postId,
     });
     if ((body['code'] as num?)?.toInt() != 200) {
-      throw Exception((body['msg'] as String?) ?? '操作失败');
+      throw clubApiResponseFailure(body['msg'] as String?, 'action', '操作失败');
     }
   }
 
@@ -456,7 +479,7 @@ class ClubApi {
       if (images.isNotEmpty) 'images': images.join(';'),
     });
     if ((body['code'] as num?)?.toInt() != 200) {
-      throw Exception((body['msg'] as String?) ?? '发布失败');
+      throw clubApiResponseFailure(body['msg'] as String?, 'publish', '发布失败');
     }
   }
 
@@ -475,7 +498,7 @@ class ClubApi {
       'requestId': requestId,
     });
     _ensureOk(body);
-    return (body['msg'] as String?) ?? '已更新';
+    return (body['msg'] as String?) ?? ClubApiLocalCopy.text('updated', '已更新');
   }
 
   Future<String> setPostPinned({
@@ -491,7 +514,7 @@ class ClubApi {
       'requestId': requestId,
     });
     _ensureOk(body);
-    return (body['msg'] as String?) ?? (pinned ? '已置顶' : '已取消置顶');
+    return (body['msg'] as String?) ?? (pinned ? ClubApiLocalCopy.text('pinned', '已置顶') : ClubApiLocalCopy.text('unpinned', '已取消置顶'));
   }
 
   Future<List<ClubPostRevision>> postHistory(int postId) async {
@@ -515,9 +538,9 @@ class ClubApi {
       'id': postId,
     });
     if ((body['code'] as num?)?.toInt() != 200) {
-      throw Exception((body['msg'] as String?) ?? '删除失败');
+      throw clubApiResponseFailure(body['msg'] as String?, 'delete', '删除失败');
     }
-    return (body['msg'] as String?) ?? '已删除';
+    return (body['msg'] as String?) ?? ClubApiLocalCopy.text('deleted', '已删除');
   }
 
   /// 举报一条俱乐部动态。
@@ -528,9 +551,9 @@ class ClubApi {
       'id': postId,
     });
     if ((body['code'] as num?)?.toInt() != 200) {
-      throw Exception((body['msg'] as String?) ?? '举报失败');
+      throw clubApiResponseFailure(body['msg'] as String?, 'report', '举报失败');
     }
-    return (body['msg'] as String?) ?? '举报已提交,将进入审核';
+    return (body['msg'] as String?) ?? ClubApiLocalCopy.text('reported', '举报已提交,将进入审核');
   }
 
   Future<ClubFeed> postFeed({int pageNum = 1, int pageSize = 20}) async {
@@ -540,7 +563,7 @@ class ClubApi {
     );
     final body = resp.data ?? <String, dynamic>{};
     if ((body['code'] as num?)?.toInt() != 200) {
-      throw Exception((body['msg'] as String?) ?? '加载失败');
+      throw clubApiResponseFailure(body['msg'] as String?, 'load', '加载失败');
     }
     return ClubFeed.fromJson(
       (body['data'] as Map<String, dynamic>?) ?? <String, dynamic>{},
@@ -603,7 +626,7 @@ class ClubApi {
         (body['data'] as Map<String, dynamic>?) ?? <String, dynamic>{};
     final Object? id = data['conversationId'];
     if (id is! num) {
-      throw ClubApiException('群聊没能打开,请稍后重试');
+      throw const ClubLocalApiFailure('chat', '群聊没能打开,请稍后重试');
     }
     return id.toInt();
   }

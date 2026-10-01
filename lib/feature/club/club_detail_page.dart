@@ -1,3 +1,5 @@
+import 'club_api_messages.dart';
+import '../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
@@ -10,7 +12,6 @@ import 'club_posts_section.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/providers.dart';
-import '../../core/network/dio_client.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/status_view.dart';
 import '../../core/widgets/cy_tabs.dart';
@@ -43,7 +44,7 @@ class ClubDetailPage extends ConsumerWidget {
     final detail = ref.watch(clubDetailProvider(clubId));
     return CupertinoPageScaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      navigationBar: const CupertinoNavigationBar(middle: Text('俱乐部详情')),
+      navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).clubMainDetail)),
       child: Material(
         color: Colors.transparent,
         child: SafeArea(
@@ -53,7 +54,7 @@ class ClubDetailPage extends ConsumerWidget {
             // 不显式 stretch 会把 58rpx 大标题推到屏幕正中,与小程序完全不同。
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              const CyPageTitle('俱乐部详情'),
+              CyPageTitle(stringsOf(context).clubMainDetail),
               Expanded(
                 child: detail.when(
                   loading: () => const CySkeleton(type: CySkeletonType.detail),
@@ -62,13 +63,13 @@ class ClubDetailPage extends ConsumerWidget {
                   // 会把人指去查 WiFi,而重试按多少次都还是 401 —— 改成登录引导。
                   error: (Object err, StackTrace st) => clubLoginRequired(err)
                       ? ClubLoginGate(
-                          message: '登录后查看俱乐部详情',
+                          message: stringsOf(context).clubMainDetailLogin,
                           onSignedIn: () =>
                               ref.invalidate(clubDetailProvider(clubId)),
                         )
                       : StatusView(
-                          message: '没能打开这个俱乐部',
-                          sub: '检查网络后重试',
+                          message: stringsOf(context).clubMainDetailLoadError,
+                          sub: stringsOf(context).clubMainNetworkRetry,
                           icon: CupertinoIcons.exclamationmark_triangle,
                           onRetry: () =>
                               ref.invalidate(clubDetailProvider(clubId)),
@@ -120,7 +121,7 @@ class _DetailBodyState extends ConsumerState<_DetailBody> {
       if (!mounted) return;
       CyNativeNotice.show(
         context,
-        club.isJoined ? '退出失败' : '加入失败',
+        club.isJoined ? stringsOf(context).clubMainLeaveFailed : stringsOf(context).clubMainJoinFailed,
         isError: true,
       );
     } finally {
@@ -142,7 +143,7 @@ class _DetailBodyState extends ConsumerState<_DetailBody> {
       context.push(
         '/im/chat/$cid',
         extra: <String, String>{
-          'name': club.name.isEmpty ? '俱乐部群聊' : club.name,
+          'name': club.name.isEmpty ? stringsOf(context).clubMainGroupChat : club.name,
         },
       );
     } catch (e) {
@@ -151,7 +152,7 @@ class _DetailBodyState extends ConsumerState<_DetailBody> {
       //   照原文提示,别渲成「群聊打不开」(API 注释写死了这条)。
       CyNativeNotice.show(
         context,
-        e.toString().replaceFirst('Exception: ', ''),
+        clubApiErrorMessage(context, e),
         isError: true,
       );
     } finally {
@@ -163,9 +164,9 @@ class _DetailBodyState extends ConsumerState<_DetailBody> {
     final club = widget.club;
     await SharePlus.instance.share(
       ShareParams(
-        subject: club.name.isEmpty ? '城瘾俱乐部' : club.name,
+        subject: club.name.isEmpty ? stringsOf(context).clubMainChengyinClub : club.name,
         text:
-            '来看看${club.name.isEmpty ? '这个城瘾俱乐部' : club.name}\n'
+            '${stringsOf(context).clubMainShareIntro(club.name.isEmpty ? stringsOf(context).clubMainThisClub : club.name)}\n'
             'https://api.example.invalid/club/${club.id}',
       ),
     );
@@ -175,27 +176,27 @@ class _DetailBodyState extends ConsumerState<_DetailBody> {
     showCupertinoModalPopup<void>(
       context: context,
       builder: (sheetContext) => CupertinoActionSheet(
-        title: const Text('发起俱乐部合作'),
-        message: const Text('合作邀约必须绑定你发布的主题。先选择合作主题，再邀请这个俱乐部。'),
+        title: Text(stringsOf(context).clubMainStartPartnership),
+        message: Text(stringsOf(context).clubMainPartnershipHint),
         actions: <Widget>[
           CupertinoActionSheetAction(
             onPressed: () {
               Navigator.of(sheetContext).pop();
               context.push('/my-projects');
             },
-            child: const Text('选择合作主题'),
+            child: Text(stringsOf(context).clubMainChoosePartnershipTheme),
           ),
           CupertinoActionSheetAction(
             onPressed: () {
               Navigator.of(sheetContext).pop();
               context.push('/coop/list');
             },
-            child: const Text('查看我的合作'),
+            child: Text(stringsOf(context).clubMainViewPartnerships),
           ),
         ],
         cancelButton: CupertinoActionSheetAction(
           onPressed: () => Navigator.of(sheetContext).pop(),
-          child: const Text('取消'),
+          child: Text(stringsOf(context).cancel),
         ),
       ),
     );
@@ -209,11 +210,11 @@ class _DetailBodyState extends ConsumerState<_DetailBody> {
     final ClubAccess? access = ref.watch(clubAccessProvider(club.id)).value;
     final ClubManageFlags flags = ClubManageFlags(club: club, access: access);
     final tabs = <CyTab>[
-      const CyTab(key: 'posts', label: '帖子'),
-      const CyTab(key: 'events', label: '活动'),
-      const CyTab(key: 'overview', label: '概览'),
+      CyTab(key: 'posts', label: stringsOf(context).clubMainPostTab),
+      CyTab(key: 'events', label: stringsOf(context).clubMainEvents),
+      CyTab(key: 'overview', label: stringsOf(context).clubMainOverview),
       if (flags.showManageTab)
-        CyTab(key: 'manage', label: '管理', badge: club.pendingJoinRequestCount),
+        CyTab(key: 'manage', label: stringsOf(context).clubMainManage, badge: club.pendingJoinRequestCount),
     ];
     return ListView(
       padding: const EdgeInsets.only(bottom: CyTokens.space7),
@@ -305,7 +306,7 @@ class _ClubHeader extends StatelessWidget {
           ),
           const SizedBox(height: 32),
           Text(
-            club.name.isEmpty ? '未命名俱乐部' : club.name,
+            club.name.isEmpty ? stringsOf(context).clubMainUnnamedClub : club.name,
             style: textTheme.headlineSmall,
           ),
           const SizedBox(height: CyTokens.space2),
@@ -315,13 +316,13 @@ class _ClubHeader extends StatelessWidget {
             children: <Widget>[
               _HeaderMeta(
                 Icons.sell_outlined,
-                club.clubType ?? club.city ?? '城市探索',
+                club.clubType ?? club.city ?? stringsOf(context).clubMainCityExploration,
               ),
               _HeaderMeta(
                 Icons.workspace_premium_outlined,
-                '${club.memberCount} 个会员',
+                stringsOf(context).clubMainHeaderMemberCount(club.memberCount),
               ),
-              _HeaderMeta(Icons.public, club.needsApproval ? '需审批' : '公开'),
+              _HeaderMeta(Icons.public, club.needsApproval ? stringsOf(context).clubMainApprovalRequired : stringsOf(context).clubMainPublic),
             ],
           ),
           const SizedBox(height: CyTokens.space3),
@@ -329,12 +330,12 @@ class _ClubHeader extends StatelessWidget {
             key: const Key('club-share'),
             padding: EdgeInsets.zero,
             onPressed: onShare,
-            child: const Row(
+            child: Row(
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
-                Icon(CupertinoIcons.share, size: 18),
-                SizedBox(width: CyTokens.space1),
-                Text('分享俱乐部'),
+                const Icon(CupertinoIcons.share, size: 18),
+                const SizedBox(width: CyTokens.space1),
+                Text(stringsOf(context).clubMainShareClub),
               ],
             ),
           ),
@@ -346,7 +347,7 @@ class _ClubHeader extends StatelessWidget {
                   child: CyNativeButton(
                     key: const Key('club-group-chat'),
                     onPressed: busy ? null : onChat,
-                    label: '进入群聊',
+                    label: stringsOf(context).clubMainOpenChat,
                     role: CyNativeButtonRole.secondary,
                     width: double.infinity,
                   ),
@@ -356,7 +357,7 @@ class _ClubHeader extends StatelessWidget {
                   child: CyNativeButton(
                     key: const Key('club-owner-primary'),
                     onPressed: onOwnerPrimary,
-                    label: '管理项目',
+                    label: stringsOf(context).clubMainManageProject,
                     width: double.infinity,
                   ),
                 ),
@@ -368,7 +369,7 @@ class _ClubHeader extends StatelessWidget {
               child: CyNativeButton(
                 key: const Key('club-group-chat'),
                 onPressed: busy ? null : onChat,
-                label: '进入群聊',
+                label: stringsOf(context).clubMainOpenChat,
                 width: double.infinity,
               ),
             )
@@ -378,16 +379,16 @@ class _ClubHeader extends StatelessWidget {
               child: CyNativeButton(
                 key: const Key('club-merchant-coop'),
                 onPressed: onMerchantCoop,
-                label: '发起俱乐部合作',
+                label: stringsOf(context).clubMainStartPartnership,
                 width: double.infinity,
               ),
             )
           else if (club.joinPending)
-            const SizedBox(
+            SizedBox(
               width: double.infinity,
               child: CyNativeButton(
                 onPressed: null,
-                label: '等待主理人审核',
+                label: stringsOf(context).clubMainAwaitingApproval,
                 width: double.infinity,
               ),
             )
@@ -396,7 +397,7 @@ class _ClubHeader extends StatelessWidget {
               width: double.infinity,
               child: CyNativeButton(
                 onPressed: busy ? null : onJoin,
-                label: club.myJoinStatus == 2 ? '重新申请加入' : '加入俱乐部',
+                label: club.myJoinStatus == 2 ? stringsOf(context).clubMainReapplyJoin : stringsOf(context).clubMainJoinClub,
                 width: double.infinity,
               ),
             ),
@@ -405,7 +406,7 @@ class _ClubHeader extends StatelessWidget {
               alignment: Alignment.center,
               child: CupertinoButton(
                 onPressed: busy ? null : onJoin,
-                child: const Text('退出俱乐部'),
+                child: Text(stringsOf(context).clubMainLeaveClub),
               ),
             ),
         ],
@@ -445,23 +446,23 @@ class _ClubEventsTab extends ConsumerWidget {
       .when(
         loading: () => const CySkeleton(type: CySkeletonType.detail),
         error: (error, stack) => StatusView(
-          message: '活动列表加载失败',
+          message: stringsOf(context).clubMainEventsLoadError,
           onRetry: () => ref.invalidate(clubTopicsProvider(club.id)),
         ),
         data: (rows) => rows.isEmpty
             ? StatusView(
-                message: '还没有城市路线',
+                message: stringsOf(context).clubMainNoRoutes,
                 sub: club.isOwner
-                    ? '发布城市定向或自由探索，让成员开始报名。'
-                    : '主理人还没发布城市路线，先加入等通知。',
+                    ? stringsOf(context).clubMainPublishRouteHint
+                    : stringsOf(context).clubMainWaitForRouteHint,
               )
             : Column(
                 children: rows
                     .map(
                       (row) => CyCell(
-                        title: row.name.isEmpty ? '未命名项目' : row.name,
+                        title: row.name.isEmpty ? stringsOf(context).clubMainUnnamedProject : row.name,
                         subtitle:
-                            '${row.dateText.isEmpty ? '时间待定' : '${row.dateText} 出发'} · ${row.signupCount} 人已报名 · 招募中',
+                            stringsOf(context).clubMainRecruiting(row.dateText.isEmpty ? stringsOf(context).clubMainTimeTbd : stringsOf(context).clubMainDeparture(row.dateText), row.signupCount),
                         leading: const Icon(Icons.route_outlined),
                         // 举报活动挂在活动卡上(真源 ev-acts wxml:206-208,
                         // canReport = canSeeMembers):落到具体场次才立得住案。
@@ -476,7 +477,7 @@ class _ClubEventsTab extends ConsumerWidget {
                                   club: club,
                                   topicId: row.id,
                                 ),
-                                child: const Text('举报活动'),
+                                child: Text(stringsOf(context).clubMainReportEvent),
                               )
                             : null,
                         onTap: () => context.push('/topic/${row.id}'),
@@ -499,23 +500,23 @@ class _ClubOverviewTab extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        const CySectionTitle('俱乐部简介'),
+        CySectionTitle(stringsOf(context).clubMainIntroduction),
         const SizedBox(height: CyTokens.space2),
-        Text(club.description?.isNotEmpty == true ? club.description! : '暂无简介'),
+        Text(club.description?.isNotEmpty == true ? club.description! : stringsOf(context).clubMainNoIntroduction),
         if (club.leaderName?.isNotEmpty == true) ...<Widget>[
           const SizedBox(height: CyTokens.space4),
-          const CySectionTitle('主理人'),
+          CySectionTitle(stringsOf(context).clubMainOrganizer),
           const SizedBox(height: CyTokens.space1),
           Text(club.leaderName!),
         ],
         if ((club.city ?? club.address)?.isNotEmpty == true) ...<Widget>[
           const SizedBox(height: CyTokens.space4),
-          const CySectionTitle('所在城市'),
+          CySectionTitle(stringsOf(context).clubMainCity),
           const SizedBox(height: CyTokens.space1),
           Text((club.city ?? club.address)!),
         ],
         const SizedBox(height: CyTokens.space5),
-        CySectionTitle('成员 · ${club.memberCount}'),
+        CySectionTitle(stringsOf(context).clubMainMembersHeading(club.memberCount)),
         const SizedBox(height: CyTokens.space2),
         if (club.isOwner || club.isJoined)
           _MemberSection(
@@ -524,15 +525,15 @@ class _ClubOverviewTab extends ConsumerWidget {
             viewerIsCreator: club.isOwner,
           )
         else
-          const Text('加入俱乐部后可查看成员'),
+          Text(stringsOf(context).clubMainJoinToSeeMembers),
         const SizedBox(height: CyTokens.space5),
-        const CySectionTitle('本团贡献榜'),
+        CySectionTitle(stringsOf(context).clubMainContributionRank),
         const SizedBox(height: CyTokens.space2),
         ranks.when(
-          loading: () => const StatusView(message: '正在读取贡献榜'),
+          loading: () => StatusView(message: stringsOf(context).clubMainRankLoading),
           error: (_, _) => CyCell(
-            title: '贡献榜暂时没取到',
-            subtitle: '点这里重新加载',
+            title: stringsOf(context).clubMainRankLoadError,
+            subtitle: stringsOf(context).clubMainReloadHint,
             onTap: () => ref.invalidate(
               clubLeaderboardProvider((
                 clubId: club.id,
@@ -541,7 +542,7 @@ class _ClubOverviewTab extends ConsumerWidget {
             ),
           ),
           data: (rows) => rows.isEmpty
-              ? const Text('还没有人通关本团的活动，办场活动让成员动起来')
+              ? Text(stringsOf(context).clubMainNoCompletions)
               : Column(
                   children: rows
                       .take(5)
@@ -549,9 +550,9 @@ class _ClubOverviewTab extends ConsumerWidget {
                         (row) => ListTile(
                           contentPadding: EdgeInsets.zero,
                           leading: CyAvatar(url: row.avatar, size: 36),
-                          title: Text(row.nickname ?? '城瘾玩家'),
+                          title: Text(row.nickname ?? stringsOf(context).clubMainPlayer),
                           subtitle: Text(
-                            '${row.clearCount} 场 · ${row.mileage} km · 用时 ${row.durationMin} 分钟',
+                            stringsOf(context).clubMainRankMetrics(row.clearCount.toString(), row.mileage.toString(), row.durationMin.toString()),
                           ),
                           trailing: Text('${row.score}'),
                         ),
@@ -560,19 +561,18 @@ class _ClubOverviewTab extends ConsumerWidget {
                 ),
         ),
         CyCell(
-          title: '查看完整贡献榜',
-          subtitle: '综合 / 里程 / 配速 / 用时',
+          title: stringsOf(context).clubMainFullRank,
+          subtitle: stringsOf(context).clubMainRankSorts,
           onTap: () => context.push('/club/${club.id}/leaderboard'),
         ),
         // 治理与安全(小程序 detail wxml:383-392):封禁申诉/举报俱乐部只有
         // 这一个入口。申诉**不设闸** —— 被限期封禁的人恰恰看不见成员区,
         // 用 canSeeMembers 拦申诉等于把唯一的出路一起锁了。
         const SizedBox(height: CyTokens.space5),
-        const CySectionTitle('治理与安全'),
+        CySectionTitle(stringsOf(context).clubMainGovernanceSafety),
         const SizedBox(height: CyTokens.space1),
         Text(
-          '如果你被本俱乐部限期封禁，可向平台提交事实与申诉理由；'
-          '俱乐部管理者不能裁决。',
+          stringsOf(context).clubMainAppealExplanation,
           style: Theme.of(
             context,
           ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
@@ -580,13 +580,13 @@ class _ClubOverviewTab extends ConsumerWidget {
         const SizedBox(height: CyTokens.space2),
         CyCell(
           key: const Key('club-governance-appeal'),
-          title: '封禁申诉',
+          title: stringsOf(context).clubMainBanAppeal,
           onTap: () => context.push('/club/${club.id}/governance?mode=appeal'),
         ),
         if (club.isOwner || club.isJoined)
           CyCell(
             key: const Key('club-governance-report-club'),
-            title: '举报俱乐部',
+            title: stringsOf(context).clubMainReportClub,
             onTap: () => context.push(
               '/club/${club.id}/governance'
               '?mode=report&targetType=CLUB&targetId=${club.id}',
@@ -596,6 +596,28 @@ class _ClubOverviewTab extends ConsumerWidget {
     );
   }
 }
+
+ClubManageCopy _localizedManageCopy(BuildContext context, ClubManageStage stage) =>
+    switch (stage) {
+      ClubManageStage.publish => ClubManageCopy(
+        stringsOf(context).clubMainStagePublish, stringsOf(context).clubMainStagePublishHint,
+      ),
+      ClubManageStage.invite => ClubManageCopy(
+        stringsOf(context).clubMainStageInvite, stringsOf(context).clubMainStageInviteHint,
+      ),
+      ClubManageStage.pending => ClubManageCopy(
+        stringsOf(context).clubMainStagePending, stringsOf(context).clubMainStagePendingHint,
+      ),
+      ClubManageStage.accepted => ClubManageCopy(
+        stringsOf(context).clubMainStageAccepted, stringsOf(context).clubMainStageAcceptedHint,
+      ),
+      ClubManageStage.loading => ClubManageCopy(
+        stringsOf(context).clubMainStageLoading, stringsOf(context).clubMainStageLoadingHint,
+      ),
+      ClubManageStage.error => ClubManageCopy(
+        stringsOf(context).clubMainStageError, stringsOf(context).clubMainStageErrorHint,
+      ),
+    };
 
 class _ClubManageTab extends ConsumerWidget {
   const _ClubManageTab({required this.club, this.access});
@@ -620,7 +642,7 @@ class _ClubManageTab extends ConsumerWidget {
       ownerProjects: ownerProjects,
       invites: invites,
     );
-    final ClubManageCopy copy = clubManageCopy[stage]!;
+    final ClubManageCopy copy = _localizedManageCopy(context, stage);
     final List<ClubTopic> topicRows = topics.value ?? const <ClubTopic>[];
     final MyProject? acceptedProject =
         (ownerProjects.value ?? const <MyProject>[])
@@ -641,7 +663,7 @@ class _ClubManageTab extends ConsumerWidget {
               key: const Key('club-manage-stage'),
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text('现在要做', style: Theme.of(context).textTheme.labelMedium),
+                Text(stringsOf(context).clubMainNextAction, style: Theme.of(context).textTheme.labelMedium),
                 const SizedBox(height: CyTokens.space1),
                 Text(
                   copy.label,
@@ -703,7 +725,7 @@ class _ClubManageTab extends ConsumerWidget {
           ),
         if (flags.manageNow) const SizedBox(height: CyTokens.space5),
         if (flags.stats) ...<Widget>[
-          const CySectionTitle('成员与活动概况'),
+          CySectionTitle(stringsOf(context).clubMainMembersEventsOverview),
           const SizedBox(height: CyTokens.space2),
           _ClubStatsSection(clubId: club.id),
           const SizedBox(height: CyTokens.space5),
@@ -714,20 +736,20 @@ class _ClubManageTab extends ConsumerWidget {
         _ShareEditionSection(club: club),
         const SizedBox(height: CyTokens.space5),
         if (flags.stats) ...<Widget>[
-          const CySectionTitle('可对接商家'),
+          CySectionTitle(stringsOf(context).clubMainAvailableMerchants),
           const SizedBox(height: CyTokens.space2),
           merchants.when(
-            loading: () => const StatusView(message: '正在读取开放合作的商家'),
+            loading: () => StatusView(message: stringsOf(context).clubMainMerchantsLoading),
             error: (_, _) => StatusView(
-              message: '商家列表加载失败',
+              message: stringsOf(context).clubMainMerchantsLoadError,
               onRetry: () => ref.invalidate(clubCoopMerchantsProvider(club.id)),
             ),
             data: (rows) => rows.isEmpty
-                ? const Text('还没有开放对接的商家')
+                ? Text(stringsOf(context).clubMainNoMerchants)
                 : Column(
                     children: rows.take(8).map((row) {
                       final memberId = (row['memberId'] as num?)?.toInt();
-                      final name = (row['name'] ?? row['merchantName'] ?? '商家')
+                      final name = (row['name'] ?? row['merchantName'] ?? stringsOf(context).clubMainMerchant)
                           .toString();
                       return CyCell(
                         title: name,
@@ -735,7 +757,7 @@ class _ClubManageTab extends ConsumerWidget {
                           row['cityRole'],
                           row['capacity'] == null
                               ? null
-                              : '容纳 ${row['capacity']} 人',
+                              : stringsOf(context).clubMainCapacity(row['capacity'].toString()),
                           row['availableTime'],
                           row['suitActivityTypes'],
                         ].whereType<Object>().join(' · '),
@@ -753,10 +775,10 @@ class _ClubManageTab extends ConsumerWidget {
         _OpenSettingsSection(clubId: club.id),
         if (flags.toolsPanel) ...<Widget>[
           const SizedBox(height: CyTokens.space5),
-          const CySectionTitle('项目工具'),
+          CySectionTitle(stringsOf(context).clubMainProjectTools),
           if (flags.publish)
             CyCell(
-              title: '发布主题',
+              title: stringsOf(context).clubMainPublishTheme,
               leading: const Icon(Icons.route_outlined),
               onTap: () =>
                   context.push('/publish/pro?clubId=${club.id}&mode=1'),
@@ -766,7 +788,7 @@ class _ClubManageTab extends ConsumerWidget {
               // main 侧 #400 已把「开一场」改成跳运营页预选单次,不发建场请求;
               // 本 PR 只给它补 publish 权限闸,不改接线。
               key: const Key('club-open-event-ops'),
-              title: '开一场',
+              title: stringsOf(context).clubMainStartSession,
               leading: const Icon(Icons.flag_outlined),
               onTap: () =>
                   context.push('/club/${club.id}/event-ops?recurrence=ONCE'),
@@ -776,25 +798,25 @@ class _ClubManageTab extends ConsumerWidget {
         _ClubOpsCells(club: club, access: access),
         if (flags.customers)
           CyCell(
-            title: '报名名册',
-            subtitle: '点开某个人看核销详情；清退退款在那一页底部，仅主理人可操作。',
+            title: stringsOf(context).clubMainRegistrationList,
+            subtitle: stringsOf(context).clubMainRegistrationHint,
             onTap: () => context.push('/club/${club.id}/enroll'),
           ),
         if (flags.finance) _SettlementCell(clubId: club.id),
         if (flags.finance)
           CyCell(
-            title: '工时与证据',
+            title: stringsOf(context).clubMainHoursEvidence,
             onTap: () => context.push('/club/${club.id}/edition-report'),
           ),
         if (flags.toolsPanel)
           CyCell(
             key: const Key('club-ai-design'),
-            title: 'AI 策划',
+            title: stringsOf(context).clubMainAiPlanning,
             onTap: () => showClubAiDesignSheet(context, clubId: club.id),
           ),
         if (flags.joinRequests)
           CyCell(
-            title: '入会申请 ${club.pendingJoinRequestCount}',
+            title: stringsOf(context).clubMainJoinRequests(club.pendingJoinRequestCount),
             trailing: club.pendingJoinRequestCount > 0
                 ? CyBadge(count: club.pendingJoinRequestCount)
                 : null,
@@ -802,13 +824,13 @@ class _ClubManageTab extends ConsumerWidget {
           ),
         if (flags.editProfile)
           CyCell(
-            title: '设置与解散',
+            title: stringsOf(context).clubMainSettingsDissolve,
             onTap: () => context.push('/club/${club.id}/edit'),
           ),
         if (flags.finance)
           CyCell(
-            title: '解散前待处理',
-            subtitle: '合作保证金与未打款结算',
+            title: stringsOf(context).clubMainBeforeDissolve,
+            subtitle: stringsOf(context).clubMainDepositsSettlements,
             onTap: () => context.push('/club/${club.id}/dissolution-blockers'),
           ),
       ],
@@ -845,18 +867,18 @@ class _ClubOpsCells extends ConsumerWidget {
         if (flags.eventOps)
           CyCell(
             key: const Key('club-manage-event-ops'),
-            title: '活动运营',
-            subtitle: '场次、签到、出勤更正与取消',
+            title: stringsOf(context).clubMainEventOperations,
+            subtitle: stringsOf(context).clubMainEventOperationsHint,
             onTap: () => context.push('/club/${club.id}/event-ops'),
           ),
         if (flags.roles)
           CyCell(
             key: const Key('club-manage-roles'),
-            title: '角色与权限',
-            subtitle: '按职责分配俱乐部与活动权限',
+            title: stringsOf(context).clubMainRolesPermissions,
+            subtitle: stringsOf(context).clubMainRolesPermissionsHint,
             trailing: delegated > 0
                 ? Text(
-                    '$delegated 已委派',
+                    stringsOf(context).clubMainDelegated(delegated),
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
                       color: AppColors.textSecondary,
                     ),
@@ -867,15 +889,15 @@ class _ClubOpsCells extends ConsumerWidget {
         if (flags.governance)
           CyCell(
             key: const Key('club-manage-governance'),
-            title: '成员治理',
-            subtitle: '临时封禁、解禁与治理记录',
+            title: stringsOf(context).clubMainMemberGovernance,
+            subtitle: stringsOf(context).clubMainMemberGovernanceHint,
             onTap: () => context.push('/club/${club.id}/governance'),
           ),
         if (flags.notify)
           CyCell(
             key: const Key('club-manage-notify'),
-            title: '通知成员',
-            subtitle: '发送俱乐部与活动通知',
+            title: stringsOf(context).clubMainNotifyMembers,
+            subtitle: stringsOf(context).clubMainNotifyMembersHint,
             onTap: () => context.push('/club/${club.id}/notify'),
           ),
       ],
@@ -892,20 +914,20 @@ Future<void> _chooseTopicModeAndPublish(
   final mode = await showCupertinoModalPopup<int>(
     context: context,
     builder: (sheetContext) => CupertinoActionSheet(
-      title: const Text('选择主题模式'),
+      title: Text(stringsOf(context).clubMainChooseThemeMode),
       actions: <Widget>[
         CupertinoActionSheetAction(
           onPressed: () => Navigator.of(sheetContext).pop(1),
-          child: const Text('城市定向 · 顺序探索'),
+          child: Text(stringsOf(context).clubMainSequentialMode),
         ),
         CupertinoActionSheetAction(
           onPressed: () => Navigator.of(sheetContext).pop(2),
-          child: const Text('自由探索 · 全点开放'),
+          child: Text(stringsOf(context).clubMainFreeMode),
         ),
       ],
       cancelButton: CupertinoActionSheetAction(
         onPressed: () => Navigator.of(sheetContext).pop(),
-        child: const Text('取消'),
+        child: Text(stringsOf(context).cancel),
       ),
     ),
   );
@@ -963,7 +985,7 @@ Future<int?> _pickTopicActivity(
           .toList(),
       cancelButton: CupertinoActionSheetAction(
         onPressed: () => Navigator.of(sheetContext).pop(),
-        child: const Text('取消'),
+        child: Text(stringsOf(context).cancel),
       ),
     ),
   );
@@ -983,18 +1005,18 @@ Future<void> _openActivityTools(
     context,
     ref,
     topicId,
-    errorText: '场次加载失败，请稍后重试',
+    errorText: stringsOf(context).clubMainSessionsLoadError,
   );
   if (activities == null || !context.mounted) return;
   if (activities.isEmpty) {
-    CyNativeNotice.show(context, '这个项目还没有可管理的具体场次');
+    CyNativeNotice.show(context, stringsOf(context).clubMainNoManageableSessions);
     return;
   }
   final int? activityId = await _pickTopicActivity(
     context,
     activities: activities,
-    title: '选择场次',
-    sub: '一周多场时在这里选，不会被系统菜单截断',
+    title: stringsOf(context).clubMainChooseSession,
+    sub: stringsOf(context).clubMainChooseSessionHint,
   );
   if (activityId == null || !context.mounted) return;
   final ClubAccess? access = ref.read(clubAccessProvider(club.id)).value;
@@ -1014,17 +1036,17 @@ Future<void> _openActivityTools(
   final tools = <({String label, String route})>[
     if (canOperateEvent || canCheckInEvent)
       (
-        label: '现场名册与核销',
+        label: stringsOf(context).clubMainOnsiteRoster,
         route: '/club/${club.id}/event-ops?activityId=$activityId',
       ),
     if (club.isOwner || allowed(kClubRoleManage))
       (
-        label: '分配领队与核销员',
+        label: stringsOf(context).clubMainAssignEventRoles,
         route: '/club/${club.id}/roles?activityId=$activityId',
       ),
     if (canOperateEvent)
       (
-        label: '通知本场成员',
+        label: stringsOf(context).clubMainNotifySession,
         route: '/club/${club.id}/notify?activityId=$activityId',
       ),
   ];
@@ -1036,7 +1058,7 @@ Future<void> _openActivityTools(
   final String? route = await showCupertinoModalPopup<String>(
     context: context,
     builder: (sheetContext) => CupertinoActionSheet(
-      title: const Text('本场工具'),
+      title: Text(stringsOf(context).clubMainSessionTools),
       actions: tools
           .map(
             (tool) => CupertinoActionSheetAction(
@@ -1048,7 +1070,7 @@ Future<void> _openActivityTools(
           .toList(),
       cancelButton: CupertinoActionSheetAction(
         onPressed: () => Navigator.of(sheetContext).pop(),
-        child: const Text('取消'),
+        child: Text(stringsOf(context).cancel),
       ),
     ),
   );
@@ -1068,17 +1090,17 @@ Future<void> _reportTopicActivity(
     ref,
     topicId,
     // 真源两条链各说各的失败口径(js:853 场次工具 / js:2135 举报活动)。
-    errorText: '活动列表加载失败，请稍后重试',
+    errorText: stringsOf(context).clubMainEventsRetryError,
   );
   if (activities == null || !context.mounted) return;
   if (activities.isEmpty) {
-    CyNativeNotice.show(context, '这个项目还没有可举报的具体活动');
+    CyNativeNotice.show(context, stringsOf(context).clubMainNoReportableEvents);
     return;
   }
   final int? activityId = await _pickTopicActivity(
     context,
     activities: activities,
-    title: '选择要举报的场次',
+    title: stringsOf(context).clubMainChooseReportSession,
   );
   if (activityId == null || !context.mounted) return;
   context.push(
@@ -1101,40 +1123,40 @@ class _OwnerProjectSection extends ConsumerWidget {
       children: <Widget>[
         Row(
           children: <Widget>[
-            const Expanded(child: CySectionTitle('本俱乐部项目')),
+            Expanded(child: CySectionTitle(stringsOf(context).clubMainClubProjects)),
             // 「发布主题」在小程序里挂在阶段卡/添加行上,判据是主理人或活动管理权。
             if (flags.eventOps)
               CupertinoButton(
                 key: const Key('club-create-topic'),
                 onPressed: () => _chooseTopicModeAndPublish(context, club.id),
                 minimumSize: const Size(44, 44),
-                child: const Text('发布主题'),
+                child: Text(stringsOf(context).clubMainPublishTheme),
               ),
           ],
         ),
         const SizedBox(height: CyTokens.space2),
         topics.when(
           // 这一块在详情长页靠后，用静态占位，避免离屏骨架常驻呼吸动画。
-          loading: () => const StatusView(message: '正在读取项目'),
+          loading: () => StatusView(message: stringsOf(context).clubMainProjectsLoading),
           error: (Object error, StackTrace stackTrace) => StatusView(
-            message: '项目列表加载失败',
-            sub: error.toString().replaceFirst('Exception: ', ''),
+            message: stringsOf(context).clubMainProjectsLoadError,
+            sub: clubApiErrorMessage(context, error),
             onRetry: () => ref.invalidate(clubTopicsProvider(club.id)),
           ),
           data: (List<ClubTopic> rows) {
             if (rows.isEmpty) {
-              return const StatusView(
-                message: '还没有项目',
-                sub: '发布一个主题，再从项目内对接商家与玩家',
+              return StatusView(
+                message: stringsOf(context).clubMainNoProjects,
+                sub: stringsOf(context).clubMainPublishProjectHint,
               );
             }
             return Column(
               children: rows
                   .map(
                     (row) => CyCell(
-                      title: row.name.isEmpty ? '未命名项目' : row.name,
+                      title: row.name.isEmpty ? stringsOf(context).clubMainUnnamedProject : row.name,
                       subtitle:
-                          '${row.dateText.isEmpty ? '时间待定' : row.dateText} · ${row.signupCount} 人报名',
+                          stringsOf(context).clubMainProjectRegistrations(row.dateText.isEmpty ? stringsOf(context).clubMainTimeTbd : row.dateText, row.signupCount),
                       leading: const Icon(
                         Icons.route_outlined,
                         size: 20,
@@ -1161,7 +1183,7 @@ class _OwnerProjectSection extends ConsumerWidget {
                                     club: club,
                                     topicId: row.id,
                                   ),
-                                  child: const Text('场次工具'),
+                                  child: Text(stringsOf(context).clubMainSessionToolsEntry),
                                 ),
                                 CupertinoButton(
                                   key: Key('club-topic-ops-${row.id}'),
@@ -1170,7 +1192,7 @@ class _OwnerProjectSection extends ConsumerWidget {
                                   onPressed: () => context.push(
                                     '/club/${club.id}/topic/${row.id}',
                                   ),
-                                  child: const Text('运营'),
+                                  child: Text(stringsOf(context).clubMainOperations),
                                 ),
                               ],
                             )
@@ -1183,11 +1205,11 @@ class _OwnerProjectSection extends ConsumerWidget {
           },
         ),
         const SizedBox(height: CyTokens.space4),
-        const CySectionTitle('合作'),
+        CySectionTitle(stringsOf(context).clubMainPartnerships),
         const SizedBox(height: CyTokens.space2),
         CyCell(
-          title: '我的合作',
-          subtitle: '查看收到的合作邀约与处理进度',
+          title: stringsOf(context).clubMainMyPartnerships,
+          subtitle: stringsOf(context).clubMainReceivedPartnershipsHint,
           leading: const Icon(
             Icons.handshake_outlined,
             size: 20,
@@ -1196,8 +1218,8 @@ class _OwnerProjectSection extends ConsumerWidget {
           onTap: () => context.push('/coop/list'),
         ),
         CyCell(
-          title: '我发出的合作',
-          subtitle: '查看对方的回应与过期状态',
+          title: stringsOf(context).clubMainSentPartnerships,
+          subtitle: stringsOf(context).clubMainSentPartnershipsHint,
           leading: const Icon(
             Icons.outbox_outlined,
             size: 20,
@@ -1214,8 +1236,8 @@ class _OwnerProjectSection extends ConsumerWidget {
         // 申请记录在「我发出的」)。App 侧整页早就建好,缺的只是这一条路径。
         CyCell(
           key: const Key('club-coop-pool'),
-          title: '可对接的活动',
-          subtitle: '商家开放给俱乐部承接的主题；申请后在「我发出的」查看',
+          title: stringsOf(context).clubMainAvailableEvents,
+          subtitle: stringsOf(context).clubMainAvailableEventsHint,
           leading: const Icon(
             Icons.explore_outlined,
             size: 20,
@@ -1242,12 +1264,12 @@ class _ShareEditionSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        const CySectionTitle('探店日期次'),
+        CySectionTitle(stringsOf(context).clubMainVisitSessions),
         const SizedBox(height: CyTokens.space2),
         editions.when(
-          loading: () => const StatusView(message: '正在读取期次'),
+          loading: () => StatusView(message: stringsOf(context).clubMainSessionsLoading),
           error: (_, _) => StatusView(
-            message: '期次加载失败',
+            message: stringsOf(context).clubMainVisitSessionsLoadError,
             onRetry: () => ref.invalidate(clubEditionsProvider(club.id)),
           ),
           data: (List<EditionOption> rows) {
@@ -1255,25 +1277,25 @@ class _ShareEditionSection extends ConsumerWidget {
                 .where((EditionOption e) => e.executingClubId == club.id)
                 .toList(growable: false);
             if (mine.isEmpty) {
-              return const StatusView(
-                message: '还没有可分享的探店日期次',
-                sub: '期次开售并绑定本俱乐部后会出现在这里',
+              return StatusView(
+                message: stringsOf(context).clubMainNoShareableSessions,
+                sub: stringsOf(context).clubMainVisitSessionsHint,
               );
             }
             return Column(
               children: mine
                   .map(
                     (EditionOption e) => CyCell(
-                      title: e.topicName.isEmpty ? '期次 #${e.id}' : e.topicName,
+                      title: e.topicName.isEmpty ? stringsOf(context).clubMainSessionNumber(e.id) : e.topicName,
                       subtitle:
-                          '${e.dateText.isEmpty ? '时间待定' : e.dateText} · 执行俱乐部期次',
+                          stringsOf(context).clubMainClubSession(e.dateText.isEmpty ? stringsOf(context).clubMainTimeTbd : e.dateText),
                       showChevron: false,
                       trailing: CupertinoButton(
                         key: Key('club-edition-share-${e.id}'),
                         padding: EdgeInsets.zero,
                         minimumSize: const Size(44, 44),
-                        onPressed: () => _shareEditionTicket(e),
-                        child: const Text('带票分享'),
+                        onPressed: () => _shareEditionTicket(context, e),
+                        child: Text(stringsOf(context).clubMainShareWithTicket),
                       ),
                     ),
                   )
@@ -1288,14 +1310,14 @@ class _ShareEditionSection extends ConsumerWidget {
   /// 带票链接按真源 `utils/ticket-source.js` 的 `buildSharePath` 拼:
   /// `?id&sourceClubId&clubCode`,clubCode = `club-{cid}-t{topicId}`。
   /// 归因只来自本页 clubId 与冻结条款,不接受外部传入 —— 绝不产假的标记。
-  void _shareEditionTicket(EditionOption e) {
+  void _shareEditionTicket(BuildContext context, EditionOption e) {
     final name = e.topicName.isEmpty ? club.name : e.topicName;
     final code = Uri.encodeComponent('club-${club.id}-t${e.id}');
     SharePlus.instance.share(
       ShareParams(
-        subject: name.isEmpty ? '城瘾' : name,
+        subject: name.isEmpty ? stringsOf(context).appName : name,
         text:
-            '${name.isEmpty ? '城瘾' : name} · ${club.name}\n'
+            '${name.isEmpty ? stringsOf(context).appName : name} · ${club.name}\n'
             'https://api.example.invalid/topic/${e.id}'
             '?id=${e.id}&sourceClubId=${club.id}&clubCode=$code',
       ),
@@ -1346,7 +1368,7 @@ class _MemberSection extends ConsumerWidget {
         child: CySkeleton(type: CySkeletonType.detail),
       ),
       error: (Object err, StackTrace st) => StatusView(
-        message: '成员拉取失败',
+        message: stringsOf(context).clubMainMembersLoadError,
         icon: CupertinoIcons.exclamationmark_triangle,
         onRetry: () => ref.invalidate(clubMembersProvider(clubId)),
       ),
@@ -1354,7 +1376,7 @@ class _MemberSection extends ConsumerWidget {
         if (list.isEmpty) {
           return Text(
             // ★ 同一屏不能自相矛盾:上面写着 128 人、下面说没有人。
-            memberCount > 0 ? '成员名单没取到,稍后再看看' : '还没有成员',
+            memberCount > 0 ? stringsOf(context).clubMainMemberListUnavailable : stringsOf(context).clubMainNoMembers,
             style: Theme.of(
               context,
             ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
@@ -1415,83 +1437,91 @@ class _MemberRow extends StatelessWidget {
     final avatar = member.avatar;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: CyTokens.space1_5),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          Expanded(
-            child: CupertinoButton(
-              key: Key('club-member-row-${member.memberId}'),
-              // 头像 + 昵称整块可点(真源 cy-avatar 与 member-info 同一 handler)。
-              padding: EdgeInsets.zero,
-              alignment: Alignment.centerLeft,
-              onPressed: () => _openProfile(context),
-              child: Row(
-                children: <Widget>[
-                  CircleAvatar(
-                    radius: 18,
-                    backgroundColor: AppColors.bgElevated,
-                    backgroundImage: (avatar != null && avatar.isNotEmpty)
-                        ? NetworkImage(avatar)
-                        : null,
-                    child: (avatar == null || avatar.isEmpty)
-                        ? const Icon(
-                            Icons.person_outline,
-                            size: 18,
-                            color: AppColors.textDisabled,
-                          )
-                        : null,
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: CupertinoButton(
+                  key: Key('club-member-row-${member.memberId}'),
+                  // 头像 + 昵称整块可点(真源 cy-avatar 与 member-info 同一 handler)。
+                  padding: EdgeInsets.zero,
+                  alignment: Alignment.centerLeft,
+                  onPressed: () => _openProfile(context),
+                  child: Row(
+                    children: <Widget>[
+                      CircleAvatar(
+                        radius: 18,
+                        backgroundColor: AppColors.bgElevated,
+                        backgroundImage: (avatar != null && avatar.isNotEmpty)
+                            ? NetworkImage(avatar)
+                            : null,
+                        child: (avatar == null || avatar.isEmpty)
+                            ? const Icon(
+                                Icons.person_outline,
+                                size: 18,
+                                color: AppColors.textDisabled,
+                              )
+                            : null,
+                      ),
+                      const SizedBox(width: CyTokens.space3),
+                      Expanded(
+                        child: Text(
+                          (member.nickname?.isNotEmpty ?? false)
+                              ? member.nickname!
+                              : stringsOf(context).clubMainUserNumber(member.memberId),
+                          style: textTheme.bodyMedium,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: CyTokens.space3),
-                  Expanded(
-                    child: Text(
-                      (member.nickname?.isNotEmpty ?? false)
-                          ? member.nickname!
-                          : '用户${member.memberId}',
-                      style: textTheme.bodyMedium,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          // ★★★ 徽章此前用 `role == 1` 渲染「创建者」—— 标错人了。
-          //   后端 role==1 是**管理员**(ApiClubController:1180
-          //   「设置成员角色(创建者:0成员/1管理员)」,1192「管理员至多 2 个,
-          //   **主理人之外**」)。创建者是 isOwner,和 role 是两回事。
-          //   原来的写法把每个管理员标成创建者,真创建者反而没有徽章。
-          if (member.isOwner || member.isAdmin)
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: CyTokens.space2,
-                vertical: 2,
-              ),
-              decoration: BoxDecoration(
-                color: AppColors.bgElevated,
-                borderRadius: BorderRadius.circular(CyTokens.radiusSm),
-              ),
-              child: Text(
-                member.isOwner ? '创建者' : '管理员',
-                style: textTheme.labelSmall?.copyWith(
-                  color: AppColors.accentViolet,
                 ),
               ),
+              // ★★★ 徽章此前用 `role == 1` 渲染「创建者」—— 标错人了。
+              //   后端 role==1 是**管理员**(ApiClubController:1180
+              //   「设置成员角色(创建者:0成员/1管理员)」,1192「管理员至多 2 个,
+              //   **主理人之外**」)。创建者是 isOwner,和 role 是两回事。
+              //   原来的写法把每个管理员标成创建者,真创建者反而没有徽章。
+              if (member.isOwner || member.isAdmin)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: CyTokens.space2,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.bgElevated,
+                    borderRadius: BorderRadius.circular(CyTokens.radiusSm),
+                  ),
+                  child: Text(
+                    member.isOwner ? stringsOf(context).clubMainCreator : stringsOf(context).clubMainAdministrator,
+                    style: textTheme.labelSmall?.copyWith(
+                      color: AppColors.accentViolet,
+                    ),
+                  ),
+                ),
+              if (!isSelf)
+                CupertinoButton(
+                  key: Key('club-member-report-${member.memberId}'),
+                  minimumSize: const Size(44, CyTokens.btnH),
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  // 举报是「向平台反映这个成员」→ governance 报告态带 targetMemberId。
+                  onPressed: () => context.push(
+                    '/club/$clubId/governance'
+                    '?mode=report&targetMemberId=${member.memberId}',
+                  ),
+                  child: Text(stringsOf(context).clubMainReport, style: textTheme.labelMedium),
+                ),
+            ],
+          ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: ClubMemberActions(
+              clubId: clubId,
+              member: member,
+              viewerIsCreator: viewerIsCreator,
+              canGovernMembers: canGovernMembers,
             ),
-          if (!isSelf)
-            CupertinoButton(
-              key: Key('club-member-report-${member.memberId}'),
-              minimumSize: const Size(44, CyTokens.btnH),
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              // 举报是「向平台反映这个成员」→ governance 报告态带 targetMemberId。
-              onPressed: () => context.push(
-                '/club/$clubId/governance'
-                '?mode=report&targetMemberId=${member.memberId}',
-              ),
-              child: Text('举报', style: textTheme.labelMedium),
-            ),
-          ClubMemberActions(
-            clubId: clubId,
-            member: member,
-            viewerIsCreator: viewerIsCreator,
-            canGovernMembers: canGovernMembers,
           ),
         ],
       ),
@@ -1550,25 +1580,25 @@ class _ClubStatsSection extends ConsumerWidget {
     return stats.when(
       loading: () => const CySkeleton(),
       error: (Object error, StackTrace _) => StatusView(
-        message: '数据看板加载失败',
-        sub: friendlyOrBackendMessage(error, fallback: '数据看板没能加载，请稍后重试'),
+        message: stringsOf(context).clubMainStatsLoadError,
+        sub: clubApiErrorMessage(context, error, fallback: stringsOf(context).clubMainStatsRetryError),
         onRetry: () => ref.invalidate(clubStatsProvider(clubId)),
-        retryLabel: '重新加载',
+        retryLabel: stringsOf(context).clubMainReload,
       ),
       data: (ClubStats value) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Row(
             children: <Widget>[
-              _StatCell(value: '${value.topicCount}', label: '项目'),
-              _StatCell(value: '${value.participants}', label: '参与人次'),
-              _StatCell(value: '${value.completed}', label: '完成人次'),
-              _StatCell(value: value.overallRateText, label: '完成率'),
+              _StatCell(value: '${value.topicCount}', label: stringsOf(context).clubMainProjects),
+              _StatCell(value: '${value.participants}', label: stringsOf(context).clubMainParticipations),
+              _StatCell(value: '${value.completed}', label: stringsOf(context).clubMainCompletions),
+              _StatCell(value: value.overallRateText, label: stringsOf(context).clubMainCompletionRate),
             ],
           ),
           const SizedBox(height: CyTokens.space3),
           if (value.topics.isEmpty)
-            const StatusView(message: '还没有可统计的项目数据')
+            StatusView(message: stringsOf(context).clubMainNoStats)
           else
             for (final ClubTopicStats topic in value.topics)
               Padding(
@@ -1640,13 +1670,13 @@ class _CustomerCell extends ConsumerWidget {
     final count = ref.watch(clubCustomerCountProvider(clubId));
     return CyCell(
       key: const Key('club-manage-customers'),
-      title: '查看客户',
-      subtitle: '本俱乐部所有购票客户，含未到店与已退款',
+      title: stringsOf(context).clubMainViewCustomers,
+      subtitle: stringsOf(context).clubMainCustomersHint,
       trailing: Text(
         count.when(
           loading: () => '',
-          error: (_, _) => '暂时读不到',
-          data: (int total) => total > 0 ? '$total 人' : '',
+          error: (_, _) => stringsOf(context).clubMainUnavailable,
+          data: (int total) => total > 0 ? stringsOf(context).clubMainPeopleCount(total) : '',
         ),
         style: Theme.of(
           context,
@@ -1668,16 +1698,16 @@ class _SettlementCell extends ConsumerWidget {
     final summary = ref.watch(clubSettlementSummaryProvider(clubId));
     return CyCell(
       key: const Key('club-manage-settlement'),
-      title: '俱乐部分润',
-      subtitle: '已入账、待结算与提现',
+      title: stringsOf(context).clubMainClubRevenueShare,
+      subtitle: stringsOf(context).clubMainRevenueShareHint,
       trailing: Text(
         summary.when(
           loading: () => '',
-          error: (_, _) => '暂时读不到',
+          error: (_, _) => stringsOf(context).clubMainUnavailable,
           // 金额只透传服务端算好的字符串,前端一分钱都不算;
           // 「金额待核验」时后端不下发合计,这里显示状态话术而非留空/补 0。
           data: (value) =>
-              value.amountUnverified ? '待核验' : value.settledAmountText ?? '',
+              value.amountUnverified ? stringsOf(context).clubMainPendingVerification : value.settledAmountText ?? '',
         ),
         style: Theme.of(
           context,
@@ -1747,7 +1777,7 @@ class _OpenSettingsSectionState extends ConsumerState<_OpenSettingsSection> {
         // 服务端回读的与点的不一样(有别的写入者):说清楚,不假装点成了。
         setState(() {
           _errorKey = key;
-          _errorText = '服务端回读到的是「${saved.enabled ? '已开启' : '已关闭'}」';
+          _errorText = saved.enabled ? stringsOf(context).clubMainServerEnabled : stringsOf(context).clubMainServerDisabled;
         });
       }
     } catch (error) {
@@ -1758,7 +1788,7 @@ class _OpenSettingsSectionState extends ConsumerState<_OpenSettingsSection> {
         _errorText =
             error is ClubApiException && error.message.trim().isNotEmpty
             ? error.message
-            : '网络异常，开关没有保存';
+            : stringsOf(context).clubMainSwitchSaveError;
       });
     }
   }
@@ -1774,12 +1804,12 @@ class _OpenSettingsSectionState extends ConsumerState<_OpenSettingsSection> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            const CySectionTitle('开放设置'),
+            CySectionTitle(stringsOf(context).clubMainOpenSettings),
             const SizedBox(height: CyTokens.space2),
             _OpenSettingRow(
               rowKey: const Key('club-open-public-visible'),
-              title: '俱乐部公开可见',
-              sub: '关掉后只有成员能搜到和打开',
+              title: stringsOf(context).clubMainPublicVisibility,
+              sub: stringsOf(context).clubMainPublicVisibilityHint,
               saving: _saving == 'publicVisible',
               enabled: club.publicVisible,
               disabled: _saving.isNotEmpty,
@@ -1799,8 +1829,8 @@ class _OpenSettingsSectionState extends ConsumerState<_OpenSettingsSection> {
             ),
             _OpenSettingRow(
               rowKey: const Key('club-open-merchant-coop'),
-              title: '开放商家承接',
-              sub: '关掉后本俱乐部的主题不进商家可承接列表',
+              title: stringsOf(context).clubMainMerchantAccess,
+              sub: stringsOf(context).clubMainMerchantAccessHint,
               saving: _saving == 'merchantCoop',
               enabled: club.merchantUndertakeOpen,
               disabled: _saving.isNotEmpty,
@@ -1820,8 +1850,8 @@ class _OpenSettingsSectionState extends ConsumerState<_OpenSettingsSection> {
             ),
             _OpenSettingRow(
               rowKey: const Key('club-open-member-post'),
-              title: '允许成员发帖',
-              sub: '关掉后只有管理员能在俱乐部发帖',
+              title: stringsOf(context).clubMainMemberPosts,
+              sub: stringsOf(context).clubMainMemberPostsHint,
               saving: _saving == 'memberPost',
               enabled: club.memberPostAllowed,
               disabled: _saving.isNotEmpty,
@@ -1898,7 +1928,7 @@ class _OpenSettingRow extends StatelessWidget {
               children: <Widget>[
                 Expanded(
                   child: Text(
-                    '开关没有保存成功：$error',
+                    stringsOf(context).clubMainSwitchFailure(error),
                     style: TextStyle(
                       fontSize: CyTokens.typeCaption,
                       color: CyTokens.statusDanger,
@@ -1910,7 +1940,7 @@ class _OpenSettingRow extends StatelessWidget {
                   minimumSize: const Size(44, 44),
                   onPressed: onRetry,
                   child: Text(
-                    '重试',
+                    stringsOf(context).retry,
                     style: TextStyle(fontSize: CyTokens.typeLabel),
                   ),
                 ),

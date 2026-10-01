@@ -61,6 +61,7 @@ class MerchantOperatorAccess {
     required this.active,
     required this.merchantId,
     required this.merchantName,
+    this.hasMerchantNameFallback = false,
     required this.merchantLogo,
     required this.roleCode,
     required this.permissions,
@@ -94,12 +95,16 @@ class MerchantOperatorAccess {
       active: true,
       merchantId: _positiveInt(merchant['id'], '门店 ID'),
       merchantName: _optionalText(merchant['name']) ?? '门店',
+      hasMerchantNameFallback: _optionalText(merchant['name']) == null,
       merchantLogo: _optionalText(merchant['logo']),
       roleCode: roleCode,
       permissions: permissions,
       canManageOperators: canManage,
     );
   }
+
+  /// True only when parsing supplied a local placeholder.
+  final bool hasMerchantNameFallback;
 
   final bool active;
   final int? merchantId;
@@ -123,6 +128,7 @@ class MerchantAssignableRole {
   const MerchantAssignableRole({
     required this.role,
     required this.name,
+    this.hasNameFallback = false,
     required this.permissions,
   });
 
@@ -133,11 +139,15 @@ class MerchantAssignableRole {
     return MerchantAssignableRole(
       role: role,
       name: _optionalText(json['name']) ?? role.label,
+      hasNameFallback: _optionalText(json['name']) == null,
       permissions: _stringSet(json['permissions'], '岗位权限'),
     );
   }
 
   final MerchantOperatorRole role;
+  /// True only when parsing supplied a local placeholder.
+  final bool hasNameFallback;
+
   final String name;
   final Set<String> permissions;
 
@@ -156,6 +166,7 @@ class MerchantOperator {
   const MerchantOperator({
     required this.id,
     required this.nickname,
+    this.hasNicknameFallback = false,
     required this.avatar,
     required this.role,
     required this.status,
@@ -167,12 +178,16 @@ class MerchantOperator {
       MerchantOperator(
         id: _positiveInt(json['id'], '员工 ID'),
         nickname: _optionalText(json['nickname']) ?? '未设置昵称',
+        hasNicknameFallback: _optionalText(json['nickname']) == null,
         avatar: _optionalText(json['avatar']),
         role: MerchantOperatorRole.parse(json['roleCode']),
         status: MerchantOperatorStatus.parse(json['status']),
         acceptedAt: _requiredDate(json['acceptedAt'], '加入时间'),
         version: _version(json['version']),
       );
+
+  /// True only when parsing supplied a local placeholder.
+  final bool hasNicknameFallback;
 
   final int id;
   final String nickname;

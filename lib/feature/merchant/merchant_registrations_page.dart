@@ -1,3 +1,4 @@
+import '../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -44,7 +45,7 @@ class _MerchantRegistrationsPageState
     final async = ref.watch(merchantRegistrationsProvider(_filter));
     return CupertinoPageScaffold(
       backgroundColor: CyPalette.of(context).bgPage,
-      navigationBar: const CupertinoNavigationBar(middle: Text('我的报名')),
+      navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).merchantCatalogRegistrations)),
       child: Material(
         color: Colors.transparent,
         child: SafeArea(
@@ -57,7 +58,13 @@ class _MerchantRegistrationsPageState
                 tabs: RegistrationListFilter.values
                     .map(
                       (RegistrationListFilter f) =>
-                          CyTab(key: f.wire, label: f.label),
+                          CyTab(key: f.wire, label: switch (f) {
+RegistrationListFilter.all => stringsOf(context).merchantCatalogAll,
+RegistrationListFilter.ongoing => stringsOf(context).merchantCatalogOngoing,
+RegistrationListFilter.reviewing => stringsOf(context).merchantCatalogReviewing,
+RegistrationListFilter.rejected => stringsOf(context).merchantCatalogRejected,
+RegistrationListFilter.finished => stringsOf(context).merchantCatalogFinished
+}),
                     )
                     .toList(),
                 active: _filter.wire,
@@ -72,7 +79,7 @@ class _MerchantRegistrationsPageState
                   loading: () => const CySkeleton(),
                   error: (Object e, StackTrace st) => StatusView(
                     icon: CupertinoIcons.exclamationmark_triangle,
-                    message: '报名列表没读出来',
+                    message: stringsOf(context).merchantCatalogListError,
                     sub: e.toString().replaceFirst('Exception: ', ''),
                     large: true,
                     onRetry: () =>
@@ -83,11 +90,11 @@ class _MerchantRegistrationsPageState
                       return StatusView(
                         icon: CupertinoIcons.tray,
                         message: _filter == RegistrationListFilter.all
-                            ? '还没有报名记录'
-                            : '这个筛选下没有记录',
+                            ? stringsOf(context).merchantCatalogListEmpty
+                            : stringsOf(context).merchantCatalogFilterEmpty,
                         sub: _filter == RegistrationListFilter.all
-                            ? '在主题详情里报名承接,记录会出现在这里'
-                            : '换个筛选看看',
+                            ? stringsOf(context).merchantCatalogListEmptyHint
+                            : stringsOf(context).merchantCatalogFilterEmptyHint,
                         large: true,
                       );
                     }
@@ -134,9 +141,9 @@ class _CardState extends ConsumerState<_Card> {
   Future<void> _cancel() async {
     final bool ok = await cyConfirm(
       context,
-      title: '取消这条报名?',
-      content: '取消后需要重新报名,记录不会保留。',
-      confirmText: '取消报名',
+      title: stringsOf(context).merchantCatalogCancelTitle,
+      content: stringsOf(context).merchantCatalogCancelHint,
+      confirmText: stringsOf(context).merchantCatalogCancel,
       danger: true,
     );
     if (!ok) return;
@@ -177,14 +184,14 @@ class _CardState extends ConsumerState<_Card> {
             children: <Widget>[
               Expanded(
                 child: Text(
-                  (r.topicName?.isNotEmpty ?? false) ? r.topicName! : '主题报名',
+                  (r.topicName?.isNotEmpty ?? false) ? r.topicName! : stringsOf(context).merchantCatalogApplication,
                   style: t.titleSmall,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
               Text(
-                _statusText(r),
+                _statusText(context, r),
                 style: t.labelSmall?.copyWith(color: _statusColor(r, p)),
               ),
             ],
@@ -209,9 +216,9 @@ class _CardState extends ConsumerState<_Card> {
               ),
               child: Text(
                 (r.reason?.isNotEmpty ?? false)
-                    ? '驳回原因:${r.reason}'
+                    ? stringsOf(context).merchantCatalogReason(r.reason!)
                     // 后端没给原因时说实话,别编一句。
-                    : '被驳回了,但后台没填原因 —— 可以联系平台问一下',
+                    : stringsOf(context).merchantCatalogMissingListReason,
                 style: t.bodySmall,
               ),
             ),
@@ -224,7 +231,7 @@ class _CardState extends ConsumerState<_Card> {
                 Expanded(
                   child: CyNativeButton(
                     onPressed: _busy ? null : _cancel,
-                    label: '取消报名',
+                    label: stringsOf(context).merchantCatalogCancel,
                     role: CyNativeButtonRole.secondary,
                   ),
                 ),
@@ -235,13 +242,13 @@ class _CardState extends ConsumerState<_Card> {
                   child: CyNativeButton(
                     key: Key('registration-edit-${r.id}'),
                     onPressed: _busy ? null : _edit,
-                    label: '修改',
+                    label: stringsOf(context).merchantCatalogEdit,
                   ),
                 ),
               if (!r.canCancel && !r.canEdit)
                 Expanded(
                   child: Text(
-                    r.isWon ? '已中标,不能再改动' : '当前状态不可改动',
+                    r.isWon ? stringsOf(context).merchantCatalogWonLocked : stringsOf(context).merchantCatalogLocked,
                     style: t.bodySmall?.copyWith(color: p.textTertiary),
                   ),
                 ),
@@ -269,19 +276,19 @@ class _CardState extends ConsumerState<_Card> {
     widget.onChanged();
   }
 
-  static String _statusText(TopicRegistration r) {
-    if (r.isWon) return '已中标';
+  static String _statusText(BuildContext context, TopicRegistration r) {
+    if (r.isWon) return stringsOf(context).merchantCatalogWon;
     switch (r.status) {
       case 0:
-        return '审核中';
+        return stringsOf(context).merchantCatalogReviewing;
       case 1:
-        return '已通过';
+        return stringsOf(context).merchantCatalogApproved;
       case 2:
-        return '已驳回';
+        return stringsOf(context).merchantCatalogRejected;
       default:
         // 状态没拿到就说没拿到,别默认成"审核中" ——
         // 那会让界面给出它其实没有的操作。
-        return '状态未知';
+        return stringsOf(context).merchantCatalogUnknown;
     }
   }
 

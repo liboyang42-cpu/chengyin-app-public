@@ -12,6 +12,7 @@ import '../../core/widgets/cy_native_notice.dart';
 import '../../core/widgets/cy_widgets.dart';
 import '../../core/widgets/status_view.dart';
 import '../../data/api/merchant_api.dart';
+import '../../l10n/strings.dart';
 import '../../data/models/merchant_application.dart';
 import '../auth/login_gate.dart';
 import 'merchant_error_view.dart';
@@ -51,7 +52,7 @@ class MerchantHomePage extends ConsumerWidget {
     return CupertinoPageScaffold(
       backgroundColor: CyPalette.of(context).bgPage,
       navigationBar: CupertinoNavigationBar(
-        middle: const Text('商家工作台'),
+        middle: Text(stringsOf(context).merchantHomeTitle),
         // ★ 消息入口此前**只在「我的」页** —— 而合作邀约、官方通知
         //   都落在消息里,商家在工作台完全看不到。
         //   小程序的结算页就挂着「查看聊天与系统通知」。
@@ -67,7 +68,7 @@ class MerchantHomePage extends ConsumerWidget {
             error: (Object e, _) => merchantErrorView(
               context,
               e,
-              what: '经营身份',
+              what: stringsOf(context).merchantHomeIdentity,
               onRetry: () => ref.invalidate(merchantAccessProvider),
             ),
             data: (MerchantAccess a) =>
@@ -94,11 +95,11 @@ class _ApplicationStateCard extends StatelessWidget {
     if (application == null) {
       // NONE(没有申请行)或后端没给结论 —— 不替商家编一个状态。
       return StatusView(
-        message: '你还不是商家',
-        sub: '申请入驻通过后,这里会显示你的经营数据',
+        message: stringsOf(context).merchantHomeNotMerchant,
+        sub: stringsOf(context).merchantHomeApplyHint,
         large: true,
         onRetry: () => context.push('/merchant/apply'),
-        retryLabel: '去申请入驻',
+        retryLabel: stringsOf(context).merchantHomeApply,
       );
     }
     final textTheme = Theme.of(context).textTheme;
@@ -113,7 +114,7 @@ class _ApplicationStateCard extends StatelessWidget {
               Row(
                 children: <Widget>[
                   _StateBadge(
-                    text: application.statusLabel,
+                    text: _applicationStatusLabel(context, application),
                     foreground: application.isDangerBadge
                         ? palette.statusDanger
                         : palette.textSecondary,
@@ -129,18 +130,18 @@ class _ApplicationStateCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: CyTokens.space2),
-              Text(application.statusText, style: textTheme.bodyMedium),
+              Text(_applicationStatusText(context, application), style: textTheme.bodyMedium),
               const SizedBox(height: CyTokens.space2),
               CupertinoButton(
                 key: const Key('merchant-application-progress-entry'),
                 padding: EdgeInsets.zero,
                 minimumSize: const Size(44, 44),
                 onPressed: () => context.push('/merchant/apply'),
-                child: const Row(
+                child: Row(
                   children: <Widget>[
-                    Text('查看申请进度'),
-                    SizedBox(width: CyTokens.space1),
-                    Icon(CupertinoIcons.chevron_forward, size: 16),
+                    Text(stringsOf(context).merchantHomeProgress),
+                    const SizedBox(width: CyTokens.space1),
+                    const Icon(CupertinoIcons.chevron_forward, size: 16),
                   ],
                 ),
               ),
@@ -150,6 +151,30 @@ class _ApplicationStateCard extends StatelessWidget {
       ],
     );
   }
+}
+
+String _applicationStatusLabel(BuildContext context, MerchantApplication a) {
+  if (a.isDisabled) return stringsOf(context).merchantHomeDisabled;
+  if (a.status == 1 && a.accountStatus == 1) return stringsOf(context).merchantHomeActive;
+  if (a.isRejected) return stringsOf(context).merchantHomeRejected;
+  if (a.status == 1) return stringsOf(context).merchantHomeAwaitingActivation;
+  if (a.status == 0) return stringsOf(context).merchantHomeUnderReview;
+  return stringsOf(context).merchantHomeUnknownStatus;
+}
+
+String _applicationStatusText(BuildContext context, MerchantApplication a) {
+  if (a.isDisabled) {
+    final reason = a.disableReason.trim();
+    return reason.isEmpty ? stringsOf(context).merchantHomeDisabledNoReason : stringsOf(context).merchantHomeDisabledReason(reason);
+  }
+  if (a.status == 1 && a.accountStatus == 1) return stringsOf(context).merchantHomeActiveExplanation;
+  if (a.isRejected) {
+    final reason = a.rejectReason.trim();
+    return reason.isEmpty ? stringsOf(context).merchantHomeRejectedNoReason : stringsOf(context).merchantHomeRejectedReason(reason);
+  }
+  if (a.status == 1) return stringsOf(context).merchantHomeActivationExplanation;
+  if (a.status == 0) return stringsOf(context).merchantHomeReviewExplanation;
+  return stringsOf(context).merchantHomeUnknownExplanation;
 }
 
 class _StateBadge extends StatelessWidget {
@@ -252,7 +277,7 @@ class _RevenueCard extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Text(
-            '累计收入',
+            stringsOf(context).merchantHomeRevenue,
             style: textTheme.bodySmall?.copyWith(color: palette.textSecondary),
           ),
           const SizedBox(height: CyTokens.space1),
@@ -261,7 +286,7 @@ class _RevenueCard extends ConsumerWidget {
             //   也不把没取到冒充成 ¥0.00。
             loading: () => <Widget>[
               Text(
-                '正在更新经营数据…',
+                stringsOf(context).merchantHomeRevenueLoading,
                 style: textTheme.bodyMedium?.copyWith(
                   color: palette.textSecondary,
                 ),
@@ -269,7 +294,7 @@ class _RevenueCard extends ConsumerWidget {
             ],
             error: (Object e, _) => <Widget>[
               Text(
-                '暂未取到',
+                stringsOf(context).merchantHomeRevenueUnavailable,
                 style: textTheme.headlineSmall?.copyWith(
                   color: palette.textTertiary,
                 ),
@@ -279,7 +304,7 @@ class _RevenueCard extends ConsumerWidget {
                 children: <Widget>[
                   Expanded(
                     child: Text(
-                      '收入没更新成功，这次暂未取到金额',
+                      stringsOf(context).merchantHomeRevenueError,
                       style: textTheme.bodySmall?.copyWith(
                         color: palette.textSecondary,
                       ),
@@ -290,7 +315,7 @@ class _RevenueCard extends ConsumerWidget {
                     minimumSize: const Size(44, 44),
                     padding: EdgeInsets.zero,
                     onPressed: () => ref.invalidate(merchantDashboardProvider),
-                    child: const Text('重新加载此部分'),
+                    child: Text(stringsOf(context).merchantHomeReloadSection),
                   ),
                 ],
               ),
@@ -369,13 +394,13 @@ class _TodoBlock extends ConsumerWidget {
     final async = ref.watch(merchantTodoProvider);
     final textTheme = Theme.of(context).textTheme;
     return async.when(
-      loading: () => const _Card(child: Text('待办加载中…')),
+      loading: () => _Card(child: Text(stringsOf(context).merchantHomeTodoLoading)),
       error: (Object e, _) => _Card(
         child: Row(
           children: <Widget>[
             Expanded(
               child: Text(
-                '待办没取到',
+                stringsOf(context).merchantHomeTodoError,
                 style: textTheme.bodyMedium?.copyWith(
                   color: CyPalette.of(context).textSecondary,
                 ),
@@ -384,7 +409,7 @@ class _TodoBlock extends ConsumerWidget {
             CupertinoButton(
               onPressed: () => ref.invalidate(merchantTodoProvider),
               padding: EdgeInsets.zero,
-              child: const Text('重试'),
+              child: Text(stringsOf(context).retry),
             ),
           ],
         ),
@@ -393,21 +418,21 @@ class _TodoBlock extends ConsumerWidget {
         // ★ 待办为 0 的项不显示 —— 「待核销 0」是噪音,不是信息。
         //   全部为 0 时说一句「暂时没有待办」,而不是排一列 0。
         final rows = <(String, int, String)>[
-          ('待核销', t.pendingVerify, '/merchant/scan'),
-          ('待确认扫码', t.pendingScanConfirm, '/merchant/scan'),
-          ('待处理订单', t.pendingOrders, '/orders'),
-          ('退款单', t.refundCount, '/merchant/aftercare'),
+          (stringsOf(context).merchantHomePendingVerify, t.pendingVerify, '/merchant/scan'),
+          (stringsOf(context).merchantHomePendingScan, t.pendingScanConfirm, '/merchant/scan'),
+          (stringsOf(context).merchantHomePendingOrders, t.pendingOrders, '/orders'),
+          (stringsOf(context).merchantHomeRefunds, t.refundCount, '/merchant/aftercare'),
         ].where(((String, int, String) r) => r.$2 > 0).toList();
 
         return _Card(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              const CySectionTitle('待办'),
+              CySectionTitle(stringsOf(context).merchantHomeTodo),
               const SizedBox(height: CyTokens.space2),
               if (rows.isEmpty)
                 Text(
-                  '暂时没有待办',
+                  stringsOf(context).merchantHomeNoTodo,
                   style: textTheme.bodyMedium?.copyWith(
                     color: CyPalette.of(context).textSecondary,
                   ),
@@ -416,14 +441,14 @@ class _TodoBlock extends ConsumerWidget {
                 ...rows.map(
                   ((String, int, String) r) => CyCell(
                     title: r.$1,
-                    subtitle: '${r.$2} 项',
+                    subtitle: stringsOf(context).itemCount(r.$2),
                     onTap: () => context.push(r.$3),
                   ),
                 ),
               if (t.verifiedCount > 0) ...<Widget>[
                 const SizedBox(height: CyTokens.space2),
                 Text(
-                  '已核销 ${t.verifiedCount} 单',
+                  stringsOf(context).merchantHomeVerifiedCount(t.verifiedCount),
                   style: textTheme.bodySmall?.copyWith(
                     color: CyPalette.of(context).textSecondary,
                   ),
@@ -455,7 +480,7 @@ class _EventsBlock extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              const CySectionTitle('最新动态'),
+              CySectionTitle(stringsOf(context).merchantHomeEvents),
               const SizedBox(height: CyTokens.space2),
               ...events.map((Map<String, dynamic> e) {
                 final String content = (e['content'] as String?) ?? '';
@@ -551,13 +576,13 @@ class _ActionsState extends ConsumerState<_Actions> {
                 children: <Widget>[
                   Row(
                     children: <Widget>[
-                      const CySectionTitle('营业状态'),
+                      CySectionTitle(stringsOf(context).merchantHomeBusinessStatus),
                       const Spacer(),
                       // ★ 状态文案用后端原话(「营业中」/「已打烊」),不另编一套。
                       //   还没读回来时不写死一个默认值 —— 那等于替商家宣称一个
                       //   我们并不知道的状态。
                       Text(
-                        st.asData?.value.text ?? '状态读取中…',
+                        st.asData?.value.text ?? stringsOf(context).merchantHomeStatusLoading,
                         style: TextStyle(
                           color: CyPalette.of(context).textSecondary,
                           fontSize: CyTokens.typeCaption,
@@ -576,7 +601,7 @@ class _ActionsState extends ConsumerState<_Actions> {
                         //   主次正好反了(实拍基准图看出来的)。
                         //   点当前态是空操作,靠 onPressed:null 之外的方式表达"就是它"。
                         child: CyNativeButton(
-                          label: open == false ? '已打烊' : '打烊',
+                          label: open == false ? stringsOf(context).merchantHomeClosed : stringsOf(context).merchantHomeClose,
                           onPressed: !editable || (open != false && _busy)
                               ? null
                               : open == false
@@ -590,7 +615,7 @@ class _ActionsState extends ConsumerState<_Actions> {
                       const SizedBox(width: CyTokens.space2),
                       Expanded(
                         child: CyNativeButton(
-                          label: open == true ? '营业中' : '开始营业',
+                          label: open == true ? stringsOf(context).merchantHomeOpen : stringsOf(context).merchantHomeStart,
                           onPressed: !editable || (open != true && _busy)
                               ? null
                               : open == true
@@ -624,7 +649,7 @@ class _ActionsState extends ConsumerState<_Actions> {
     final entries = <Widget>[
       if (a.canVerify)
         _wideSecondaryAction(
-          label: '扫码核销',
+          label: stringsOf(context).merchantHomeScan,
           onPressed: () => context.push('/merchant/scan'),
           icon: const CyNativeButtonIcon(
             sfSymbol: 'qrcode.viewfinder',
@@ -640,20 +665,20 @@ class _ActionsState extends ConsumerState<_Actions> {
             onPressed: () {
               context.push('/merchant/ledger?view=settlement');
             },
-            child: const Row(
+            child: Row(
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
                 // R10 过渡期:此入口是只读账本/结算视图,不发起提现、无卡号表单。
                 // creditcard 会被读成「能往银行卡打钱」,用账簿语义的 doc.text。
-                Icon(CupertinoIcons.doc_text),
-                SizedBox(width: CyTokens.space2),
-                Text('财务'),
+                const Icon(CupertinoIcons.doc_text),
+                const SizedBox(width: CyTokens.space2),
+                Text(stringsOf(context).merchantHomeFinance),
               ],
             ),
           ),
         ),
       _wideSecondaryAction(
-        label: '合作中心',
+        label: stringsOf(context).merchantHomeCooperation,
         onPressed: () => context.push('/merchant/coop'),
         icon: const CyNativeButtonIcon(
           sfSymbol: 'person.2',
@@ -661,7 +686,7 @@ class _ActionsState extends ConsumerState<_Actions> {
         ),
       ),
       _wideSecondaryAction(
-        label: '我的承接',
+        label: stringsOf(context).merchantHomeAssignments,
         onPressed: () => context.push('/merchant/chapters'),
         icon: const CyNativeButtonIcon(
           sfSymbol: 'list.bullet.clipboard',
@@ -670,7 +695,7 @@ class _ActionsState extends ConsumerState<_Actions> {
       ),
       if (a.canWriteProfile)
         _wideSecondaryAction(
-          label: '店铺装修',
+          label: stringsOf(context).merchantHomeDecor,
           onPressed: () => context.push('/merchant/decor'),
           icon: const CyNativeButtonIcon(
             sfSymbol: 'storefront',
@@ -678,7 +703,7 @@ class _ActionsState extends ConsumerState<_Actions> {
           ),
         ),
       _wideSecondaryAction(
-        label: '店铺形象',
+        label: stringsOf(context).merchantHomeCharacter,
         onPressed: () => context.push('/merchant/npc'),
         icon: const CyNativeButtonIcon(
           sfSymbol: 'person.crop.circle.badge.questionmark',
@@ -687,7 +712,7 @@ class _ActionsState extends ConsumerState<_Actions> {
       ),
       if (a.canReadAftercare)
         _wideSecondaryAction(
-          label: '退款售后',
+          label: stringsOf(context).merchantHomeAftercare,
           onPressed: () => context.push('/merchant/aftercare'),
           icon: const CyNativeButtonIcon(
             sfSymbol: 'arrow.uturn.backward.circle',
@@ -696,7 +721,7 @@ class _ActionsState extends ConsumerState<_Actions> {
         ),
       if (a.canReadCrm)
         _wideSecondaryAction(
-          label: '客户',
+          label: stringsOf(context).merchantHomeCustomers,
           onPressed: () => context.push('/merchant/customers'),
           icon: const CyNativeButtonIcon(
             sfSymbol: 'person.2',
@@ -705,7 +730,7 @@ class _ActionsState extends ConsumerState<_Actions> {
         ),
       if (a.canManageCoop)
         _wideSecondaryAction(
-          label: '承接档案',
+          label: stringsOf(context).merchantHomeCoopProfile,
           onPressed: () => context.push('/merchant/coop-profile'),
           icon: const CyNativeButtonIcon(
             sfSymbol: 'person.text.rectangle',
@@ -713,7 +738,7 @@ class _ActionsState extends ConsumerState<_Actions> {
           ),
         ),
       _wideSecondaryAction(
-        label: '伙伴',
+        label: stringsOf(context).merchantHomePartners,
         onPressed: () => context.push('/merchant/relations'),
         icon: const CyNativeButtonIcon(
           sfSymbol: 'person.3',
@@ -721,7 +746,7 @@ class _ActionsState extends ConsumerState<_Actions> {
         ),
       ),
       _wideSecondaryAction(
-        label: '城市据点',
+        label: stringsOf(context).merchantHomeCityNodes,
         onPressed: () => context.push('/merchant/city-nodes'),
         icon: const CyNativeButtonIcon(
           sfSymbol: 'mappin.and.ellipse',
@@ -729,7 +754,7 @@ class _ActionsState extends ConsumerState<_Actions> {
         ),
       ),
       _wideSecondaryAction(
-        label: '项目主页',
+        label: stringsOf(context).merchantHomeProjects,
         onPressed: () => context.push('/project/home'),
         icon: const CyNativeButtonIcon(
           sfSymbol: 'rectangle.grid.2x2',
@@ -737,7 +762,7 @@ class _ActionsState extends ConsumerState<_Actions> {
         ),
       ),
       _wideSecondaryAction(
-        label: '我的报名',
+        label: stringsOf(context).merchantHomeRegistrations,
         onPressed: () => context.push('/merchant/registrations'),
         icon: const CyNativeButtonIcon(
           sfSymbol: 'checklist',
@@ -745,7 +770,7 @@ class _ActionsState extends ConsumerState<_Actions> {
         ),
       ),
       _wideSecondaryAction(
-        label: '营销',
+        label: stringsOf(context).merchantHomeMarketing,
         onPressed: () => context.push('/merchant/marketing'),
         icon: const CyNativeButtonIcon(
           sfSymbol: 'megaphone',
@@ -754,7 +779,7 @@ class _ActionsState extends ConsumerState<_Actions> {
       ),
       if (a.canWriteProfile)
         _wideSecondaryAction(
-          label: '店铺资料',
+          label: stringsOf(context).merchantHomeStoreProfile,
           onPressed: () => context.push('/merchant/edit'),
           icon: const CyNativeButtonIcon(
             sfSymbol: 'storefront',
@@ -763,7 +788,7 @@ class _ActionsState extends ConsumerState<_Actions> {
         ),
       if (a.canReadOrders)
         _wideSecondaryAction(
-          label: '订单',
+          label: stringsOf(context).merchantHomeOrders,
           onPressed: () => context.push('/merchant/orders'),
           icon: const CyNativeButtonIcon(
             sfSymbol: 'bag',
@@ -771,7 +796,7 @@ class _ActionsState extends ConsumerState<_Actions> {
           ),
         ),
       _wideSecondaryAction(
-        label: '增值服务',
+        label: stringsOf(context).merchantHomeServices,
         onPressed: () => context.push('/merchant/subscription'),
         icon: const CyNativeButtonIcon(
           sfSymbol: 'star',
@@ -779,7 +804,7 @@ class _ActionsState extends ConsumerState<_Actions> {
         ),
       ),
       _wideSecondaryAction(
-        label: '可邀请的俱乐部',
+        label: stringsOf(context).merchantHomeClubs,
         onPressed: () => context.push('/merchant/clubs'),
         icon: const CyNativeButtonIcon(
           sfSymbol: 'person.3',
@@ -847,7 +872,7 @@ class _UnreadBell extends ConsumerWidget {
       },
       child: Semantics(
         button: true,
-        label: '消息',
+        label: stringsOf(context).merchantHomeMessages,
         child: Stack(
           clipBehavior: Clip.none,
           children: <Widget>[
@@ -861,7 +886,7 @@ class _UnreadBell extends ConsumerWidget {
                 // 而这一页是**恒浅**的商家页:浅端红是压深的 #D0323B,白字在
                 // danger 底上对比度 3.91 不达 AA(深字 5.06)。同一个坑在
                 // CyBadge 上踩过,判据见 test/theme/badge_fg_test.dart。
-                child: CyBadge(count: unread, semanticsLabel: '$unread 条未读消息'),
+                child: CyBadge(count: unread, semanticsLabel: stringsOf(context).merchantHomeUnreadCount(unread)),
               ),
           ],
         ),

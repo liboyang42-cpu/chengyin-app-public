@@ -1,3 +1,4 @@
+import '../../l10n/strings.dart';
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
@@ -23,7 +24,9 @@ import '../../data/api/game_session_api.dart';
 import '../../data/models/club_director.dart';
 import '../../data/models/club_topic_ops.dart';
 import 'club_director_controller.dart';
+import 'club_director_messages.dart';
 import 'club_director_sheets.dart';
+import 'club_director_labels.dart';
 import 'club_login_gate.dart';
 import 'club_ops_access.dart';
 import 'club_ops_sections.dart';
@@ -153,7 +156,7 @@ class _ClubTopicDetailPageState extends ConsumerState<ClubTopicDetailPage> {
       if (!mounted) return;
       setState(() {
         _stage = clubOpsFailureState(error);
-        _error = clubOpsErrorMessage(error, '活动详情加载失败，请稍后再试');
+        _error = clubOpsErrorMessage(error, stringsOf(context).clubTopicLoadFailed);
         _loginRequired = clubLoginRequired(error);
       });
     }
@@ -259,7 +262,7 @@ class _ClubTopicDetailPageState extends ConsumerState<ClubTopicDetailPage> {
       return (
         date: '${match[1]}-${match[2]}-${match[3]}',
         time: time,
-        text: '${int.parse(match[2]!)}月${int.parse(match[3]!)}日 $time',
+        text: stringsOf(context).clubTopicMeetingDate(int.parse(match[2]!), int.parse(match[3]!), time),
       );
     }
     return null;
@@ -300,7 +303,7 @@ class _ClubTopicDetailPageState extends ConsumerState<ClubTopicDetailPage> {
       if (!mounted) return;
       setState(() {
         _recap = null;
-        _recapError = clubOpsErrorMessage(error, '本局复盘状态没能加载出来');
+        _recapError = clubOpsErrorMessage(error, stringsOf(context).clubTopicRecapLoadFailed);
       });
     }
   }
@@ -312,7 +315,7 @@ class _ClubTopicDetailPageState extends ConsumerState<ClubTopicDetailPage> {
         !state.exportAvailable ||
         _exporting ||
         activityId <= 0) {
-      CyNativeNotice.show(context, '复盘还没生成，稍后再导出');
+      CyNativeNotice.show(context, stringsOf(context).clubTopicRecapNotReady);
       return;
     }
     setState(() => _exporting = true);
@@ -325,13 +328,13 @@ class _ClubTopicDetailPageState extends ConsumerState<ClubTopicDetailPage> {
       await Clipboard.setData(ClipboardData(text: jsonEncode(payload)));
       if (!mounted) return;
       setState(() => _exporting = false);
-      CyNativeNotice.show(context, '复盘数据已复制');
+      CyNativeNotice.show(context, stringsOf(context).clubTopicRecapCopied);
     } catch (error) {
       if (!mounted) return;
       setState(() => _exporting = false);
       CyNativeNotice.show(
         context,
-        classifyClubOpsFailure(error).network ? '网络异常，复制失败' : '复盘数据复制失败',
+        classifyClubOpsFailure(error).network ? stringsOf(context).clubTopicCopyNetworkFailed : stringsOf(context).clubTopicRecapCopyFailed,
       );
     }
   }
@@ -346,15 +349,15 @@ class _ClubTopicDetailPageState extends ConsumerState<ClubTopicDetailPage> {
     final ClubRecapState? state = _recap;
     if (state == null) {
       return ClubOpsSection(
-        title: '活动复盘',
-        note: _recapError.isEmpty ? '复盘状态加载中…' : _recapError,
+        title: stringsOf(context).clubTopicRecapTitle,
+        note: _recapError.isEmpty ? stringsOf(context).clubTopicRecapLoading : _recapError,
         children: <Widget>[
           if (_recapError.isNotEmpty)
             ClubOpsCard(
               children: <Widget>[
                 ClubOpsRowLink(
                   key: const Key('topic-recap-retry'),
-                  label: '重试',
+                  label: stringsOf(context).clubTopicRetry,
                   onTap: _loadRecap,
                 ),
               ],
@@ -363,15 +366,15 @@ class _ClubTopicDetailPageState extends ConsumerState<ClubTopicDetailPage> {
       );
     }
     if (!state.recapAvailable) {
-      return const ClubOpsSection(
-        title: '活动复盘',
-        note: '复盘尚未生成，不会把缺失指标显示为零。',
+      return ClubOpsSection(
+        title: stringsOf(context).clubTopicRecapTitle,
+        note: stringsOf(context).clubTopicRecapMissing,
         children: <Widget>[],
       );
     }
     if (!state.exportAvailable) return null;
     return ClubOpsSection(
-      title: '活动复盘',
+      title: stringsOf(context).clubTopicRecapTitle,
       children: <Widget>[
         ClubOpsCard(
           children: <Widget>[
@@ -379,7 +382,7 @@ class _ClubTopicDetailPageState extends ConsumerState<ClubTopicDetailPage> {
               padding: const EdgeInsets.all(CyTokens.space4),
               child: CyNativeButton(
                 key: const Key('topic-recap-export'),
-                label: _exporting ? '复制中' : '复制复盘数据',
+                label: _exporting ? stringsOf(context).clubTopicCopying : stringsOf(context).clubTopicCopyRecap,
                 role: CyNativeButtonRole.secondary,
                 width: double.infinity,
                 onPressed: _exporting ? null : _copyRecap,
@@ -476,14 +479,14 @@ class _ClubTopicDetailPageState extends ConsumerState<ClubTopicDetailPage> {
         .projection;
     if (p == null) return;
     if (!p.canPrepare) {
-      CyNativeNotice.show(context, '当前不能进入准备');
+      CyNativeNotice.show(context, stringsOf(context).clubTopicCannotPrepare);
       return;
     }
     final bool ok = await cyConfirm(
       context,
-      title: '进入准备',
-      content: '进入后将开始收集站点和队伍 READY 状态。',
-      confirmText: '开始准备',
+      title: stringsOf(context).clubTopicPrepareTitle,
+      content: stringsOf(context).clubTopicPrepareBody,
+      confirmText: stringsOf(context).clubTopicPrepareAction,
     );
     if (!ok || !mounted) return;
     await _directorWrite(
@@ -498,14 +501,14 @@ class _ClubTopicDetailPageState extends ConsumerState<ClubTopicDetailPage> {
         .projection;
     if (p == null) return;
     if (!p.canStart) {
-      CyNativeNotice.show(context, '准备未完成，暂时不能开局');
+      CyNativeNotice.show(context, stringsOf(context).clubTopicNotReady);
       return;
     }
     final bool ok = await cyConfirm(
       context,
-      title: '确认开局',
-      content: '开局后玩家将按当前角色和节点状态进入活动。',
-      confirmText: '开始活动',
+      title: stringsOf(context).clubTopicStartTitle,
+      content: stringsOf(context).clubTopicStartBody,
+      confirmText: stringsOf(context).clubTopicStartAction,
     );
     if (!ok || !mounted) return;
     await _directorWrite(
@@ -520,17 +523,16 @@ class _ClubTopicDetailPageState extends ConsumerState<ClubTopicDetailPage> {
         .projection;
     if (p == null) return;
     if (!p.canFinish) {
-      CyNativeNotice.show(context, '当前不能结束活动');
+      CyNativeNotice.show(context, stringsOf(context).clubTopicCannotEnd);
       return;
     }
     final bool ok = await cyConfirm(
       context,
-      title: '结束这场活动？',
+      title: stringsOf(context).clubTopicEndTitle,
       content:
-          '结束后不能再核销、不能再改队伍与角色;已产生的结算事实会保留。'
-          '此操作不可撤销。',
-      confirmText: '结束活动',
-      cancelText: '再想想',
+          stringsOf(context).clubTopicEndSessionBody,
+      confirmText: stringsOf(context).clubTopicEndAction,
+      cancelText: stringsOf(context).clubTopicReconsider,
       danger: true,
     );
     if (!ok || !mounted) return;
@@ -558,11 +560,13 @@ class _ClubTopicDetailPageState extends ConsumerState<ClubTopicDetailPage> {
   /// unknown-write 的两个安全出口(真源 onReconcileUnknownWrite / retryUnknownWrite):
   /// 核对 = 用原 requestId 回读,绝不重发;重试 = 同一 requestId 幂等重放。
   Future<void> _onReconcileUnknownWrite(int directorId) async {
-    final String? toast = await ref
+    final ClubDirectorReconcileResult? outcome = await ref
         .read(clubDirectorProvider(directorId).notifier)
-        .reconcile();
-    if (!mounted || toast == null) return;
-    CyNativeNotice.show(context, toast);
+        .reconcileOutcome();
+    if (!mounted || outcome == null) return;
+    CyNativeNotice.show(context, outcome == ClubDirectorReconcileResult.confirmed
+        ? stringsOf(context).clubDirectorMessageConfirmedNotice
+        : stringsOf(context).clubDirectorMessageRejectedNotice);
   }
 
   Future<void> _onRetryUnknownWrite(int directorId) async {
@@ -573,7 +577,7 @@ class _ClubTopicDetailPageState extends ConsumerState<ClubTopicDetailPage> {
     if (!mounted) return;
     if (result == ClubDirectorWriteResult.blocked) {
       // retryPending 只有「存根没存住/没得重试」才会 blocked。
-      CyNativeNotice.show(context, '无法安全保存，未发送重试');
+      CyNativeNotice.show(context, stringsOf(context).clubTopicRetryNotSent);
       return;
     }
     clubDirectorNotifyWriteResult(
@@ -593,7 +597,7 @@ class _ClubTopicDetailPageState extends ConsumerState<ClubTopicDetailPage> {
   ) {
     final ClubTopicStatus status = eff.status;
     final ({String text, bool enabled, String hint}) base = (
-      text: status.primaryText,
+      text: _topicPrimaryLabel(context, status),
       enabled: !status.primaryDisabled,
       hint: '',
     );
@@ -616,10 +620,10 @@ class _ClubTopicDetailPageState extends ConsumerState<ClubTopicDetailPage> {
     }
     if (_stats?.canManageSessions != true) return none;
     if (overview.activities.isNotEmpty) {
-      return (text: '去选一场', enabled: true, hint: '');
+      return (text: stringsOf(context).clubTopicSelectSession, enabled: true, hint: '');
     }
     // §5-断6:没场次时主键换成「去开场」,原因就地写出来 —— 不留点了没反应的死入口。
-    return (text: '去开场', enabled: true, hint: '这个主题还没有场次：核销与团码都要先开一场。');
+    return (text: stringsOf(context).clubTopicCreateSession, enabled: true, hint: stringsOf(context).clubTopicNeedsSession);
   }
 
   /// 主键文案为空(小程序 `primary.text = ''`)时整条不出。
@@ -664,7 +668,7 @@ class _ClubTopicDetailPageState extends ConsumerState<ClubTopicDetailPage> {
     await showCupertinoModalPopup<void>(
       context: context,
       builder: (_) => _SheetFrame(
-        title: '商家',
+        title: stringsOf(context).clubTopicMerchants,
         sheetKey: const Key('topic-merchants-sheet'),
         child: _MerchantsBody(clubId: widget.clubId, topicId: widget.topicId),
       ),
@@ -676,7 +680,7 @@ class _ClubTopicDetailPageState extends ConsumerState<ClubTopicDetailPage> {
     await showCupertinoModalPopup<void>(
       context: context,
       builder: (_) => _SheetFrame(
-        title: '成员',
+        title: stringsOf(context).clubTopicMembers,
         sheetKey: const Key('topic-customers-sheet'),
         child: _CustomersBody(
           clubId: widget.clubId,
@@ -693,13 +697,13 @@ class _ClubTopicDetailPageState extends ConsumerState<ClubTopicDetailPage> {
   Future<void> _openBroadcastSheet() async {
     final int directorId = _directorActivityId;
     if (directorId <= 0) {
-      CyNativeNotice.show(context, '当前不能发送广播');
+      CyNativeNotice.show(context, stringsOf(context).clubTopicBroadcastDenied);
       return;
     }
     final ClubDirectorState s = ref.read(clubDirectorProvider(directorId));
     if (s.writeLocked) return;
     if (s.projection?.canBroadcast != true) {
-      CyNativeNotice.show(context, '当前不能发送广播');
+      CyNativeNotice.show(context, stringsOf(context).clubTopicBroadcastDenied);
       return;
     }
     await ClubDirectorBroadcastSheet.open(context, ref, directorId);
@@ -733,7 +737,7 @@ class _ClubTopicDetailPageState extends ConsumerState<ClubTopicDetailPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              const CyPageTitle('活动详情'),
+              CyPageTitle(stringsOf(context).clubTopicTitle),
               Expanded(child: _body()),
               if (_stage == ClubOpsLoadState.ready && overview != null)
                 ..._footer(overview, _effectiveStatus(overview, d)),
@@ -748,36 +752,36 @@ class _ClubTopicDetailPageState extends ConsumerState<ClubTopicDetailPage> {
     // 401 排在四态之前:登录过期既不是「没权限」也不是「网络差」,
     // 重试不改登录态就是死路 —— 就地给登录门(#258)。
     if (_loginRequired) {
-      return ClubLoginGate(message: '登录后查看活动详情', onSignedIn: () => _load());
+      return ClubLoginGate(message: stringsOf(context).clubTopicLogin, onSignedIn: () => _load());
     }
     switch (_stage) {
       case ClubOpsLoadState.loading:
-        return const CySkeleton(
+        return CySkeleton(
           type: CySkeletonType.card,
           count: 4,
-          label: '正在加载活动详情',
+          label: stringsOf(context).clubTopicLoading,
         );
       case ClubOpsLoadState.noPermission:
         return StatusView(
-          message: '你看不到这条活动',
-          sub: _error.isEmpty ? '这条主题可能只对成员可见，或者你不在这个俱乐部。' : _error,
+          message: stringsOf(context).clubTopicDenied,
+          sub: _error.isEmpty ? stringsOf(context).clubTopicDeniedBody : _error,
           icon: CupertinoIcons.lock,
           large: true,
         );
       case ClubOpsLoadState.networkError:
         return StatusView(
-          message: '网络连接失败',
+          message: stringsOf(context).clubTopicNetworkFailed,
           sub: _error,
           icon: CupertinoIcons.exclamationmark_triangle,
           large: true,
           // 小程序 retry="重新连接" —— 断网后是「重连」不是泛泛的「重试」。
-          retryLabel: '重新连接',
+          retryLabel: stringsOf(context).clubTopicReconnect,
           onRetry: _load,
         );
       case ClubOpsLoadState.error:
         return StatusView(
-          message: '活动暂时打不开',
-          sub: _error.isEmpty ? '可能是网络波动，或这个活动已经下架。' : _error,
+          message: stringsOf(context).clubTopicUnavailable,
+          sub: _error.isEmpty ? stringsOf(context).clubTopicUnavailableBody : _error,
           icon: CupertinoIcons.exclamationmark_triangle,
           large: true,
           onRetry: _load,
@@ -821,7 +825,7 @@ class _ClubTopicDetailPageState extends ConsumerState<ClubTopicDetailPage> {
         if (overview.status.showsRejectReason &&
             overview.rejectReason.isNotEmpty)
           ClubOpsSection(
-            title: '未通过原因',
+            title: stringsOf(context).clubTopicRejectionReason,
             children: <Widget>[
               ClubOpsCard(
                 children: <Widget>[
@@ -846,18 +850,18 @@ class _ClubTopicDetailPageState extends ConsumerState<ClubTopicDetailPage> {
         if (eff.status.showsVerify && stats.canViewVerify && !eff.cancelled)
           _VerifySection(stats: stats, onLedger: _openLedger),
         ClubOpsSection(
-          title: '主题',
+          title: stringsOf(context).clubTopicTopic,
           children: <Widget>[
             _TopicCard(overview: overview, stats: stats, onTap: _openStory),
           ],
         ),
         if (overview.status.showsSessions && overview.sessions.isNotEmpty)
           ClubOpsSection(
-            title: '接下来',
+            title: stringsOf(context).clubTopicNext,
             trailing: stats.canManageSessions
                 ? ClubOpsRowLink(
                     key: const Key('topic-detail-manage-sessions'),
-                    label: '管理场次',
+                    label: stringsOf(context).clubTopicManageSessions,
                     onTap: _openEventOps,
                   )
                 : null,
@@ -885,12 +889,12 @@ class _ClubTopicDetailPageState extends ConsumerState<ClubTopicDetailPage> {
               children: <Widget>[
                 ClubOpsRow(
                   key: const Key('topic-ops-time'),
-                  title: '集合时间',
+                  title: stringsOf(context).clubTopicMeetingTime,
                   value: opsTime.text,
                   valueColor: CyPalette.of(context).textPrimary,
                   trailing: ClubOpsRowLink(
                     key: const Key('topic-ops-time-edit'),
-                    label: '修改',
+                    label: stringsOf(context).clubTopicChange,
                     onTap: _openOpsTimeSheet,
                   ),
                   onTap: _openOpsTimeSheet,
@@ -907,9 +911,9 @@ class _ClubTopicDetailPageState extends ConsumerState<ClubTopicDetailPage> {
               horizontal: CyTokens.pageX,
               vertical: CyTokens.space4,
             ),
-            child: const StatusView(
-              message: '暂无节点状态',
-              sub: '节点数据尚未下发，不能据此判断为零进度。',
+            child: StatusView(
+              message: stringsOf(context).clubTopicNoNodeStatus,
+              sub: stringsOf(context).clubTopicNoNodeStatusBody,
               icon: CupertinoIcons.number,
             ),
           ),
@@ -922,7 +926,7 @@ class _ClubTopicDetailPageState extends ConsumerState<ClubTopicDetailPage> {
               0,
             ),
             child: Text(
-              '仅改变章节开放状态，玩家进度与发放状态保持不变。',
+              stringsOf(context).clubTopicChapterStateOnly,
               style: TextStyle(
                 fontSize: CyTokens.typeCaption,
                 height: 1.45,
@@ -973,7 +977,7 @@ class _ClubTopicDetailPageState extends ConsumerState<ClubTopicDetailPage> {
         Padding(
           padding: pad,
           child: ClubLoginGate(
-            message: '登录后查看活动导演台',
+            message: stringsOf(context).clubTopicDirectorLogin,
             onSignedIn: () =>
                 ref.read(clubDirectorProvider(directorId).notifier).load(),
           ),
@@ -993,12 +997,12 @@ class _ClubTopicDetailPageState extends ConsumerState<ClubTopicDetailPage> {
           Padding(
             padding: pad,
             child: StatusView(
-              message: '导演台读取失败',
-              sub: d.errorText,
+              message: stringsOf(context).clubTopicDirectorFailed,
+              sub: clubDirectorErrorMessage(context, d),
               icon: CupertinoIcons.exclamationmark_triangle,
               onRetry: () =>
                   ref.read(clubDirectorProvider(directorId).notifier).load(),
-              retryLabel: '重新加载',
+              retryLabel: stringsOf(context).clubTopicReload,
             ),
           ),
         ];
@@ -1007,12 +1011,12 @@ class _ClubTopicDetailPageState extends ConsumerState<ClubTopicDetailPage> {
           Padding(
             padding: pad,
             child: StatusView(
-              message: '网络连接失败',
-              sub: d.errorText,
+              message: stringsOf(context).clubTopicNetworkFailed,
+              sub: clubDirectorErrorMessage(context, d),
               icon: CupertinoIcons.exclamationmark_triangle,
               onRetry: () =>
                   ref.read(clubDirectorProvider(directorId).notifier).load(),
-              retryLabel: '重新连接',
+              retryLabel: stringsOf(context).clubTopicReconnect,
             ),
           ),
         ];
@@ -1021,8 +1025,8 @@ class _ClubTopicDetailPageState extends ConsumerState<ClubTopicDetailPage> {
           Padding(
             padding: pad,
             child: StatusView(
-              message: '还没有可管理的活动局',
-              sub: d.errorText.isEmpty ? '先从俱乐部管理区开一场，再进入导演台。' : d.errorText,
+              message: stringsOf(context).clubTopicNoSession,
+              sub: d.errorText.isEmpty ? stringsOf(context).clubTopicNoSessionBody : clubDirectorErrorMessage(context, d),
               icon: CupertinoIcons.gamecontroller,
             ),
           ),
@@ -1051,44 +1055,44 @@ class _ClubTopicDetailPageState extends ConsumerState<ClubTopicDetailPage> {
     }
     return <Widget>[
       ClubOpsSection(
-        title: '准备总览',
-        caption: d.writeMessage.isEmpty ? null : d.writeMessage,
+        title: stringsOf(context).clubTopicPreparationOverview,
+        caption: d.writeMessage.isEmpty ? null : clubDirectorWriteMessage(context, d),
         children: <Widget>[
-          const ClubDirectorSectionTitle('节点状态'),
+          ClubDirectorSectionTitle(stringsOf(context).clubTopicNodeStatus),
           Padding(
             padding: const EdgeInsets.only(
               left: CyTokens.pageX,
               bottom: CyTokens.space2,
             ),
             child: Text(
-              p.readinessText,
+              ClubDirectorLabels(context).readiness(p.readiness),
               style: TextStyle(
                 fontSize: CyTokens.typeCaption,
                 color: palette.textTertiary,
               ),
             ),
           ),
-          ClubDirectorRowList(rows: clubDirectorStationRows(p.stations)),
-          const ClubDirectorSectionTitle('队伍进度'),
+          ClubDirectorRowList(rows: clubDirectorStationRows(p.stations, context: context)),
+          ClubDirectorSectionTitle(stringsOf(context).clubTopicTeamProgress),
           Padding(
             padding: const EdgeInsets.only(
               left: CyTokens.pageX,
               bottom: CyTokens.space2,
             ),
             child: Text(
-              p.sessionStatusText,
+              ClubDirectorLabels(context).sessionStatus(p.status),
               style: TextStyle(
                 fontSize: CyTokens.typeCaption,
                 color: palette.textTertiary,
               ),
             ),
           ),
-          ClubDirectorRowList(rows: clubDirectorTeamRows(p.teams)),
+          ClubDirectorRowList(rows: clubDirectorTeamRows(p.teams, context: context)),
           const SizedBox(height: CyTokens.space4),
           // 「开始活动」在非法态是**禁用**,不是消失 —— 主理人得看见自己卡在哪。
           CyNativeButton(
             key: const Key('topic-director-d1-start'),
-            label: '开始活动',
+            label: stringsOf(context).clubTopicStartAction,
             width: double.infinity,
             onPressed: !p.canStart || d.writeLocked
                 ? null
@@ -1106,34 +1110,34 @@ class _ClubTopicDetailPageState extends ConsumerState<ClubTopicDetailPage> {
     if (d == null || p == null || d.load != ClubDirectorLoadState.ready) {
       return const <Widget>[];
     }
-    final bool hasTeamRows = clubDirectorTeamRows(p.teams).isNotEmpty;
+    final bool hasTeamRows = clubDirectorTeamRows(p.teams, context: context).isNotEmpty;
     final bool hasMemberRows = p.canAssignRoles && p.roleMemberRows.isNotEmpty;
     final List<({String label, Key key, Future<void> Function() open})>
     tools = <({String label, Key key, Future<void> Function() open})>[
       if (p.canUnlockChapter)
         (
-          label: '手动解锁章节',
+          label: stringsOf(context).clubTopicUnlockChapter,
           key: const Key('director-tool-unlock'),
           open: () =>
               ClubDirectorChapterSheet.open(context, ref, _directorActivityId),
         ),
       if (hasTeamRows)
         (
-          label: '队伍进度',
+          label: stringsOf(context).clubTopicTeamProgress,
           key: const Key('director-tool-teams'),
           open: () =>
               ClubDirectorTeamSheet.open(context, ref, _directorActivityId),
         ),
       if (hasMemberRows)
         (
-          label: '角色分配',
+          label: stringsOf(context).clubTopicAssignRoles,
           key: const Key('director-tool-roles'),
           open: () =>
               ClubDirectorRoleSheet.open(context, ref, _directorActivityId),
         ),
       if (p.incidents.isNotEmpty)
         (
-          label: '现场事件',
+          label: stringsOf(context).clubTopicIncidents,
           key: const Key('director-tool-incidents'),
           open: () =>
               ClubDirectorIncidentSheet.open(context, ref, _directorActivityId),
@@ -1379,7 +1383,7 @@ class _StatusCapsule extends StatelessWidget {
           ),
           const SizedBox(width: CyTokens.space1_5),
           Text(
-            cancelled ? '已取消' : status.text,
+            cancelled ? stringsOf(context).clubTopicCancelled : _topicStatusLabel(context, status),
             style: TextStyle(
               fontSize: CyTokens.typeMicro,
               fontWeight: FontWeight.w600,
@@ -1440,7 +1444,7 @@ class _QuickActions extends StatelessWidget {
       // 四圆钮是一整块导航(小程序 aria-label="活动快捷入口"),
       // 读屏时四个孤立图标读不出它们是一组。
       container: true,
-      label: '活动快捷入口',
+      label: stringsOf(context).clubTopicQuickEntries,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(
           CyTokens.pageX,
@@ -1454,25 +1458,25 @@ class _QuickActions extends StatelessWidget {
             _QuickAction(
               actionKey: const Key('topic-detail-quick-merchant'),
               icon: CupertinoIcons.briefcase,
-              label: '商家',
+              label: stringsOf(context).clubTopicMerchants,
               onTap: onMerchant,
             ),
             _QuickAction(
               actionKey: const Key('topic-detail-quick-customer'),
               icon: CupertinoIcons.person_2,
-              label: '成员',
+              label: stringsOf(context).clubTopicMembers,
               onTap: onCustomer,
             ),
             _QuickAction(
               actionKey: const Key('topic-detail-quick-groupcode'),
               icon: CupertinoIcons.qrcode,
-              label: '团码',
+              label: stringsOf(context).clubTopicGroupCode,
               onTap: onGroupCode,
             ),
             _QuickAction(
               actionKey: const Key('topic-detail-quick-more'),
               icon: CupertinoIcons.ellipsis,
-              label: '更多',
+              label: stringsOf(context).clubTopicMore,
               onTap: onMore,
             ),
           ],
@@ -1539,15 +1543,15 @@ class _VerifySection extends StatelessWidget {
   Widget build(BuildContext context) {
     final CyPalette palette = CyPalette.of(context);
     return ClubOpsSection(
-      title: '核销',
+      title: stringsOf(context).clubTopicCheckin,
       trailing: Semantics(
         // 小程序: aria-label="打开核销台账"(可见字仍是「台账」)
         button: true,
         excludeSemantics: true,
-        label: '打开核销台账',
+        label: stringsOf(context).clubTopicOpenLedger,
         child: ClubOpsRowLink(
           key: const Key('topic-detail-ledger'),
-          label: '台账',
+          label: stringsOf(context).clubTopicLedger,
           onTap: onLedger,
         ),
       ),
@@ -1625,7 +1629,7 @@ class _TopicCard extends StatelessWidget {
               fallback: ColoredBox(color: palette.bgSurfaceSubtle),
             ),
           ),
-          value: '打开剧情与玩法',
+          value: stringsOf(context).clubTopicOpenStory,
           onTap: onTap,
         ),
         if (overview.statusChips.isNotEmpty)
@@ -1687,7 +1691,7 @@ class _SessionRow extends StatelessWidget {
     ].where((String s) => s.isNotEmpty).join(' · ');
     return ClubOpsRow(
       key: Key('topic-detail-session-${session.id}'),
-      title: session.whenText.isEmpty ? '时间待定' : session.whenText,
+      title: session.whenText.isEmpty ? stringsOf(context).clubTopicTimePending : session.whenText,
       meta: meta.isEmpty ? null : meta,
       value: session.kindText,
     );
@@ -1824,7 +1828,7 @@ class _TopicSettingSheetState extends ConsumerState<_TopicSettingSheet> {
       if (!mounted) return;
       setState(() {
         _stage = clubOpsFailureState(error);
-        _error = clubOpsErrorMessage(error, '主题设置没能取到，稍后再试一次');
+        _error = clubOpsErrorMessage(error, stringsOf(context).clubTopicSettingsRetryLater);
       });
     }
   }
@@ -1873,7 +1877,7 @@ class _TopicSettingSheetState extends ConsumerState<_TopicSettingSheet> {
       });
       CyNativeNotice.show(
         context,
-        clubOpsErrorMessage(error, '没能保存，请重试'),
+        clubOpsErrorMessage(error, stringsOf(context).clubTopicSaveFailed),
         isError: true,
       );
     }
@@ -1889,13 +1893,13 @@ class _TopicSettingSheetState extends ConsumerState<_TopicSettingSheet> {
       setState(() => _saving = false);
       await _load();
       if (!mounted) return;
-      CyNativeNotice.show(context, chapter.recruiting ? '已关闭商家承接' : '已开放商家承接');
+      CyNativeNotice.show(context, chapter.recruiting ? stringsOf(context).clubTopicMerchantClosed : stringsOf(context).clubTopicMerchantOpened);
     } catch (error) {
       if (!mounted) return;
       setState(() => _saving = false);
       CyNativeNotice.show(
         context,
-        clubOpsErrorMessage(error, '没改成功，检查网络后重试'),
+        clubOpsErrorMessage(error, stringsOf(context).clubTopicChangeFailed),
         isError: true,
       );
     }
@@ -1915,7 +1919,7 @@ class _TopicSettingSheetState extends ConsumerState<_TopicSettingSheet> {
       setState(() => _saving = false);
       CyNativeNotice.show(
         context,
-        clubOpsErrorMessage(error, '没能结束本章'),
+        clubOpsErrorMessage(error, stringsOf(context).clubTopicChapterEndFailed),
         isError: true,
       );
     }
@@ -1925,8 +1929,8 @@ class _TopicSettingSheetState extends ConsumerState<_TopicSettingSheet> {
     Navigator.of(context).pop();
     await showCupertinoModalPopup<void>(
       context: context,
-      builder: (_) => const _SheetFrame(
-        title: '退出与暂停规则',
+      builder: (_) => _SheetFrame(
+        title: stringsOf(context).clubTopicExitRules,
         sheetKey: Key('topic-rules-sheet'),
         child: _RulesBody(),
       ),
@@ -1956,7 +1960,7 @@ class _TopicSettingSheetState extends ConsumerState<_TopicSettingSheet> {
   @override
   Widget build(BuildContext context) {
     return _SheetFrame(
-      title: '更多',
+      title: stringsOf(context).clubTopicMore,
       sheetKey: const Key('topic-setting-sheet'),
       child: _body(),
     );
@@ -1966,18 +1970,18 @@ class _TopicSettingSheetState extends ConsumerState<_TopicSettingSheet> {
     switch (_stage) {
       case ClubOpsLoadState.loading:
         return const Padding(
-          padding: EdgeInsets.all(CyTokens.pageX),
+          padding: const EdgeInsets.all(CyTokens.pageX),
           child: CySkeleton(type: CySkeletonType.card, count: 3),
         );
       case ClubOpsLoadState.noPermission:
-        return const Padding(
-          padding: EdgeInsets.symmetric(
+        return Padding(
+          padding: const EdgeInsets.symmetric(
             horizontal: CyTokens.pageX,
             vertical: CyTokens.space5,
           ),
           child: StatusView(
-            message: '当前岗位没有查看权限',
-            sub: '主题设置需要「活动查看」权限。',
+            message: stringsOf(context).clubTopicRoleDenied,
+            sub: stringsOf(context).clubTopicSettingsPermission,
             icon: CupertinoIcons.lock,
           ),
         );
@@ -1989,8 +1993,8 @@ class _TopicSettingSheetState extends ConsumerState<_TopicSettingSheet> {
             vertical: CyTokens.space5,
           ),
           child: StatusView(
-            message: '主题设置没能取到',
-            sub: _error.isEmpty ? '稍后再试一次' : _error,
+            message: stringsOf(context).clubTopicSettingsFailed,
+            sub: _error.isEmpty ? stringsOf(context).clubTopicRetryLater : _error,
             icon: CupertinoIcons.exclamationmark_triangle,
             onRetry: _load,
           ),
@@ -2036,8 +2040,8 @@ class _TopicSettingSheetState extends ConsumerState<_TopicSettingSheet> {
             children: <Widget>[
               ClubOpsRow(
                 key: const Key('topic-setting-edit'),
-                title: '编辑主题内容',
-                meta: '名称、封面、剧情、日期、票价都在编辑主题页改。',
+                title: stringsOf(context).clubTopicEditContent,
+                meta: stringsOf(context).clubTopicEditContentBody,
                 metaLines: 2,
                 onTap: () {
                   Navigator.of(context).pop();
@@ -2046,8 +2050,8 @@ class _TopicSettingSheetState extends ConsumerState<_TopicSettingSheet> {
               ),
               ClubOpsRow(
                 key: const Key('topic-setting-story'),
-                title: '剧情与玩法',
-                meta: '看这条路线有几章几站、玩法配没配。',
+                title: stringsOf(context).clubTopicStory,
+                meta: stringsOf(context).clubTopicStoryBody,
                 metaLines: 2,
                 onTap: () {
                   Navigator.of(context).pop();
@@ -2056,8 +2060,8 @@ class _TopicSettingSheetState extends ConsumerState<_TopicSettingSheet> {
               ),
               ClubOpsRow(
                 key: const Key('topic-setting-ledger'),
-                title: '核销台账',
-                meta: '按团看报名与核销，能清退退款。',
+                title: stringsOf(context).clubTopicCheckinLedger,
+                meta: stringsOf(context).clubTopicLedgerBody,
                 metaLines: 2,
                 onTap: () {
                   Navigator.of(context).pop();
@@ -2067,8 +2071,8 @@ class _TopicSettingSheetState extends ConsumerState<_TopicSettingSheet> {
               if (widget.canManageSessions)
                 ClubOpsRow(
                   key: const Key('topic-setting-sessions'),
-                  title: '场次管理',
-                  meta: '加日期、改未来场次、取消本场。',
+                  title: stringsOf(context).clubTopicSessionManagement,
+                  meta: stringsOf(context).clubTopicSessionManagementBody,
                   metaLines: 2,
                   onTap: () {
                     Navigator.of(context).pop();
@@ -2077,24 +2081,24 @@ class _TopicSettingSheetState extends ConsumerState<_TopicSettingSheet> {
                 ),
               Semantics(
                 button: true,
-                label: '查看退出与暂停规则',
+                label: stringsOf(context).clubTopicViewRules,
                 child: ClubOpsRow(
                   key: const Key('topic-setting-rules'),
-                  title: '退出与暂停规则',
-                  meta: '玩家退出、队长移交、暂停与退款的判据。',
+                  title: stringsOf(context).clubTopicExitRules,
+                  meta: stringsOf(context).clubTopicRulesBody,
                   metaLines: 2,
                   onTap: _openRules,
                 ),
               ),
             ],
           ),
-          _sectionLabel('开放商家对接'),
+          _sectionLabel(stringsOf(context).clubTopicMerchantConnections),
           ClubOpsCard(
             children: <Widget>[
               _SwitchRow(
                 rowKey: const Key('topic-setting-coop'),
-                title: '开放商家承接',
-                meta: '关掉后本主题不再出现在商家的可承接列表里。',
+                title: stringsOf(context).clubTopicMerchantParticipation,
+                meta: stringsOf(context).clubTopicMerchantParticipationBody,
                 value: setting.coopOpen,
                 enabled: setting.canManage && !_saving,
                 onChanged: (bool next) => _toggle(
@@ -2106,14 +2110,14 @@ class _TopicSettingSheetState extends ConsumerState<_TopicSettingSheet> {
             ],
           ),
           if (setting.chapters.isNotEmpty) ...<Widget>[
-            _sectionLabel('章节'),
+            _sectionLabel(stringsOf(context).clubTopicChapters),
             ClubOpsCard(
               children: setting.chapters
                   .map(
                     (TopicSettingChapter chapter) => ClubOpsRow(
                       key: Key('topic-setting-chapter-${chapter.id}'),
-                      title: chapter.name.isEmpty ? '未命名章节' : chapter.name,
-                      meta: chapter.finished ? '本章已结束' : '管理商家承接',
+                      title: chapter.name.isEmpty ? stringsOf(context).clubTopicUnnamedChapter : chapter.name,
+                      meta: chapter.finished ? stringsOf(context).clubTopicChapterEnded : stringsOf(context).clubTopicManageMerchants,
                       value: chapter.recruitingText,
                       valueColor: chapter.recruiting
                           ? null
@@ -2125,13 +2129,13 @@ class _TopicSettingSheetState extends ConsumerState<_TopicSettingSheet> {
                   .toList(growable: false),
             ),
           ],
-          _sectionLabel('在俱乐部页的展示'),
+          _sectionLabel(stringsOf(context).clubTopicClubDisplay),
           ClubOpsCard(
             children: <Widget>[
               _SwitchRow(
                 rowKey: const Key('topic-setting-pinned'),
-                title: '置顶在俱乐部主页',
-                meta: '俱乐部页「活动」tab 里排在最前。',
+                title: stringsOf(context).clubTopicPin,
+                meta: stringsOf(context).clubTopicPinBody,
                 value: setting.pinned,
                 enabled: setting.canManage && !_saving,
                 onChanged: (bool next) => _toggle(
@@ -2142,8 +2146,8 @@ class _TopicSettingSheetState extends ConsumerState<_TopicSettingSheet> {
               ),
               _SwitchRow(
                 rowKey: const Key('topic-setting-member-only'),
-                title: '只对成员可见',
-                meta: '开启后非成员看不到这条主题。',
+                title: stringsOf(context).clubTopicMembersOnly,
+                meta: stringsOf(context).clubTopicMembersOnlyBody,
                 value: setting.memberOnly,
                 enabled: setting.canManage && !_saving,
                 onChanged: (bool next) => _toggle(
@@ -2160,9 +2164,9 @@ class _TopicSettingSheetState extends ConsumerState<_TopicSettingSheet> {
               children: <Widget>[
                 ClubOpsRow(
                   key: const Key('topic-setting-end'),
-                  title: '结束主题',
+                  title: stringsOf(context).clubTopicEndTopic,
                   titleColor: CyTokens.statusDanger,
-                  meta: '停止售卖，并把未核销的票原价退回。',
+                  meta: stringsOf(context).clubTopicEndRefundBody,
                   metaLines: 2,
                   onTap: _openEndTopic,
                 ),
@@ -2171,7 +2175,7 @@ class _TopicSettingSheetState extends ConsumerState<_TopicSettingSheet> {
           Padding(
             padding: const EdgeInsets.only(top: CyTokens.space2),
             child: Text(
-              '含已核销票的订单退不了，会留给平台人工处理，结束后会告诉你有几笔。',
+              stringsOf(context).clubTopicManualRefundBody,
               style: TextStyle(
                 fontSize: CyTokens.typeCaption,
                 height: 1.45,
@@ -2189,7 +2193,7 @@ class _TopicSettingSheetState extends ConsumerState<_TopicSettingSheet> {
         await showCupertinoModalPopup<_ChapterAction>(
           context: context,
           builder: (BuildContext sheetContext) => CupertinoActionSheet(
-            title: Text(chapter.name.isEmpty ? '未命名章节' : chapter.name),
+            title: Text(chapter.name.isEmpty ? stringsOf(context).clubTopicUnnamedChapter : chapter.name),
             actions: <Widget>[
               if (!chapter.finished)
                 CupertinoActionSheetAction(
@@ -2197,7 +2201,7 @@ class _TopicSettingSheetState extends ConsumerState<_TopicSettingSheet> {
                   onPressed: () => Navigator.of(
                     sheetContext,
                   ).pop(_ChapterAction.toggleRecruit),
-                  child: Text(chapter.recruiting ? '关闭商家承接' : '开放商家承接'),
+                  child: Text(chapter.recruiting ? stringsOf(context).clubTopicCloseMerchantParticipation : stringsOf(context).clubTopicMerchantParticipation),
                 ),
               if (!chapter.finished)
                 CupertinoActionSheetAction(
@@ -2205,12 +2209,12 @@ class _TopicSettingSheetState extends ConsumerState<_TopicSettingSheet> {
                   isDestructiveAction: true,
                   onPressed: () =>
                       Navigator.of(sheetContext).pop(_ChapterAction.finish),
-                  child: const Text('结束本章'),
+                  child: Text(stringsOf(context).clubTopicEndChapter),
                 ),
             ],
             cancelButton: CupertinoActionSheetAction(
               onPressed: () => Navigator.of(sheetContext).pop(),
-              child: const Text('取消'),
+              child: Text(stringsOf(context).clubTopicCancel),
             ),
           ),
         );
@@ -2302,7 +2306,6 @@ class _EndTopicDialogState extends ConsumerState<_EndTopicDialog> {
   bool _submitting = false;
   String _errorText = '';
 
-  static const String _bodyCopy = '停止售卖并把未核销的票原价退回。只是想让它不再露出的话，下架就够了。';
 
   Future<void> _submit() async {
     if (_submitting) return;
@@ -2320,7 +2323,7 @@ class _EndTopicDialogState extends ConsumerState<_EndTopicDialog> {
         setState(() {
           _submitting = false;
           _errorText =
-              '${result.failedSessions.length} 场没能取消：${result.failedSessions.first}';
+              stringsOf(context).clubTopicFailedSessions(result.failedSessions.length, result.failedSessions.first);
         });
         return;
       }
@@ -2335,7 +2338,7 @@ class _EndTopicDialogState extends ConsumerState<_EndTopicDialog> {
         _errorText =
             error is ClubApiException && error.message.trim().isNotEmpty
             ? error.message
-            : '网络开小差了，没能结束。';
+            : stringsOf(context).clubTopicEndNetworkFailed;
       });
     }
   }
@@ -2345,22 +2348,22 @@ class _EndTopicDialogState extends ConsumerState<_EndTopicDialog> {
     return CupertinoAlertDialog(
       // 标题与小程序 `结束这场活动？` 同一句;主题名放正文,
       // 因为标题里插名字会把原文句子打断(「结束主题「X」？」读起来是两句话)。
-      title: const Text('结束这场活动？'),
+      title: Text(stringsOf(context).clubTopicEndTitle),
       content: Text(
-        '主题「${widget.topicName}」：$_bodyCopy'
+        stringsOf(context).clubTopicEndNamedBody(widget.topicName) +
         '${_errorText.isEmpty ? '' : '\n$_errorText'}',
       ),
       actions: <Widget>[
         CupertinoDialogAction(
           key: const Key('topic-setting-end-cancel'),
           onPressed: _submitting ? null : () => Navigator.of(context).pop(),
-          child: const Text('再想想'),
+          child: Text(stringsOf(context).clubTopicReconsider),
         ),
         CupertinoDialogAction(
           key: const Key('topic-setting-end-confirm'),
           isDestructiveAction: true,
           onPressed: _submitting ? null : _submit,
-          child: Text(_submitting ? '结束中…' : '结束并退款'),
+          child: Text(_submitting ? stringsOf(context).clubTopicEnding : stringsOf(context).clubTopicEndAndRefund),
         ),
       ],
     );
@@ -2407,7 +2410,7 @@ class _MerchantsBodyState extends ConsumerState<_MerchantsBody> {
       if (!mounted) return;
       setState(() {
         _stage = clubOpsFailureState(error);
-        _error = clubOpsErrorMessage(error, '商家信息没能取到，稍后再试一次');
+        _error = clubOpsErrorMessage(error, stringsOf(context).clubTopicMerchantsRetryLater);
       });
     }
   }
@@ -2415,7 +2418,7 @@ class _MerchantsBodyState extends ConsumerState<_MerchantsBody> {
   Future<void> _copyPhone(String phone) async {
     await Clipboard.setData(ClipboardData(text: phone));
     if (!mounted) return;
-    CyNativeNotice.show(context, '手机号已复制');
+    CyNativeNotice.show(context, stringsOf(context).clubTopicPhoneCopied);
   }
 
   @override
@@ -2424,18 +2427,18 @@ class _MerchantsBodyState extends ConsumerState<_MerchantsBody> {
     switch (_stage) {
       case ClubOpsLoadState.loading:
         return const Padding(
-          padding: EdgeInsets.all(CyTokens.pageX),
+          padding: const EdgeInsets.all(CyTokens.pageX),
           child: CySkeleton(type: CySkeletonType.card, count: 2),
         );
       case ClubOpsLoadState.noPermission:
-        return const Padding(
-          padding: EdgeInsets.symmetric(
+        return Padding(
+          padding: const EdgeInsets.symmetric(
             horizontal: CyTokens.pageX,
             vertical: CyTokens.space5,
           ),
           child: StatusView(
-            message: '当前岗位没有查看权限',
-            sub: '承接商家需要「活动查看」权限。',
+            message: stringsOf(context).clubTopicRoleDenied,
+            sub: stringsOf(context).clubTopicMerchantsPermission,
             icon: CupertinoIcons.lock,
           ),
         );
@@ -2447,22 +2450,22 @@ class _MerchantsBodyState extends ConsumerState<_MerchantsBody> {
             vertical: CyTokens.space5,
           ),
           child: StatusView(
-            message: '商家信息没能取到',
-            sub: _error.isEmpty ? '稍后再试一次' : _error,
+            message: stringsOf(context).clubTopicMerchantsFailed,
+            sub: _error.isEmpty ? stringsOf(context).clubTopicRetryLater : _error,
             icon: CupertinoIcons.exclamationmark_triangle,
             onRetry: _load,
           ),
         );
       case ClubOpsLoadState.ready:
         if (_rows.isEmpty) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(
+          return Padding(
+            padding: const EdgeInsets.symmetric(
               horizontal: CyTokens.pageX,
               vertical: CyTokens.space5,
             ),
             child: StatusView(
-              message: '这个主题还没有承接商家',
-              sub: '开放商家对接后，商家会出现在这里。',
+              message: stringsOf(context).clubTopicNoMerchants,
+              sub: stringsOf(context).clubTopicNoMerchantsBody,
               icon: CupertinoIcons.briefcase,
             ),
           );
@@ -2483,7 +2486,7 @@ class _MerchantsBodyState extends ConsumerState<_MerchantsBody> {
                       (RecruitOverviewNode node) => ClubOpsRow(
                         key: Key('topic-merchant-${node.nodeId}'),
                         title: node.merchantName.isEmpty
-                            ? '未命名商家'
+                            ? stringsOf(context).clubTopicUnnamedMerchant
                             : node.merchantName,
                         meta: node.stationName.isEmpty
                             ? node.contactText
@@ -2495,7 +2498,7 @@ class _MerchantsBodyState extends ConsumerState<_MerchantsBody> {
                                 minimumSize: const Size(44, 44),
                                 onPressed: () => _copyPhone(node.phone),
                                 child: Text(
-                                  '复制',
+                                  stringsOf(context).clubTopicCopy,
                                   style: TextStyle(
                                     fontSize: CyTokens.typeLabel,
                                     color: palette.brand,
@@ -2510,7 +2513,7 @@ class _MerchantsBodyState extends ConsumerState<_MerchantsBody> {
               Padding(
                 padding: const EdgeInsets.only(top: CyTokens.space2),
                 child: Text(
-                  '联系方式在商家接受合作后才下发；未确认的商家不展示手机号。',
+                  stringsOf(context).clubTopicContactScope,
                   style: TextStyle(
                     fontSize: CyTokens.typeCaption,
                     height: 1.45,
@@ -2544,12 +2547,12 @@ class _CustomersBody extends ConsumerStatefulWidget {
 }
 
 class _CustomersBodyState extends ConsumerState<_CustomersBody> {
-  static const List<({String value, String label})> _chips =
+  List<({String value, String label})> get _chips =>
       <({String value, String label})>[
-        (value: '', label: '全部'),
-        (value: 'pending', label: '待核销'),
-        (value: 'contacted', label: '已接洽'),
-        (value: 'verified', label: '已核销'),
+        (value: '', label: stringsOf(context).clubTopicAll),
+        (value: 'pending', label: stringsOf(context).clubTopicPending),
+        (value: 'contacted', label: stringsOf(context).clubTopicContacted),
+        (value: 'verified', label: stringsOf(context).clubTopicVerified),
       ];
 
   ClubOpsLoadState _stage = ClubOpsLoadState.loading;
@@ -2585,7 +2588,7 @@ class _CustomersBodyState extends ConsumerState<_CustomersBody> {
       if (!mounted) return;
       setState(() {
         _stage = clubOpsFailureState(error);
-        _error = clubOpsErrorMessage(error, '成员名单没能取到，稍后再试一次');
+        _error = clubOpsErrorMessage(error, stringsOf(context).clubTopicMembersRetryLater);
       });
     }
   }
@@ -2602,18 +2605,18 @@ class _CustomersBodyState extends ConsumerState<_CustomersBody> {
     switch (_stage) {
       case ClubOpsLoadState.loading:
         return const Padding(
-          padding: EdgeInsets.all(CyTokens.pageX),
+          padding: const EdgeInsets.all(CyTokens.pageX),
           child: CySkeleton(type: CySkeletonType.card, count: 2),
         );
       case ClubOpsLoadState.noPermission:
-        return const Padding(
-          padding: EdgeInsets.symmetric(
+        return Padding(
+          padding: const EdgeInsets.symmetric(
             horizontal: CyTokens.pageX,
             vertical: CyTokens.space5,
           ),
           child: StatusView(
-            message: '当前岗位没有查看权限',
-            sub: '主题成员名单需要「成员查看」权限。',
+            message: stringsOf(context).clubTopicRoleDenied,
+            sub: stringsOf(context).clubTopicMembersPermission,
             icon: CupertinoIcons.lock,
           ),
         );
@@ -2625,8 +2628,8 @@ class _CustomersBodyState extends ConsumerState<_CustomersBody> {
             vertical: CyTokens.space5,
           ),
           child: StatusView(
-            message: '成员名单没能取到',
-            sub: _error.isEmpty ? '稍后再试一次' : _error,
+            message: stringsOf(context).clubTopicMembersFailed,
+            sub: _error.isEmpty ? stringsOf(context).clubTopicRetryLater : _error,
             icon: CupertinoIcons.exclamationmark_triangle,
             onRetry: _load,
           ),
@@ -2718,8 +2721,8 @@ class _CustomersBodyState extends ConsumerState<_CustomersBody> {
             Padding(
               padding: const EdgeInsets.symmetric(vertical: CyTokens.space5),
               child: StatusView(
-                message: _filter.isEmpty ? '这个主题还没有成员' : '这一档还没有人',
-                sub: _filter.isEmpty ? '有人下单后会出现在这里。' : '换一个筛选看看。',
+                message: _filter.isEmpty ? stringsOf(context).clubTopicNoMembers : stringsOf(context).clubTopicFilterEmpty,
+                sub: _filter.isEmpty ? stringsOf(context).clubTopicNoMembersBody : stringsOf(context).clubTopicFilterEmptyBody,
                 icon: CupertinoIcons.person_2,
               ),
             )
@@ -2729,9 +2732,9 @@ class _CustomersBodyState extends ConsumerState<_CustomersBody> {
                   .map(
                     (TopicCustomerRow row) => ClubOpsRow(
                       key: Key('topic-customer-${row.key}'),
-                      title: row.displayName,
+                      title: row.nameMissing ? stringsOf(context).clubTopicUnnamedMember : row.displayName,
                       meta: <String>[
-                        row.timeText,
+                        row.timeMissing ? stringsOf(context).clubTopicMissingTime : row.timeText,
                         row.phoneText,
                       ].where((String s) => s.isNotEmpty).join(' · '),
                       metaLines: 2,
@@ -2743,7 +2746,7 @@ class _CustomersBodyState extends ConsumerState<_CustomersBody> {
           Padding(
             padding: const EdgeInsets.only(top: CyTokens.space2),
             child: Text(
-              '手机号按岗位权限下发，且只给掩码；没有权限时这一格由服务端给替代说明。',
+              stringsOf(context).clubTopicPhoneScope,
               style: TextStyle(
                 fontSize: CyTokens.typeCaption,
                 height: 1.45,
@@ -2760,8 +2763,8 @@ class _CustomersBodyState extends ConsumerState<_CustomersBody> {
                 children: <Widget>[
                   ClubOpsRow(
                     key: const Key('topic-customers-broadcast'),
-                    title: '定向广播',
-                    meta: '选队伍发一条现场通知。进去后先选范围再发送。',
+                    title: stringsOf(context).clubTopicBroadcast,
+                    meta: stringsOf(context).clubTopicBroadcastBody,
                     metaLines: 2,
                     onTap: () {
                       Navigator.of(context).pop();
@@ -2795,73 +2798,73 @@ class _CustomersBodyState extends ConsumerState<_CustomersBody> {
 class _RulesBody extends StatelessWidget {
   const _RulesBody();
 
-  static const List<_RulesSection> _sections = <_RulesSection>[
+  List<_RulesSection> _sections(BuildContext context) => <_RulesSection>[
     _RulesSection(
-      label: '退出俱乐部',
+      label: stringsOf(context).clubRulesCopy1,
       rows: <_RulesRow>[
         _RulesRow(
-          title: '主理人不能直接退出',
-          text: '要先转让主理人或解散俱乐部。（"主理人不能直接退出；请先在成员治理中转让主理人，或解散俱乐部"）',
+          title: stringsOf(context).clubRulesCopy2,
+          text: stringsOf(context).clubRulesCopy3,
         ),
         _RulesRow(
-          title: '退出会一并终止会籍',
-          text: '回包给出四个数：已取消期数 / 被拦下的账单 / 待审条数 / 不可退条数，以及打款是否已完成。',
+          title: stringsOf(context).clubRulesCopy4,
+          text: stringsOf(context).clubRulesCopy5,
         ),
         _RulesRow(
-          title: '群聊清理与退出同事务',
-          text: '清理没成功就整体回滚，不会出现「退了但群还在」。（"退出失败，群聊权限清理未完成"）',
+          title: stringsOf(context).clubRulesCopy6,
+          text: stringsOf(context).clubRulesCopy7,
         ),
       ],
     ),
     _RulesSection(
-      label: '退出队伍',
+      label: stringsOf(context).clubRulesCopy8,
       rows: <_RulesRow>[
-        _RulesRow(title: '最后一人退出 = 队伍解散', text: '同时关闭队伍群聊。'),
-        _RulesRow(title: '队长退出会自动移交', text: '移交给最早加入的其他在队成员，并通知他"你已成为队长"。'),
-        _RulesRow(title: '不在队里就退不了', text: '（"你不在该队伍中"）'),
+        _RulesRow(title: stringsOf(context).clubRulesCopy9, text: stringsOf(context).clubRulesCopy10),
+        _RulesRow(title: stringsOf(context).clubRulesCopy11, text: stringsOf(context).clubRulesCopy12),
+        _RulesRow(title: stringsOf(context).clubRulesCopy13, text: stringsOf(context).clubRulesCopy14),
       ],
     ),
     _RulesSection(
-      label: '退出以后的钱（RefundPolicy 是唯一真源）',
+      label: stringsOf(context).clubRulesCopy15,
       rows: <_RulesRow>[
         _RulesRow(
-          title: '已核销不退',
-          text: '（"已核销报名不可退款"）。探店日是唯一例外，转人工：（"已核销订单需人工处理"）',
+          title: stringsOf(context).clubRulesCopy16,
+          text: stringsOf(context).clubRulesCopy17,
         ),
-        _RulesRow(title: '过了时点不退', text: '城市定向按集合时间、自由探索按主题有效期、活动按开始时间，各自一句话。'),
-        _RulesRow(title: '进了履约窗不退', text: '（"已进入履约窗，不可退款"）'),
+        _RulesRow(title: stringsOf(context).clubRulesCopy18, text: stringsOf(context).clubRulesCopy19),
+        _RulesRow(title: stringsOf(context).clubRulesCopy20, text: stringsOf(context).clubRulesCopy21),
         _RulesRow(
-          title: '算不出来 ≠ 不该退',
-          text: '退款截止时间缺失时转人工——系统没资格自己决定。（"退款截止时间缺失，需人工处理"）',
+          title: stringsOf(context).clubRulesCopy22,
+          text: stringsOf(context).clubRulesCopy23,
         ),
       ],
     ),
     _RulesSection(
-      label: '暂停一个站点',
+      label: stringsOf(context).clubRulesCopy24,
       rows: <_RulesRow>[
-        _RulesRow(title: '原因和预计恢复时间都必填', text: '（"请选择暂停原因" / "请选择预计恢复时间"）'),
+        _RulesRow(title: stringsOf(context).clubRulesCopy25, text: stringsOf(context).clubRulesCopy26),
         _RulesRow(
-          title: '必须绑一个已批准的备用方案',
-          text: '不能直接指定备用站点。（"备用站点必须由已批准方案解析"）',
+          title: stringsOf(context).clubRulesCopy27,
+          text: stringsOf(context).clubRulesCopy28,
         ),
         _RulesRow(
-          title: '暂停期间这一站停摆',
-          text: '玩家提交不了（"站点暂停中"），商家也核验不了（"站点暂停中，不能核验"）。',
+          title: stringsOf(context).clubRulesCopy29,
+          text: stringsOf(context).clubRulesCopy30,
         ),
-        _RulesRow(title: '暂停只影响本站', text: '不改变已发放的权益，也不动已经完成的提交。'),
+        _RulesRow(title: stringsOf(context).clubRulesCopy31, text: stringsOf(context).clubRulesCopy32),
         _RulesRow(
-          title: '「兜底完成」是自动的',
-          text: '站点暂停并绑好方案后，玩家走到备用站点时由服务端记为兜底完成——没有这个按钮。',
+          title: stringsOf(context).clubRulesCopy33,
+          text: stringsOf(context).clubRulesCopy34,
         ),
-        _RulesRow(title: '恢复要过两个服务窗', text: '活动服务窗和站点服务窗都得在窗内才恢复得了。'),
+        _RulesRow(title: stringsOf(context).clubRulesCopy35, text: stringsOf(context).clubRulesCopy36),
       ],
     ),
     _RulesSection(
-      label: '取消一整场',
+      label: stringsOf(context).clubRulesCopy37,
       rows: <_RulesRow>[
         _RulesRow(
-          title: '会下架本场、处理退款并终止候补',
-          text: '取消原因 2–255 字必填，会随通知一起发给已报名的人。',
+          title: stringsOf(context).clubRulesCopy38,
+          text: stringsOf(context).clubRulesCopy39,
         ),
       ],
     ),
@@ -2881,14 +2884,14 @@ class _RulesBody extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Text(
-            '这一页写的都是系统真正在执行的判据，不是倡议。括号里是代码里的原话。',
+            stringsOf(context).clubRulesCopy40,
             style: TextStyle(
               fontSize: CyTokens.typeCaption,
               height: 1.45,
               color: palette.textTertiary,
             ),
           ),
-          for (final _RulesSection section in _sections) ...<Widget>[
+          for (final _RulesSection section in _sections(context)) ...<Widget>[
             Padding(
               padding: const EdgeInsets.only(
                 top: CyTokens.space4,
@@ -2925,7 +2928,7 @@ class _RulesBody extends StatelessWidget {
             ],
           ],
           Text(
-            '以上每一条都能在代码里指到具体判据；改文案前先改判据，否则这一页会变成许愿。',
+            stringsOf(context).clubRulesCopy41,
             style: TextStyle(
               fontSize: CyTokens.typeCaption,
               height: 1.45,
@@ -2956,9 +2959,9 @@ class _RulesRow {
 /// 改集合时间失败的两种读法(小程序 `confirmOpsTime` 的 fail / successStatusAbnormal):
 /// · 业务拒绝(4xx 且非 408 / body `code != 200`)是**明确拒绝**,后端原话原样带出去;
 /// · 传输失败、5xx、408 都只是**结果未知** —— 不下「没改成」的结论,回读服务端真相。
-({bool definite, String why}) _opsWriteFailure(Object error) {
+({bool definite, String why}) _opsWriteFailure(BuildContext context, Object error) {
   String whenEmpty(String message) =>
-      message.trim().isEmpty ? '服务拒绝了这次修改' : message.trim();
+      message.trim().isEmpty ? stringsOf(context).clubOpsTimeRefused : message.trim();
   if (error is ClubApiException) {
     return (definite: true, why: whenEmpty(error.message));
   }
@@ -2970,9 +2973,9 @@ class _RulesRow {
     return (definite: true, why: whenEmpty(msg is String ? msg : ''));
   }
   if (status != null) {
-    return (definite: false, why: '服务暂时不可用，结果待确认；已重新读取当前时间');
+    return (definite: false, why: stringsOf(context).clubOpsTimeServiceUnknown);
   }
-  return (definite: false, why: '网络异常，结果待确认；已重新读取当前时间');
+  return (definite: false, why: stringsOf(context).clubOpsTimeNetworkUnknown);
 }
 
 /// HO-26 改集合时间(半屏)。日期 + 时间各一格,底部两颗按钮并排。
@@ -2998,9 +3001,9 @@ class _OpsTimeSheet extends ConsumerStatefulWidget {
 }
 
 class _OpsTimeSheetState extends ConsumerState<_OpsTimeSheet> {
-  static const String _soldLockHint = '已有人报名或下单的场次，集合时间和地点不能再改（当日备注仍可改）。';
-  static const String _effectHint = '改完会报备发起人；退款截止按新的集合时间前 24 小时计算。';
-  static const String _doneHint = '已报备发起人；退款截止按新的集合时间前 24 小时计算。';
+  String get _soldLockHint => stringsOf(context).clubOpsTimeSoldPolicy;
+  String get _effectHint => stringsOf(context).clubOpsTimeEffectPolicy;
+  String get _doneHint => stringsOf(context).clubOpsTimeDonePolicy;
 
   late String _date = widget.date;
   late String _time = widget.time;
@@ -3016,7 +3019,7 @@ class _OpsTimeSheetState extends ConsumerState<_OpsTimeSheet> {
       initialDateTime: DateTime.tryParse(_date) ?? today,
       minimumDate: DateTime(today.year, today.month, today.day),
       maximumDate: today.add(const Duration(days: 365)),
-      title: '集合日期',
+      title: stringsOf(context).clubOpsTimeDate,
     );
     if (picked == null || !mounted) return;
     setState(
@@ -3039,7 +3042,7 @@ class _OpsTimeSheetState extends ConsumerState<_OpsTimeSheet> {
       ),
       minimumDate: DateTime(today.year, today.month, today.day),
       maximumDate: DateTime(today.year, today.month, today.day, 23, 59),
-      title: '集合时间',
+      title: stringsOf(context).clubOpsTimeTime,
     );
     if (picked == null || !mounted) return;
     setState(() => _time = '${_two(picked.hour)}:${_two(picked.minute)}');
@@ -3049,7 +3052,7 @@ class _OpsTimeSheetState extends ConsumerState<_OpsTimeSheet> {
     if (_submitting) return;
     if (!RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(_date) ||
         !RegExp(r'^\d{2}:\d{2}$').hasMatch(_time)) {
-      CyNativeNotice.show(context, '请选择集合日期与时间');
+      CyNativeNotice.show(context, stringsOf(context).clubOpsTimeRequired);
       return;
     }
     setState(() => _submitting = true);
@@ -3061,12 +3064,12 @@ class _OpsTimeSheetState extends ConsumerState<_OpsTimeSheet> {
             startDate: '$_date $_time:00',
           );
       if (!mounted) return;
-      CyNativeNotice.show(context, '集合时间已更新\n$_doneHint');
+      CyNativeNotice.show(context, stringsOf(context).clubOpsTimeUpdated(_doneHint));
       Navigator.of(context).pop(true);
     } catch (error) {
       if (!mounted) return;
-      final ({bool definite, String why}) failure = _opsWriteFailure(error);
-      CyNativeNotice.show(context, '集合时间没改成\n${failure.why}', isError: true);
+      final ({bool definite, String why}) failure = _opsWriteFailure(context, error);
+      CyNativeNotice.show(context, stringsOf(context).clubOpsTimeNotChanged(failure.why), isError: true);
       Navigator.of(context).pop(!failure.definite);
     }
   }
@@ -3101,7 +3104,7 @@ class _OpsTimeSheetState extends ConsumerState<_OpsTimeSheet> {
       color: palette.textTertiary,
     );
     return _SheetFrame(
-      title: '修改集合时间',
+      title: stringsOf(context).clubOpsTimeEdit,
       sheetKey: const Key('topic-ops-time-sheet'),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(
@@ -3118,14 +3121,14 @@ class _OpsTimeSheetState extends ConsumerState<_OpsTimeSheet> {
               children: <Widget>[
                 _pickerRow(
                   key: const Key('topic-ops-time-date'),
-                  label: '集合日期',
-                  value: _date.isEmpty ? '选择日期' : _date,
+                  label: stringsOf(context).clubOpsTimeDate,
+                  value: _date.isEmpty ? stringsOf(context).clubOpsTimeChooseDate : _date,
                   onTap: _submitting ? null : () => _pickDate(),
                 ),
                 _pickerRow(
                   key: const Key('topic-ops-time-time'),
-                  label: '集合时间',
-                  value: _time.isEmpty ? '选择时间' : _time,
+                  label: stringsOf(context).clubOpsTimeTime,
+                  value: _time.isEmpty ? stringsOf(context).clubOpsTimeChooseTime : _time,
                   onTap: _submitting ? null : () => _pickTime(),
                 ),
               ],
@@ -3138,7 +3141,7 @@ class _OpsTimeSheetState extends ConsumerState<_OpsTimeSheet> {
                 Expanded(
                   child: CyNativeButton(
                     key: const Key('topic-ops-time-cancel'),
-                    label: '取消',
+                    label: stringsOf(context).clubOpsTimeCancel,
                     role: CyNativeButtonRole.secondary,
                     width: double.infinity,
                     onPressed: _submitting
@@ -3150,7 +3153,7 @@ class _OpsTimeSheetState extends ConsumerState<_OpsTimeSheet> {
                 Expanded(
                   child: CyNativeButton(
                     key: const Key('topic-ops-time-save'),
-                    label: _submitting ? '提交中…' : '保存',
+                    label: _submitting ? stringsOf(context).clubOpsTimeSubmitting : stringsOf(context).clubOpsTimeSave,
                     width: double.infinity,
                     onPressed: _submitting ? null : _submit,
                   ),
@@ -3163,3 +3166,23 @@ class _OpsTimeSheetState extends ConsumerState<_OpsTimeSheet> {
     );
   }
 }
+
+String _topicStatusLabel(BuildContext context, ClubTopicStatus status) => switch (status) {
+  ClubTopicStatus.reviewing => stringsOf(context).clubTopicStatusReviewing,
+  ClubTopicStatus.rejected => stringsOf(context).clubTopicStatusRejected,
+  ClubTopicStatus.confirmed => stringsOf(context).clubTopicStatusConfirmed,
+  ClubTopicStatus.preparing => stringsOf(context).clubTopicStatusPreparing,
+  ClubTopicStatus.running => stringsOf(context).clubTopicStatusRunning,
+  ClubTopicStatus.selfRun => stringsOf(context).clubTopicStatusRunning,
+  ClubTopicStatus.ended => stringsOf(context).clubTopicStatusEnded,
+};
+
+String _topicPrimaryLabel(BuildContext context, ClubTopicStatus status) => switch (status) {
+  ClubTopicStatus.reviewing => stringsOf(context).clubTopicAwaitReview,
+  ClubTopicStatus.rejected => stringsOf(context).clubTopicResubmit,
+  ClubTopicStatus.confirmed => stringsOf(context).clubTopicPrepareAction,
+  ClubTopicStatus.preparing => stringsOf(context).clubTopicStartAction,
+  ClubTopicStatus.running => stringsOf(context).clubTopicEndAction,
+  ClubTopicStatus.selfRun => stringsOf(context).clubTopicEndAction,
+  ClubTopicStatus.ended => stringsOf(context).clubTopicSettlementReport,
+};

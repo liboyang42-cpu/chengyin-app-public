@@ -1,3 +1,4 @@
+import '../../l10n/strings.dart';
 import '../../core/theme/cy_palette.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -46,21 +47,21 @@ class NearbyMerchantsPage extends ConsumerWidget {
     final int? parsed = raw.isEmpty ? null : int.tryParse(raw);
     final bool hasTopic = parsed != null && parsed > 0;
     final bool missingParam = raw.isNotEmpty && !hasTopic;
-    final String title = hasTopic || missingParam ? '找商家承接' : '附近商家';
-    const String needLogin = '登录后查看附近商家';
+    final String title = hasTopic || missingParam ? stringsOf(context).coopFindBusiness : stringsOf(context).coopNearbyBusinesses;
+    final String needLogin = stringsOf(context).coopLoginNearby;
     if (missingParam) {
       return CupertinoPageScaffold(
         backgroundColor: CyPalette.of(context).bgPage,
-        navigationBar: const CupertinoNavigationBar(middle: Text('找商家承接')),
+        navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).coopFindBusiness)),
         child: SafeArea(
           bottom: false,
           // 真源 missing-param 终态的 cta 就是「返回上一页」——
           // 参数是坏的,重试也没用,给路。
           child: StatusView(
-            message: '主题参数无效',
-            sub: '主题参数无效，无法查询可承接商家',
+            message: stringsOf(context).coopInvalidTheme,
+            sub: stringsOf(context).coopInvalidThemeHint,
             large: true,
-            retryLabel: '返回上一页',
+            retryLabel: stringsOf(context).coopBack,
             onRetry: () => context.pop(),
           ),
         ),
@@ -104,7 +105,7 @@ class NearbyMerchantsPage extends ConsumerWidget {
               //   后者是在陈述一个我们根本没查过的事实。
               if (e is MapLocationException) {
                 return StatusView(
-                  message: '需要定位才能找附近商家',
+                  message: stringsOf(context).coopLocationNeeded,
                   sub: e.message,
                   large: true,
                   onRetry: () => ref.invalidate(currentMapLocationProvider),
@@ -119,8 +120,8 @@ class NearbyMerchantsPage extends ConsumerWidget {
                 );
               }
               return StatusView(
-                message: '附近商家没能加载出来',
-                sub: coopErrorSub(e),
+                message: stringsOf(context).coopNearbyLoadFailed,
+                sub: coopErrorSub(e, context: context),
                 large: true,
                 onRetry: () => ref.invalidate(nearbyMerchantsProvider),
               );
@@ -130,11 +131,11 @@ class NearbyMerchantsPage extends ConsumerWidget {
                 // ★ 文案里说了「再试」就必须给按钮 —— 门禁
                 //   test/status_view_retry_gate_test.dart 盯着这条,刚抓到我一次。
                 return StatusView(
-                  message: '附近暂时没有商家',
-                  sub: '换个位置再看看',
+                  message: stringsOf(context).coopNoNearby,
+                  sub: stringsOf(context).coopTryLocation,
                   large: true,
                   onRetry: () => ref.invalidate(nearbyMerchantsProvider),
-                  retryLabel: '重新搜索',
+                  retryLabel: stringsOf(context).coopSearchAgain,
                 );
               }
               return RefreshIndicator.adaptive(
@@ -165,7 +166,7 @@ class NearbyMerchantsPage extends ConsumerWidget {
   void _openMerchant(BuildContext context, NearbyMerchant m) {
     final int? memberId = m.memberId;
     if (memberId == null) {
-      CyNativeNotice.show(context, '这家还没在平台建档，先电话联系');
+      CyNativeNotice.show(context, stringsOf(context).coopCallUnlisted);
       return;
     }
     context.push('/merchant/public-home/member/$memberId');
@@ -251,7 +252,7 @@ class _NearbyTile extends StatelessWidget {
               SizedBox(
                 width: double.infinity,
                 child: CyNativeButton(
-                  label: '复制电话 $phone',
+                  label: stringsOf(context).coopCopyPhone(phone),
                   role: CyNativeButtonRole.secondary,
                   icon: const CyNativeButtonIcon(
                     sfSymbol: 'doc.on.doc',
@@ -260,7 +261,7 @@ class _NearbyTile extends StatelessWidget {
                   onPressed: () async {
                     await Clipboard.setData(ClipboardData(text: phone));
                     if (!context.mounted) return;
-                    CyNativeNotice.show(context, '已复制 $phone');
+                    CyNativeNotice.show(context, stringsOf(context).coopPhoneCopied(phone));
                   },
                 ),
               ),

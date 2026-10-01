@@ -1,3 +1,6 @@
+import 'coop_guard.dart';
+import '../../l10n/strings.dart';
+import 'coop_strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -153,11 +156,11 @@ class _ComplaintPageState extends ConsumerState<ComplaintPage> {
           (topic['topicId'] as num).toInt() == _topicId,
     );
     final int? index = await _pickOption(
-      title: '选择投诉活动',
+      title: stringsOf(context).coopPickComplaintActivity,
       options: topics
           .map(
             (Map<String, dynamic> topic) =>
-                (topic['topicName'] ?? '未命名活动').toString(),
+                (topic['topicName'] ?? stringsOf(context).coopUnnamedActivity).toString(),
           )
           .toList(),
       selected: selected < 0 ? null : selected,
@@ -170,8 +173,9 @@ class _ComplaintPageState extends ConsumerState<ComplaintPage> {
 
   Future<void> _pickType() async {
     final int? index = await _pickOption(
-      title: '选择投诉类型',
-      options: _complaintTypes,
+      title: stringsOf(context).coopPickComplaintType,
+      options: List<String>.generate(_complaintTypes.length,
+          (index) => coopComplaintCategory(context, index)),
       selected: _typeIndex,
     );
     if (index != null && mounted) setState(() => _typeIndex = index);
@@ -250,14 +254,14 @@ class _ComplaintPageState extends ConsumerState<ComplaintPage> {
       Navigator.of(context).pop(true);
       // ★ 说「已受理」而不是「已解决」——后端 status=0 就叫受理,
       //   后面还有垫付/追偿/关闭三档,不能替客服承诺结果。
-      CyNativeNotice.show(context, '投诉已提交');
+      CyNativeNotice.show(context, stringsOf(context).coopComplaintSubmitted);
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _busy = false;
         // 两种正常拒绝(非参与者 / 已有处理中的投诉)都靠原文说清,
         // 渲成「提交失败,请重试」会让人一直点。
-        _error = e.toString().replaceFirst('Exception: ', '');
+        _error = coopErrorSub(e, context: context);
       });
     }
   }
@@ -269,7 +273,7 @@ class _ComplaintPageState extends ConsumerState<ComplaintPage> {
     final TextTheme t = Theme.of(context).textTheme;
 
     return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(middle: Text('投诉与建议')),
+      navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).coopComplaintTitle)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -281,19 +285,19 @@ class _ComplaintPageState extends ConsumerState<ComplaintPage> {
               CyTokens.space2,
             ),
             child: Text(
-              '仅限已报名并支付的活动，平台会介入处理',
+              stringsOf(context).coopComplaintEligibility,
               style: t.bodySmall?.copyWith(color: p.textSecondary),
             ),
           ),
           Expanded(
             child: async.when(
-              loading: () => const Center(
+              loading: () => Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: <Widget>[
                     CupertinoActivityIndicator(),
                     SizedBox(height: CyTokens.space2),
-                    Text('正在加载可投诉的活动'),
+                    Text(stringsOf(context).coopComplaintActivitiesLoading),
                   ],
                 ),
               ),
@@ -301,30 +305,30 @@ class _ComplaintPageState extends ConsumerState<ComplaintPage> {
                 // 加载失败不止断网(还有 401),泛化失败字形比首轮选的 `cloud`
                 // 诚实;口径同 club 域各页错误态。
                 icon: CupertinoIcons.exclamationmark_circle,
-                message: '可投诉活动没能加载出来',
-                sub: e.toString().replaceFirst('Exception: ', ''),
+                message: stringsOf(context).coopComplaintActivitiesFailed,
+                sub: coopErrorSub(e, context: context),
                 large: true,
                 onRetry: () => ref.invalidate(complainableTopicsProvider),
               ),
               data: (List<Map<String, dynamic>> topics) {
                 if (topics.isEmpty) {
-                  return const StatusView(
+                  return StatusView(
                     icon: CupertinoIcons.tray,
-                    message: '暂无可投诉的活动',
+                    message: stringsOf(context).coopNoComplaintActivities,
                     // 说清判据,否则玩家会以为是 bug。
-                    sub: '投诉需针对你已报名并支付的活动；报名并支付后可在这里发起。',
+                    sub: stringsOf(context).coopComplaintEligibilityEmpty,
                     large: true,
                   );
                 }
                 return ListView(
                   padding: const EdgeInsets.all(CyTokens.space4),
                   children: <Widget>[
-                    Text('投诉活动', style: t.labelLarge),
+                    Text(stringsOf(context).coopComplaintActivity, style: t.labelLarge),
                     const SizedBox(height: CyTokens.space2),
                     _selectionField(
                       key: const Key('complaint-topic-picker'),
                       text: _topicId == null
-                          ? '请选择要投诉的活动'
+                          ? stringsOf(context).coopChooseComplaintActivity
                           : (topics.firstWhere(
                                       (Map<String, dynamic> topic) =>
                                           topic['topicId'] is num &&
@@ -332,41 +336,41 @@ class _ComplaintPageState extends ConsumerState<ComplaintPage> {
                                               _topicId,
                                       orElse: () => <String, dynamic>{},
                                     )['topicName'] ??
-                                    '未命名活动')
+                                    stringsOf(context).coopUnnamedActivity)
                                 .toString(),
                       selected: _topicId != null,
                       onPressed: () => _pickTopic(topics),
                     ),
                     const SizedBox(height: CyTokens.space4),
-                    Text('投诉类型', style: t.labelLarge),
+                    Text(stringsOf(context).coopComplaintType, style: t.labelLarge),
                     const SizedBox(height: CyTokens.space2),
                     _selectionField(
                       key: const Key('complaint-type-picker'),
                       text: _typeIndex == null
-                          ? '请选择投诉类型（可选）'
-                          : _complaintTypes[_typeIndex!],
+                          ? stringsOf(context).coopChooseComplaintType
+                          : coopComplaintCategory(context, _typeIndex!),
                       selected: _typeIndex != null,
                       onPressed: _pickType,
                     ),
                     const SizedBox(height: CyTokens.space4),
-                    Text('投诉内容', style: t.labelLarge),
+                    Text(stringsOf(context).coopComplaintContent, style: t.labelLarge),
                     const SizedBox(height: CyTokens.space2),
                     _textField(
                       key: const Key('complaint-reason'),
                       controller: _reason,
-                      placeholder: '请详细描述遇到的问题…',
+                      placeholder: stringsOf(context).coopComplaintPlaceholder,
                       maxLength: 500,
                       maxLines: 5,
                       textInputAction: TextInputAction.newline,
                       onChanged: (_) => setState(() {}),
                     ),
                     const SizedBox(height: CyTokens.space4),
-                    Text('联系方式', style: t.labelLarge),
+                    Text(stringsOf(context).coopContactDetails, style: t.labelLarge),
                     const SizedBox(height: CyTokens.space2),
                     _textField(
                       controller: _contact,
                       key: const Key('complaint-contact'),
-                      placeholder: '手机号/微信（可选，便于客服联系）',
+                      placeholder: stringsOf(context).coopComplaintContact,
                       maxLength: 50,
                       maxLines: 1,
                       textInputAction: TextInputAction.done,
@@ -387,7 +391,7 @@ class _ComplaintPageState extends ConsumerState<ComplaintPage> {
                               height: 18,
                               child: CupertinoActivityIndicator(),
                             )
-                          : const Text('提交投诉'),
+                          : Text(stringsOf(context).coopSubmitComplaint),
                     ),
                   ],
                 );

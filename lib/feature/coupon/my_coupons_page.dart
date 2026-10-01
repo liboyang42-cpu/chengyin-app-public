@@ -1,3 +1,5 @@
+import '../../l10n/strings.dart';
+import 'coupon_copy.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -31,7 +33,7 @@ class MyCouponsPage extends ConsumerStatefulWidget {
 class _MyCouponsPageState extends ConsumerState<MyCouponsPage> {
   int _tab = 0;
 
-  static const List<String> _tabs = <String>['全部', '待使用', '已使用', '已过期'];
+  List<String> get _tabs => <String>[stringsOf(context).couponWalletAll, stringsOf(context).couponWalletUnused, stringsOf(context).couponWalletUsed, stringsOf(context).couponWalletExpired];
 
   @override
   Widget build(BuildContext context) {
@@ -55,18 +57,18 @@ class _MyCouponsPageState extends ConsumerState<MyCouponsPage> {
             // 不显式 stretch 会把 58rpx 大标题推到屏幕正中,与小程序完全不同。
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              const CyPageTitle('我的优惠券'),
+              CyPageTitle(stringsOf(context).couponWalletTitle),
               // ★ 游客深链落地给登录门而不是静默弹回首页(b1-sim-coupon P1-1,
               //   同 roam #208 范式);游客短路掉注定 401 的请求。
               if (!auth.isLoggedIn)
                 Expanded(
                   child: StatusView(
                     key: const Key('coupons-login-gate'),
-                    message: '登录后查看优惠券',
-                    sub: '券存在账号里,登录完就能看到。',
+                    message: stringsOf(context).couponWalletLogin,
+                    sub: stringsOf(context).couponWalletLoginDetail,
                     icon: CupertinoIcons.lock,
                     large: true,
-                    retryLabel: '去登录',
+                    retryLabel: stringsOf(context).couponWalletSignIn,
                     onRetry: () async {
                       if (!await requireLogin(context, ref)) return;
                       if (!mounted) return;
@@ -122,10 +124,10 @@ class _MyCouponsPageState extends ConsumerState<MyCouponsPage> {
                                       .toList();
                             if (items.isEmpty) {
                               return StatusView(
-                                message: _tab == 0 ? '这里还没有优惠券' : '当前筛选暂无优惠券',
+                                message: _tab == 0 ? stringsOf(context).couponWalletEmpty : stringsOf(context).couponWalletFilterEmpty,
                                 sub: _tab == 0
-                                    ? '完成探索或活动任务后，领取的券会出现在这里。'
-                                    : '切换其他状态查看优惠券。',
+                                    ? stringsOf(context).couponWalletEmptyDetail
+                                    : stringsOf(context).couponWalletFilterEmptyDetail,
                                 large: true,
                                 icon: CupertinoIcons.ticket,
                                 scrollable: true,
@@ -167,17 +169,17 @@ class _MyCouponsPageState extends ConsumerState<MyCouponsPage> {
       r'ConnectionException|SocketException|NetworkException|connection (error|timeout)|Failed host lookup|未找到主机|超时',
       caseSensitive: false,
     ).hasMatch(text)) {
-      message = '网络异常，请检查网络后重试。';
+      message = stringsOf(context).couponWalletNetwork;
     } else if (RegExp(
       r'登录|未登录|401|token',
       caseSensitive: false,
     ).hasMatch(text)) {
-      message = '登录状态待确认，请登录后重试。';
+      message = stringsOf(context).couponWalletSession;
     } else {
-      message = '优惠券暂时没能打开，请稍后重试。';
+      message = stringsOf(context).couponWalletTryLater;
     }
     return StatusView(
-      message: '优惠券没能打开',
+      message: stringsOf(context).couponWalletLoadError,
       sub: message,
       icon: CupertinoIcons.exclamationmark_triangle,
       scrollable: true,
@@ -205,7 +207,8 @@ class _Tab extends StatelessWidget {
       padding: EdgeInsets.zero,
       minimumSize: const Size(44, 44),
       child: Container(
-        height: 44,
+        constraints: const BoxConstraints(minHeight: 44),
+        padding: const EdgeInsets.symmetric(vertical: CyTokens.space2),
         alignment: Alignment.center,
         decoration: BoxDecoration(
           // 真源 `.wallet-tab`:未选中**无底色**(只有文字 secondary),
@@ -215,6 +218,7 @@ class _Tab extends StatelessWidget {
         ),
         child: Text(
           label,
+          textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: CyTokens.typeLabel,
             fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
@@ -264,7 +268,7 @@ class _CouponCard extends StatelessWidget {
               children: <Widget>[
                 Expanded(
                   child: Text(
-                    record.displayName,
+                    couponName(context, record),
                     style: const TextStyle(
                       fontSize: CyTokens.typeCardTitle,
                       fontWeight: FontWeight.w700,
@@ -292,7 +296,7 @@ class _CouponCard extends StatelessWidget {
               children: <Widget>[
                 Expanded(
                   child: Text(
-                    record.dateText,
+                    couponDateLine(context, record),
                     style: const TextStyle(
                       fontSize: CyTokens.typeCaption,
                       color: CyTokens.textSecondary,
@@ -306,7 +310,7 @@ class _CouponCard extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: <Widget>[
                       Text(
-                        record.isUsable ? '出示核销码' : '查看可用时间',
+                        record.isUsable ? stringsOf(context).couponWalletShowCode : stringsOf(context).couponWalletViewAvailability,
                         style: const TextStyle(
                           fontSize: CyTokens.typeCaption,
                           fontWeight: FontWeight.w600,
@@ -377,7 +381,7 @@ class _CouponTag extends StatelessWidget {
             SizedBox(width: CyTokens.space1), // 真源 gap 8rpx
           ],
           Text(
-            record.statusText,
+            couponStatus(context, record.useStatus),
             style: TextStyle(
               fontSize: CyTokens.typeLabel, // 真源 .bd__label 走 type-label
               fontWeight: FontWeight.w500,

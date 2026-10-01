@@ -1,3 +1,4 @@
+import '../../l10n/strings.dart';
 import '../../core/theme/cy_palette.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -62,15 +63,15 @@ class MerchantPublicHomePage extends ConsumerWidget {
     return CupertinoPageScaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       // 标题照小程序 `pages/merchant/profile/index`(cy-nav-bar title)。
-      navigationBar: const CupertinoNavigationBar(middle: Text('商家主页')),
+      navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).merchantPublicUiTitle)),
       child: Material(
         color: Colors.transparent,
         child: SafeArea(
           bottom: false,
           child: async == null
-              ? const StatusView(
-                  message: '链接参数无效',
-                  sub: '这个链接缺少商家或据点信息，无法确定要打开哪一页。',
+              ? StatusView(
+                  message: stringsOf(context).merchantPublicUiInvalid,
+                  sub: stringsOf(context).merchantPublicUiInvalidHint,
                   large: true,
                 )
               : async.when(
@@ -89,16 +90,16 @@ class MerchantPublicHomePage extends ConsumerWidget {
     //   小程序把这两态分开,给一个点了永远不会好的「重试」人就一直在点
     //   (网络失败也不能反过来说成「这家不存在」,那是把「没查到」伪装成事实)。
     if (error is MerchantApiException && error.isPublicHomeUnavailable) {
-      return const StatusView(
-        message: '商家不存在或未开放',
-        sub: '这家店暂时无法查看，去首页看看其他城市内容。',
+      return StatusView(
+        message: stringsOf(context).merchantPublicUiUnavailable,
+        sub: stringsOf(context).merchantPublicUiUnavailableHint,
         large: true,
       );
     }
     return merchantErrorView(
       context,
       error,
-      what: '商家资料',
+      what: stringsOf(context).merchantPublicUiProfile,
       onRetry: () {
         if (memberId != null) {
           ref.invalidate(merchantPublicHomeProvider(memberId!));
@@ -171,11 +172,11 @@ class _Body extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  Text(name.isEmpty ? '商家' : name, style: textTheme.titleLarge),
+                  Text(name.isEmpty ? stringsOf(context).merchantPublicUiMerchant : name, style: textTheme.titleLarge),
                   // ★ businessStatus 缺席(null)时不宣称任何一种状态。
                   if (businessStatus != null)
                     Text(
-                      businessStatus == 1 ? '营业中' : '已打烊',
+                      businessStatus == 1 ? stringsOf(context).merchantPublicUiOpen : stringsOf(context).merchantPublicUiClosed,
                       style: textTheme.bodySmall?.copyWith(
                         color: CyPalette.of(context).textSecondary,
                       ),
@@ -192,7 +193,7 @@ class _Body extends ConsumerWidget {
         if ((merchantRowId ?? 0) > 0 && (ownerMemberId ?? 0) > 0) ...<Widget>[
           const SizedBox(height: CyTokens.space3),
           CyNativeButton(
-            label: '查看口碑',
+            label: stringsOf(context).merchantPublicUiReviews,
             role: CyNativeButtonRole.secondary,
             width: double.infinity,
             icon: const CyNativeButtonIcon(
@@ -274,7 +275,7 @@ class _Body extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 CySectionTitle(
-                  (storyTitle ?? '').isNotEmpty ? storyTitle! : '介绍',
+                  (storyTitle ?? '').isNotEmpty ? storyTitle! : stringsOf(context).merchantPublicUiAbout,
                 ),
                 if ((description ?? '').isNotEmpty) ...<Widget>[
                   const SizedBox(height: CyTokens.space2),
@@ -286,7 +287,7 @@ class _Body extends ConsumerWidget {
         ],
         if (gallery.isNotEmpty) ...<Widget>[
           const SizedBox(height: CyTokens.space3),
-          const CySectionTitle('相册'),
+          CySectionTitle(stringsOf(context).merchantPublicUiGallery),
           const SizedBox(height: CyTokens.space2),
           Wrap(
             spacing: CyTokens.space2,
@@ -320,15 +321,15 @@ class _Body extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                const CySectionTitle('承接信息'),
+                CySectionTitle(stringsOf(context).merchantPublicUiHosting),
                 const SizedBox(height: CyTokens.space2),
                 if (capacity != null && capacity > 0)
-                  Text('可接待人数:$capacity', style: textTheme.bodyMedium),
+                  Text(stringsOf(context).merchantPublicUiCapacity(capacity), style: textTheme.bodyMedium),
                 if ((availableTime ?? '').isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: CyTokens.space1),
                     child: Text(
-                      '可承接时段:$availableTime',
+                      stringsOf(context).merchantPublicUiAvailable(availableTime!),
                       style: textTheme.bodyMedium,
                     ),
                   ),
@@ -336,14 +337,14 @@ class _Body extends ConsumerWidget {
                   Padding(
                     padding: const EdgeInsets.only(top: CyTokens.space1),
                     child: Text(
-                      '适合类型:$suitActivityTypes',
+                      stringsOf(context).merchantPublicUiTypes(suitActivityTypes!),
                       style: textTheme.bodyMedium,
                     ),
                   ),
                 if ((demand ?? '').isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: CyTokens.space1),
-                    child: Text('合作需求:$demand', style: textTheme.bodyMedium),
+                    child: Text(stringsOf(context).merchantPublicUiDemand(demand!), style: textTheme.bodyMedium),
                   ),
               ],
             ),
@@ -408,7 +409,7 @@ extension _NpcSection on _Body {
                   avatar: avatar,
                   greeting: greeting,
                 ),
-                child: const Text('聊聊'),
+                child: Text(stringsOf(context).merchantPublicUiChat),
               ),
           ],
         ),

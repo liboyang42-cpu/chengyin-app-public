@@ -6,9 +6,12 @@ import '../models/merchant_crm_console.dart';
 /// 商家 CRM 运营台的接口异常。message 是**可直接展示**的一句话
 /// (后端 msg,或本地兜底文案)。
 class MerchantCrmApiException implements Exception {
-  const MerchantCrmApiException(this.message);
+  const MerchantCrmApiException(this.message, {this.isLocalFallback = false});
 
   final String message;
+
+  /// True only for app-authored validation, shape, or absent-message errors.
+  final bool isLocalFallback;
 
   @override
   String toString() => message;
@@ -38,7 +41,7 @@ class MerchantCrmConsoleApi {
     );
     final CrmCustomerPageData? page = CrmCustomerPageData.tryParse(data);
     if (page == null) {
-      throw const MerchantCrmApiException('客户名单数据格式异常，请稍后重试');
+      throw const MerchantCrmApiException('客户名单数据格式异常，请稍后重试', isLocalFallback: true);
     }
     return page;
   }
@@ -78,7 +81,7 @@ class MerchantCrmConsoleApi {
     );
     final String phone = '${data['phone'] ?? ''}'.trim();
     if (phone.isEmpty) {
-      throw const MerchantCrmApiException('服务端没有下发可用号码');
+      throw const MerchantCrmApiException('服务端没有下发可用号码', isLocalFallback: true);
     }
     return phone;
   }
@@ -87,7 +90,7 @@ class MerchantCrmConsoleApi {
   Future<List<CrmSavedSegment>> segments() async {
     final Object? data = await _get('/api/merchant/crm/segments', '保存分群加载失败');
     if (data is! List) {
-      throw const MerchantCrmApiException('保存分群加载失败');
+      throw const MerchantCrmApiException('保存分群加载失败', isLocalFallback: true);
     }
     return CrmSavedSegment.parseList(data);
   }
@@ -111,7 +114,7 @@ class MerchantCrmConsoleApi {
       '优惠券加载失败',
     );
     if (data is! List) {
-      throw const MerchantCrmApiException('优惠券加载失败');
+      throw const MerchantCrmApiException('优惠券加载失败', isLocalFallback: true);
     }
     return CrmCoupon.parseList(data);
   }
@@ -132,7 +135,7 @@ class MerchantCrmConsoleApi {
     );
     final CrmCampaignPreview? preview = CrmCampaignPreview.tryParse(data);
     if (preview == null) {
-      throw const MerchantCrmApiException('触达预览失败');
+      throw const MerchantCrmApiException('触达预览失败', isLocalFallback: true);
     }
     return preview;
   }
@@ -163,7 +166,7 @@ class MerchantCrmConsoleApi {
     );
     final CrmCampaignTask? task = CrmCampaignTask.tryParse(data);
     if (task == null || task.id == null) {
-      throw const MerchantCrmApiException('触达任务创建失败');
+      throw const MerchantCrmApiException('触达任务创建失败', isLocalFallback: true);
     }
     return task;
   }
@@ -177,7 +180,7 @@ class MerchantCrmConsoleApi {
     );
     final CrmCampaignTask? task = CrmCampaignTask.tryParse(data);
     if (task == null) {
-      throw const MerchantCrmApiException('触达发送失败，可从任务列表重试');
+      throw const MerchantCrmApiException('触达发送失败，可从任务列表重试', isLocalFallback: true);
     }
     return task;
   }
@@ -189,7 +192,7 @@ class MerchantCrmConsoleApi {
     // 回包形状不对时**保留屏上已加载的历史**。这里抛出去,让调用方走
     // 「刷新失败静默降级」那条路;返空列表会把历史当成"没有历史"清掉。
     if (data is! List) {
-      throw const MerchantCrmApiException('触达历史加载失败，请稍后重试');
+      throw const MerchantCrmApiException('触达历史加载失败，请稍后重试', isLocalFallback: true);
     }
     return data
         .map(CrmCampaignTask.tryParse)
@@ -212,7 +215,7 @@ class MerchantCrmConsoleApi {
     );
     final CrmBroadcastPreview? preview = CrmBroadcastPreview.tryParse(data);
     if (preview == null) {
-      throw const MerchantCrmApiException('可触达人数没算出来，请稍后重试');
+      throw const MerchantCrmApiException('可触达人数没算出来，请稍后重试', isLocalFallback: true);
     }
     return preview;
   }
@@ -240,7 +243,7 @@ class MerchantCrmConsoleApi {
     );
     final CrmBroadcastResult? result = CrmBroadcastResult.tryParse(data);
     if (result == null) {
-      throw const MerchantCrmApiException('发送结果异常，请重试并按结果核对');
+      throw const MerchantCrmApiException('发送结果异常，请重试并按结果核对', isLocalFallback: true);
     }
     return result;
   }
@@ -254,7 +257,7 @@ class MerchantCrmConsoleApi {
     final CrmCampaignTask? task = data is Map<String, dynamic>
         ? CrmCampaignTask.tryParse(data)
         : null;
-    if (task == null) throw const MerchantCrmApiException('回执加载失败');
+    if (task == null) throw const MerchantCrmApiException('回执加载失败', isLocalFallback: true);
     return task;
   }
 
@@ -266,7 +269,7 @@ class MerchantCrmConsoleApi {
       '重试失败',
     );
     final CrmCampaignTask? task = CrmCampaignTask.tryParse(data);
-    if (task == null) throw const MerchantCrmApiException('重试失败');
+    if (task == null) throw const MerchantCrmApiException('重试失败', isLocalFallback: true);
     return task;
   }
 
@@ -283,7 +286,7 @@ class MerchantCrmConsoleApi {
       networkFallback: networkFallback,
     );
     if (data is! Map<String, dynamic>) {
-      throw MerchantCrmApiException(fallback);
+      throw MerchantCrmApiException(fallback, isLocalFallback: true);
     }
     return data;
   }
@@ -298,6 +301,7 @@ class MerchantCrmConsoleApi {
     } on DioException {
       throw MerchantCrmApiException(
         fallback.isEmpty ? '网络连接失败，请稍后重试' : fallback,
+        isLocalFallback: true,
       );
     }
     return _unwrap(resp, fallback);
@@ -317,6 +321,7 @@ class MerchantCrmConsoleApi {
       throw MerchantCrmApiException(
         networkFallback ??
             (fallback.isEmpty ? '网络连接失败，请稍后重试' : fallback),
+        isLocalFallback: true,
       );
     }
     return _unwrap(resp, fallback);
@@ -328,6 +333,7 @@ class MerchantCrmConsoleApi {
       final String msg = '${body['msg'] ?? ''}'.trim();
       throw MerchantCrmApiException(
         msg.isNotEmpty ? msg : (fallback.isEmpty ? '操作失败' : fallback),
+        isLocalFallback: msg.isEmpty,
       );
     }
     return body['data'];

@@ -35,22 +35,22 @@ void main() {
     );
 
     expect(
-      profileBlock.indexOf("label: uploadHint('封面'"),
-      lessThan(profileBlock.indexOf("label: uploadHint('Logo'")),
+      profileBlock.indexOf("label: stringsOf(context).clubFormCoverHint"),
+      lessThan(profileBlock.indexOf("label: stringsOf(context).clubFormLogoHint")),
     );
     expect(
-      profileBlock.indexOf("label: '俱乐部名称'"),
-      lessThan(profileBlock.indexOf("label: '简介'")),
+      profileBlock.indexOf("label: stringsOf(context).clubFormClubName"),
+      lessThan(profileBlock.indexOf("label: stringsOf(context).clubFormShortIntroduction")),
     );
     expect(profileBlock, isNot(contains("label: '一句话介绍(选填)'")));
     expect(profileBlock, isNot(contains("label: '关键词'")));
     expect(
-      cityBlock.indexOf("label: '城市'"),
-      lessThan(cityBlock.indexOf("label: '核心关键词(选填)'")),
+      cityBlock.indexOf("label: stringsOf(context).clubFormCityField"),
+      lessThan(cityBlock.indexOf("label: stringsOf(context).clubFormOptionalKeywords")),
     );
     expect(
-      cityBlock.indexOf("label: '核心关键词(选填)'"),
-      lessThan(cityBlock.indexOf("label: '风格/调性(选填)'")),
+      cityBlock.indexOf("label: stringsOf(context).clubFormOptionalKeywords"),
+      lessThan(cityBlock.indexOf("label: stringsOf(context).clubFormOptionalStyle")),
     );
   });
 }

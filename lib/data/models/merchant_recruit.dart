@@ -36,6 +36,7 @@ class RecruitChapter {
   const RecruitChapter({
     required this.id,
     required this.name,
+    this.hasNameFallback = false,
     this.description,
     this.category,
     this.required_,
@@ -50,6 +51,7 @@ class RecruitChapter {
 
   final int id;
   final String name;
+  final bool hasNameFallback;
   final String? description;
   final String? category;
 
@@ -125,6 +127,7 @@ class RecruitChapter {
         (json['recruitStatus'] as Map<String, dynamic>?) ?? <String, dynamic>{};
     return RecruitChapter(
       id: asInt(json['id']),
+    hasNameFallback: (json['name'] as String?)?.trim().isNotEmpty != true,
       name: (json['name'] as String?)?.trim().isNotEmpty == true
           ? (json['name'] as String).trim()
           : '未命名章节',
@@ -149,6 +152,7 @@ class MyChapterNode {
   const MyChapterNode({
     required this.id,
     required this.name,
+    this.hasNameFallback = false,
     this.address,
     this.chapterId,
     this.topicId,
@@ -158,6 +162,7 @@ class MyChapterNode {
 
   final int id;
   final String name;
+  final bool hasNameFallback;
   final String? address;
   final int? chapterId;
   final int? topicId;
@@ -190,6 +195,7 @@ class MyChapterNode {
 
   factory MyChapterNode.fromJson(Map<String, dynamic> json) => MyChapterNode(
     id: asInt(json['id']),
+    hasNameFallback: (json['name'] as String?)?.trim().isNotEmpty != true,
     name: (json['name'] as String?)?.trim().isNotEmpty == true
         ? (json['name'] as String).trim()
         : '未命名点位',

@@ -1,3 +1,5 @@
+import '../../l10n/strings.dart';
+import 'merchant_review_strings.dart';
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
@@ -33,10 +35,10 @@ Future<CyImagePickSource?> _chooseImageSource(BuildContext context) =>
 
 Future<bool> _confirmImagePurpose(BuildContext context) => cyConfirm(
   context,
-  title: '添加真实到店照片',
-  content: '仅在你主动选择后访问相机或照片，用于补充这次真实到店评价；不会在后台访问其他图片。',
-  cancelText: '暂不添加',
-  confirmText: '继续选择',
+  title: stringsOf(context).merchantPublicReviewPhotoTitle,
+  content: stringsOf(context).merchantResidualPolicyReviewPhoto,
+  cancelText: stringsOf(context).merchantPublicReviewPhotoCancel,
+  confirmText: stringsOf(context).merchantPublicReviewPhotoContinue,
 );
 
 Future<bool> _openImageSettings() => Geolocator.openAppSettings();
@@ -263,14 +265,14 @@ class _MerchantPublicReviewsPageState extends State<MerchantPublicReviewsPage> {
       if (!mounted) return;
       CyNativeNotice.show(
         context,
-        '需要照片权限，请到系统设置开启后重试',
+        stringsOf(context).merchantPublicReviewPhotoPermission,
         isError: true,
-        actionLabel: '去设置',
+        actionLabel: stringsOf(context).merchantPublicReviewSettings,
         onAction: () => unawaited(widget.openImageSettings()),
       );
     } catch (error) {
       if (!mounted) return;
-      setState(() => _submitError = _errorText(error, '图片上传失败'));
+      setState(() => _submitError = _errorText(context, error, stringsOf(context).merchantPublicReviewUploadError));
     } finally {
       if (mounted) setState(() => _uploading = false);
     }
@@ -280,8 +282,8 @@ class _MerchantPublicReviewsPageState extends State<MerchantPublicReviewsPage> {
     if (_submitting) return;
     final MerchantReviewCreateDraft? draft = _draft;
     final String? validationError = draft == null
-        ? '核销资格已失效，请刷新'
-        : draft.validationError;
+        ? stringsOf(context).merchantPublicReviewEligibilityExpired
+        : merchantReviewLocalValidation(context, draft.validationError);
     if (validationError != null) {
       setState(() => _submitError = validationError);
       return;
@@ -311,9 +313,9 @@ class _MerchantPublicReviewsPageState extends State<MerchantPublicReviewsPage> {
         _imageUrlPolicy = widget.imageUrlPolicy;
       });
       final String message = switch (receipt.status) {
-        'VISIBLE' => '该评价已通过复核并公开',
-        'HIDDEN' => '该评价未通过平台复核',
-        _ => '评价已提交，等待平台复核',
+        'VISIBLE' => stringsOf(context).merchantPublicReviewVisibleReceipt,
+        'HIDDEN' => stringsOf(context).merchantPublicReviewHiddenReceipt,
+        _ => stringsOf(context).merchantPublicReviewPendingReceipt,
       };
       CyNativeNotice.show(context, message);
       await _loadFirstPage();
@@ -321,7 +323,7 @@ class _MerchantPublicReviewsPageState extends State<MerchantPublicReviewsPage> {
       if (!mounted) return;
       setState(() {
         _submitting = false;
-        _submitError = _errorText(error, '评价提交失败');
+        _submitError = _errorText(context, error, stringsOf(context).merchantPublicReviewSubmitError);
       });
     }
   }
@@ -340,7 +342,7 @@ class _MerchantPublicReviewsPageState extends State<MerchantPublicReviewsPage> {
           ),
         );
     if (!mounted || receipt == null) return;
-    CyNativeNotice.show(context, '举报已提交，等待平台复核');
+    CyNativeNotice.show(context, stringsOf(context).merchantPublicReviewReportReceipt);
   }
 
   Future<void> _previewImages(List<Uri> urls, int initialIndex) {
@@ -356,7 +358,7 @@ class _MerchantPublicReviewsPageState extends State<MerchantPublicReviewsPage> {
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
       backgroundColor: CyPalette.of(context).bgPage,
-      navigationBar: const CupertinoNavigationBar(middle: Text('真实到店评价')),
+      navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).merchantPublicReviewTitle)),
       child: SafeArea(bottom: false, child: _body(context)),
     );
   }
@@ -366,9 +368,9 @@ class _MerchantPublicReviewsPageState extends State<MerchantPublicReviewsPage> {
     //   `state === 'invalid'` 口径):说清是链接的问题,不发请求、不给
     //   点了没用的重试;StatusView 自带「回首页」出口,不会白屏困死。
     if (!widget._linkValid) {
-      return const StatusView(
-        message: '链接参数无效',
-        sub: '这个链接缺少商家或店主信息，无法打开这份口碑页。',
+      return StatusView(
+        message: stringsOf(context).merchantPublicReviewInvalid,
+        sub: stringsOf(context).merchantPublicReviewInvalidHint,
         large: true,
       );
     }
@@ -378,10 +380,10 @@ class _MerchantPublicReviewsPageState extends State<MerchantPublicReviewsPage> {
     if (_error != null) {
       return StatusView(
         icon: CupertinoIcons.exclamationmark_triangle,
-        message: '评价加载失败',
-        sub: _error.toString(),
+        message: stringsOf(context).merchantPublicReviewLoadError,
+        sub: merchantReviewErrorText(context, _error!),
         onRetry: _loadFirstPage,
-        retryLabel: '重新加载',
+        retryLabel: stringsOf(context).merchantPublicReviewReload,
         large: true,
       );
     }
@@ -441,7 +443,7 @@ class _MerchantPublicReviewsPageState extends State<MerchantPublicReviewsPage> {
                   ),
                 ),
                 const SizedBox(height: CyTokens.space1),
-                Text('真实到店体验', style: textTheme.headlineSmall),
+                Text(stringsOf(context).merchantPublicReviewHeading, style: textTheme.headlineSmall),
                 const SizedBox(height: CyTokens.space2),
                 Text(
                   '评价资格来自已生效核销，商家回复不会改写用户原评。',
@@ -457,7 +459,7 @@ class _MerchantPublicReviewsPageState extends State<MerchantPublicReviewsPage> {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: <Widget>[
               Text(
-                _averageRating?.toStringAsFixed(1) ?? '暂无',
+                _averageRating?.toStringAsFixed(1) ?? stringsOf(context).merchantPublicReviewNoRating,
                 style: textTheme.headlineMedium?.copyWith(
                   fontFeatures: const <FontFeature>[
                     FontFeature.tabularFigures(),
@@ -465,7 +467,7 @@ class _MerchantPublicReviewsPageState extends State<MerchantPublicReviewsPage> {
                 ),
               ),
               Text(
-                '$_total 条评价',
+                stringsOf(context).merchantPublicReviewCount(_total),
                 style: textTheme.bodySmall?.copyWith(
                   color: palette.textSecondary,
                 ),
@@ -496,7 +498,7 @@ class _MerchantPublicReviewsPageState extends State<MerchantPublicReviewsPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    Text('写下这次体验', style: textTheme.titleMedium),
+                    Text(stringsOf(context).merchantPublicReviewCompose, style: textTheme.titleMedium),
                     const SizedBox(height: CyTokens.space1),
                     Text(
                       '核销已验证 · 提交后平台复核，过审后公开；原评不可编辑',
@@ -517,7 +519,7 @@ class _MerchantPublicReviewsPageState extends State<MerchantPublicReviewsPage> {
           ),
           const SizedBox(height: CyTokens.space3),
           Semantics(
-            label: '体验评分',
+            label: stringsOf(context).merchantPublicReviewRating,
             child: Row(
               children: <Widget>[
                 for (int star = 1; star <= 5; star++)
@@ -536,7 +538,7 @@ class _MerchantPublicReviewsPageState extends State<MerchantPublicReviewsPage> {
                           ? CupertinoIcons.star_fill
                           : CupertinoIcons.star,
                       color: palette.textPrimary,
-                      semanticLabel: '$star 星',
+                      semanticLabel: stringsOf(context).merchantPublicReviewStars(star),
                     ),
                   ),
               ],
@@ -552,7 +554,7 @@ class _MerchantPublicReviewsPageState extends State<MerchantPublicReviewsPage> {
             enabled: !_submitting,
             textInputAction: TextInputAction.newline,
             keyboardType: TextInputType.multiline,
-            placeholder: '说说环境、服务和真实到店感受',
+            placeholder: stringsOf(context).merchantPublicReviewContentHint,
             padding: const EdgeInsets.all(CyTokens.space3),
             decoration: BoxDecoration(
               color: palette.inputBgEmpty,
@@ -600,7 +602,7 @@ class _MerchantPublicReviewsPageState extends State<MerchantPublicReviewsPage> {
                                     ),
                               const SizedBox(height: CyTokens.space1),
                               Text(
-                                '添加图片',
+                                stringsOf(context).merchantPublicReviewAddImage,
                                 style: textTheme.labelSmall?.copyWith(
                                   color: palette.textSecondary,
                                 ),
@@ -633,7 +635,7 @@ class _MerchantPublicReviewsPageState extends State<MerchantPublicReviewsPage> {
             width: double.infinity,
             child: CyNativeButton(
               key: const Key('public-review-submit'),
-              label: _submitting ? '提交中…' : '提交真实评价',
+              label: _submitting ? stringsOf(context).merchantPublicReviewSubmitting : stringsOf(context).merchantPublicReviewSubmit,
               loading: _submitting,
               onPressed: canSubmit ? _submit : null,
               liquidGlassSupported: widget.liquidGlassSupported,
@@ -669,9 +671,9 @@ class _MerchantPublicReviewsPageState extends State<MerchantPublicReviewsPage> {
               onPressed: _submitting
                   ? null
                   : () => setState(() => _uploadedImages.removeAt(index)),
-              child: const Icon(
+              child: Icon(
                 CupertinoIcons.xmark_circle_fill,
-                semanticLabel: '删除图片',
+                semanticLabel: stringsOf(context).merchantPublicReviewDeleteImage,
               ),
             ),
           ),
@@ -696,7 +698,7 @@ class _MerchantPublicReviewsPageState extends State<MerchantPublicReviewsPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text(eligibility.title, style: textTheme.titleMedium),
+          Text(merchantReviewEligibilityTitle(context, eligibility), style: textTheme.titleMedium),
           const SizedBox(height: CyTokens.space1),
           Text(
             eligibility.subtitle,
@@ -713,7 +715,7 @@ class _MerchantPublicReviewsPageState extends State<MerchantPublicReviewsPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Text('到店评价', style: textTheme.titleMedium),
+        Text(stringsOf(context).merchantPublicReviewListTitle, style: textTheme.titleMedium),
         const SizedBox(height: CyTokens.space1),
         Text(
           '公开列表仅展示平台当前判定为 VISIBLE 的内容',
@@ -756,10 +758,10 @@ class _MerchantPublicReviewsPageState extends State<MerchantPublicReviewsPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    Text(review.authorNickname, style: textTheme.titleSmall),
+                    Text(review.hasAuthorNicknameFallback ? stringsOf(context).merchantPublicReviewAnonymous : review.authorNickname, style: textTheme.titleSmall),
                     const SizedBox(height: CyTokens.space1),
                     Text(
-                      _minute(review.createTime) ?? '时间待确认',
+                      _minute(review.createTime) ?? stringsOf(context).merchantPublicReviewTimeUnknown,
                       style: textTheme.bodySmall?.copyWith(
                         color: palette.textSecondary,
                       ),
@@ -769,7 +771,7 @@ class _MerchantPublicReviewsPageState extends State<MerchantPublicReviewsPage> {
               ),
               if (review.verifiedRedemption)
                 Text(
-                  '核销已验证',
+                  stringsOf(context).merchantPublicReviewVerified,
                   style: textTheme.labelSmall?.copyWith(
                     color: palette.textSecondary,
                   ),
@@ -847,7 +849,7 @@ class _MerchantPublicReviewsPageState extends State<MerchantPublicReviewsPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  Text('商家公开回复', style: textTheme.labelMedium),
+                  Text(stringsOf(context).merchantPublicReviewReply, style: textTheme.labelMedium),
                   const SizedBox(height: CyTokens.space1),
                   Text(review.merchantReply!),
                   if (review.repliedAt != null) ...<Widget>[
@@ -874,7 +876,7 @@ class _MerchantPublicReviewsPageState extends State<MerchantPublicReviewsPage> {
                   horizontal: CyTokens.space2,
                 ),
                 onPressed: () => _report(review),
-                child: const Text('举报'),
+                child: Text(stringsOf(context).merchantPublicReviewReport),
               ),
             ),
           ],
@@ -895,7 +897,7 @@ class _MerchantPublicReviewsPageState extends State<MerchantPublicReviewsPage> {
         child: CupertinoButton(
           key: const Key('public-review-load-more'),
           onPressed: _loadMore,
-          child: const Text('加载更多'),
+          child: Text(stringsOf(context).merchantPublicReviewMore),
         ),
       );
     }
@@ -903,7 +905,7 @@ class _MerchantPublicReviewsPageState extends State<MerchantPublicReviewsPage> {
       padding: const EdgeInsets.all(CyTokens.space3),
       child: Center(
         child: Text(
-          _items.isEmpty ? '' : '已经到底了',
+          _items.isEmpty ? '' : stringsOf(context).merchantPublicReviewEnd,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
             color: CyPalette.of(context).textSecondary,
           ),
@@ -964,9 +966,9 @@ class _PublicReviewImagePreviewState extends State<_PublicReviewImagePreview> {
                     minimumSize: const Size(44, 44),
                     padding: EdgeInsets.zero,
                     onPressed: () => Navigator.of(context).pop(),
-                    child: const Icon(
+                    child: Icon(
                       CupertinoIcons.xmark_circle_fill,
-                      semanticLabel: '关闭评价图片预览',
+                      semanticLabel: stringsOf(context).merchantPublicReviewClosePreview,
                     ),
                   ),
                 ],
@@ -1041,7 +1043,7 @@ class _PublicReportSheetState extends State<_PublicReportSheet> {
       expectedVersion: widget.review.version,
       reason: _controller.text,
     );
-    final String? validationError = draft.validationError;
+    final String? validationError = merchantReviewLocalValidation(context, draft.validationError);
     if (validationError != null) {
       setState(() => _error = validationError);
       return;
@@ -1066,7 +1068,7 @@ class _PublicReportSheetState extends State<_PublicReportSheet> {
       if (!mounted) return;
       setState(() {
         _submitting = false;
-        _error = _errorText(error, '举报提交失败');
+        _error = _errorText(context, error, stringsOf(context).merchantPublicReviewReportError);
       });
     }
   }
@@ -1092,14 +1094,14 @@ class _PublicReportSheetState extends State<_PublicReportSheet> {
             children: <Widget>[
               Row(
                 children: <Widget>[
-                  Expanded(child: Text('提交平台复核', style: textTheme.titleLarge)),
+                  Expanded(child: Text(stringsOf(context).merchantPublicReviewReportTitle, style: textTheme.titleLarge)),
                   CupertinoButton(
                     minimumSize: const Size(44, 44),
                     padding: EdgeInsets.zero,
                     onPressed: _submitting
                         ? null
                         : () => Navigator.of(context).pop(),
-                    child: const Text('取消'),
+                    child: Text(stringsOf(context).merchantPublicReviewCancel),
                   ),
                 ],
               ),
@@ -1121,7 +1123,7 @@ class _PublicReportSheetState extends State<_PublicReportSheet> {
                 enabled: !_submitting,
                 keyboardType: TextInputType.multiline,
                 textInputAction: TextInputAction.newline,
-                placeholder: '请说明不实、攻击、广告或其他违规事实',
+                placeholder: stringsOf(context).merchantPublicReviewReportHint,
                 padding: const EdgeInsets.all(CyTokens.space3),
                 decoration: BoxDecoration(
                   color: palette.inputBgEmpty,
@@ -1140,7 +1142,7 @@ class _PublicReportSheetState extends State<_PublicReportSheet> {
               const SizedBox(height: CyTokens.space3),
               CyNativeButton(
                 key: const Key('public-review-report-submit'),
-                label: _submitting ? '提交中…' : '提交举报',
+                label: _submitting ? stringsOf(context).merchantPublicReviewSubmitting : stringsOf(context).merchantPublicReviewReportSubmit,
                 loading: _submitting,
                 onPressed: _submitting ? null : _submit,
                 liquidGlassSupported: widget.liquidGlassSupported,
@@ -1163,8 +1165,8 @@ BoxDecoration _cardDecoration(BuildContext context) {
   );
 }
 
-String _errorText(Object error, String fallback) {
-  final String text = error.toString().replaceFirst('Exception: ', '').trim();
+String _errorText(BuildContext context, Object error, String fallback) {
+  final String text = merchantReviewErrorText(context, error).trim();
   return text.isEmpty ? fallback : text;
 }
 

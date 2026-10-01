@@ -1,3 +1,5 @@
+import 'package:flutter/widgets.dart';
+import '../../l10n/strings.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/api/club_crm_api.dart';
@@ -7,13 +9,16 @@ import '../../data/models/club_access.dart';
 const String kClubMemberListRead = 'club:member:list:read';
 const String kClubFinanceRead = 'club:finance:read';
 
+enum ClubLocalAccessReason { inactive, differentClub, permission }
+
 enum ClubAccessDecision { checking, allow, deny, unknown }
 
 class ClubAccessGateResult {
-  const ClubAccessGateResult(this.decision, this.reason);
+  const ClubAccessGateResult(this.decision, this.reason, {this.localReason});
 
   final ClubAccessDecision decision;
   final String reason;
+  final ClubLocalAccessReason? localReason;
 }
 
 /// 页内权限判定的最小版本(App 暂无俱乐部 access 底座)。
@@ -39,18 +44,21 @@ ClubAccessGateResult evaluateClubAccess(
         return const ClubAccessGateResult(
           ClubAccessDecision.deny,
           '当前账号无权进入该俱乐部',
+          localReason: ClubLocalAccessReason.inactive,
         );
       }
       if (value.clubId != null && value.clubId != clubId) {
         return const ClubAccessGateResult(
           ClubAccessDecision.deny,
           '当前账号不在这个俱乐部',
+          localReason: ClubLocalAccessReason.differentClub,
         );
       }
       if (!value.has(permission)) {
         return const ClubAccessGateResult(
           ClubAccessDecision.deny,
           '当前角色没有这项权限',
+          localReason: ClubLocalAccessReason.permission,
         );
       }
       return const ClubAccessGateResult(ClubAccessDecision.allow, '');
@@ -66,3 +74,12 @@ ClubAccessGateResult evaluateClubAccess(
   }
   return (auth: false, network: false);
 }
+
+/// Translate only locally generated reasons; server explanations stay verbatim.
+String localizedClubAccessReason(BuildContext context, ClubAccessGateResult gate) =>
+    switch (gate.localReason) {
+      ClubLocalAccessReason.inactive => stringsOf(context).clubAccessInactive,
+      ClubLocalAccessReason.differentClub => stringsOf(context).clubAccessDifferentClub,
+      ClubLocalAccessReason.permission => stringsOf(context).clubAccessPermission,
+      null => gate.reason,
+    };

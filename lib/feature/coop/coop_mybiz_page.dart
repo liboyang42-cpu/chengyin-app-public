@@ -1,3 +1,4 @@
+import '../../l10n/strings.dart';
 import '../../core/theme/cy_palette.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -24,8 +25,8 @@ class CoopMyBizPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    const String title = '合作与结算';
-    const String needLogin = '登录后查看我的合作';
+    final String title = stringsOf(context).coopFinanceUiMyBizTitle;
+    final String needLogin = stringsOf(context).coopLoginMyCooperation;
     final Widget? gate = coopLoginGate(
       context,
       ref,
@@ -37,7 +38,7 @@ class CoopMyBizPage extends ConsumerWidget {
     return CupertinoPageScaffold(
       // 显式给浅色底,理由见 coop_guard.dart。
       backgroundColor: CyPalette.of(context).bgPage,
-      navigationBar: const CupertinoNavigationBar(middle: Text(title)),
+      navigationBar: CupertinoNavigationBar(middle: Text(title)),
       child: async.when(
         loading: () => const Center(child: CupertinoActivityIndicator()),
         error: (Object e, _) => isCoopUnauthorized(e)
@@ -49,8 +50,8 @@ class CoopMyBizPage extends ConsumerWidget {
                 refetch: () => ref.invalidate(coopMyBizProvider),
               )
             : StatusView(
-                message: '我的合作没能加载出来',
-                sub: coopErrorSub(e),
+                message: stringsOf(context).coopMyBusinessLoadFailed,
+                sub: coopErrorSub(e, context: context),
                 large: true,
                 onRetry: () => ref.invalidate(coopMyBizProvider),
               ),
@@ -62,12 +63,12 @@ class CoopMyBizPage extends ConsumerWidget {
               children: <Widget>[
                 _SummaryCard(biz: biz),
                 const SizedBox(height: CyTokens.space4),
-                const CySectionTitle('结算记录'),
+                CySectionTitle(stringsOf(context).coopFinanceUiRecords),
                 const SizedBox(height: CyTokens.space2),
                 if (biz.settlements.isEmpty)
-                  const StatusView(
-                    message: '还没有结算记录',
-                    sub: '你承接的合作产生核销后,结算明细会显示在这里',
+                  StatusView(
+                    message: stringsOf(context).coopFinanceUiNoRecords,
+                    sub: stringsOf(context).coopFinanceUiNoRecordsHint,
                   )
                 else
                   ...biz.settlements.map(
@@ -108,7 +109,7 @@ class _SummaryCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Text(
-                  '近 90 天履约率',
+                  stringsOf(context).coopPerformance90Days,
                   style: textTheme.bodySmall?.copyWith(
                     color: CyPalette.of(context).textSecondary,
                   ),
@@ -117,7 +118,7 @@ class _SummaryCard extends StatelessWidget {
                 Text('${biz.fulfillmentRate}%', style: textTheme.headlineSmall),
                 if (biz.violationCount > 0)
                   Text(
-                    '${biz.violationCount} 次违约',
+                    stringsOf(context).coopFinanceUiViolations(biz.violationCount),
                     style: textTheme.bodySmall?.copyWith(
                       color: CyPalette.of(context).statusDanger,
                     ),
@@ -130,7 +131,7 @@ class _SummaryCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Text(
-                  '合作评价',
+                  stringsOf(context).coopReviews,
                   style: textTheme.bodySmall?.copyWith(
                     color: CyPalette.of(context).textSecondary,
                   ),
@@ -139,13 +140,13 @@ class _SummaryCard extends StatelessWidget {
                 // ★ 均分为 0 且条数为 0 是"还没有评价",不是"评分很差" ——
                 //   两者后端都给 avgRating=0,只有 reviewCount 能区分。
                 Text(
-                  biz.reviewCount > 0 ? '${biz.avgRating} 分' : '还没有评价',
+                  biz.reviewCount > 0 ? stringsOf(context).coopFinanceUiRating(biz.avgRating.toString()) : stringsOf(context).coopNoReviews,
                   key: const Key('coop_mybiz_rating_text'),
                   style: textTheme.headlineSmall,
                 ),
                 if (biz.reviewCount > 0)
                   Text(
-                    '共 ${biz.reviewCount} 条',
+                    stringsOf(context).coopFinanceUiReviewCount(biz.reviewCount),
                     style: textTheme.bodySmall?.copyWith(
                       color: CyPalette.of(context).textTertiary,
                     ),
@@ -167,7 +168,21 @@ class _SettlementTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final rule = row.shareRuleText;
+    final strings = stringsOf(context);
+    final rule = switch (row.shareMode) {
+      0 => strings.coopSettlementTraffic,
+      1 => row.shareRate == null ? strings.coopSettlementPercentage : strings.coopSettlementRate('${row.shareRate}'),
+      2 => row.fixedFee == null ? strings.coopSettlementFixed : strings.coopSettlementFixedAmount(row.fixedFee!.toStringAsFixed(2)),
+      _ => null,
+    };
+    final title = (row.topicName ?? '').trim().isNotEmpty ? row.topicName!.trim()
+        : row.topicId == null ? strings.coopSettlementUnnamed : strings.coopSettlementTopicId(row.topicId!);
+    final status = switch (row.status) {
+      0 => strings.coopSettlementAwaitingCredit,
+      1 => strings.coopSettlementInBalance,
+      2 => strings.coopSettlementVoidStatus,
+      _ => strings.coopSettlementUnknownStatus,
+    };
     return CupertinoButton(
       padding: EdgeInsets.zero,
       onPressed: onPressed,
@@ -185,14 +200,14 @@ class _SettlementTile extends StatelessWidget {
             Row(
               children: <Widget>[
                 Expanded(
-                  child: Text(row.topicTitle, style: textTheme.titleMedium),
+                  child: Text(title, style: textTheme.titleMedium),
                 ),
-                CyTag(label: row.statusText),
+                Flexible(child: CyTag(label: status)),
               ],
             ),
             const SizedBox(height: CyTokens.space1),
             Text(
-              row.payeeText,
+              row.payeeType?.trim().toLowerCase() == 'club' ? strings.coopSettlementClubShare : strings.coopSettlementMerchantShare,
               style: textTheme.bodySmall?.copyWith(
                 color: CyPalette.of(context).textSecondary,
               ),
@@ -207,9 +222,9 @@ class _SettlementTile extends StatelessWidget {
             Text(
               <String>[
                 ?rule,
-                if (row.verifiedHeads != null) '核销 ${row.verifiedHeads} 人',
+                if (row.verifiedHeads != null) strings.coopFinanceUiRedeemedPeople(row.verifiedHeads!),
                 if (row.verifiedSales != null)
-                  '核销销售额 ¥${row.verifiedSales!.toStringAsFixed(2)}',
+                  strings.coopFinanceUiRedeemedSales(row.verifiedSales!.toStringAsFixed(2)),
               ].join(' · '),
               style: textTheme.bodySmall?.copyWith(
                 color: CyPalette.of(context).textTertiary,

@@ -1,3 +1,4 @@
+import '../../support/fixed_auth.dart';
 // 导演台 · 集合时间(小程序 HO-26 `pages/club/topic-detail` 的 `.ctd-opstime`):
 // 入口条件、半屏保存 → `POST /api/club/lead/edit-ops` 的请求契约,以及三路结果。
 //
@@ -16,6 +17,7 @@
 //     (说「结果待确认」并回读)。
 // 本文件另钉住 `ClubLeadApi.editOpsTime` 的请求编码契约(同一端点的领队封装)。
 
+import 'package:chengyin_app/l10n/app_localizations.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -187,6 +189,7 @@ Future<void> _pumpPage(
   required _FakeTopicOpsApi ops,
   int? activityId = 41,
   bool canDirect = true,
+  Locale locale = const Locale('zh'),
 }) async {
   ops.statsValue = _stats(canDirect: canDirect);
   await tester.binding.setSurfaceSize(const Size(390, 1600));
@@ -194,6 +197,7 @@ Future<void> _pumpPage(
   await tester.pumpWidget(
     ProviderScope(
       overrides: <dynamic>[
+        signedInAuthOverride(),
         clubTopicOpsApiProvider.overrideWithValue(ops),
         clubDirectorApiProvider.overrideWithValue(
           _ReadyDirector(_directorProjection()),
@@ -203,6 +207,9 @@ Future<void> _pumpPage(
         ),
       ].cast(),
       child: MaterialApp(
+        locale: locale,
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
         debugShowCheckedModeBanner: false,
         home: ClubTopicDetailPage(
           key: ObjectKey(ops),
@@ -287,6 +294,23 @@ void main() {
   });
 
   group('集合时间半屏:保存 → /api/club/lead/edit-ops', () {
+    testWidgets('English meeting-time controls retain policy and request encoding', (tester) async {
+      final ops = _FakeTopicOpsApi()
+        ..overviewValue = ClubTopicOverview.tryFromJson(
+          _overviewJson(activities: <Map<String, dynamic>>[_activity()]),
+        )!;
+      await _pumpPage(tester, ops: ops, locale: const Locale('en'));
+      await _tapVisible(tester, const Key('topic-ops-time-edit'));
+      expect(find.text('Edit meeting time'), findsOneWidget);
+      expect(find.text('The initiator will be notified of the change. The refund deadline is calculated as 24 hours before the new meeting time.'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('topic-ops-time-save')));
+      await tester.pumpAndSettle();
+      expect(ops.editOpsCalls, <Map<String, dynamic>>[
+        <String, dynamic>{'activityId': 41, 'startDate': '2026-09-20 14:00:00'},
+      ]);
+      expect(find.textContaining('Meeting time updated'), findsOneWidget);
+    });
+
     testWidgets('半屏带小程序原文的两句提示 + 预填当前时刻', (WidgetTester tester) async {
       final ops = _FakeTopicOpsApi()
         ..overviewValue = ClubTopicOverview.tryFromJson(

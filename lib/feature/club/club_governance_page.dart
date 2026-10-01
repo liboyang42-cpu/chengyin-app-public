@@ -1,3 +1,5 @@
+import 'club_customer_labels.dart';
+import '../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -68,7 +70,6 @@ class _ClubGovernancePageState extends ConsumerState<ClubGovernancePage> {
   int? _selectedMemberId;
   String _selectedMemberName = '';
   int _selectedDurationDays = 30;
-  String _selectedDurationLabel = '30 天';
   String _actingKey = '';
   bool _empty = false;
 
@@ -97,7 +98,7 @@ class _ClubGovernancePageState extends ConsumerState<ClubGovernancePage> {
       const List<String> allowed = <String>['CLUB', 'ACTIVITY', 'MEMBER'];
       if (!allowed.contains(type) || targetId == null || targetId <= 0) {
         _state = ClubOpsLoadState.error;
-        _error = '缺少合法的举报目标';
+        _error = '';
         return;
       }
       _reportTargetType = type;
@@ -111,11 +112,15 @@ class _ClubGovernancePageState extends ConsumerState<ClubGovernancePage> {
   }
 
   String get _pageTitle {
-    if (_mode == 'appeal') return '封禁申诉';
+    if (_mode == 'appeal') return stringsOf(context).clubGovAppealTitle;
     if (_mode == 'report') {
-      return '${GovernanceCase.reportTargetText(_reportTargetType ?? '')}举报';
+      return switch (_reportTargetType) {
+        'CLUB' => stringsOf(context).clubGovClubReport,
+        'ACTIVITY' => stringsOf(context).clubGovActivityReport,
+        _ => stringsOf(context).clubGovMemberReport,
+      };
     }
-    return '成员治理';
+    return stringsOf(context).clubGovTitle;
   }
 
   Future<void> _load() async {
@@ -137,7 +142,7 @@ class _ClubGovernancePageState extends ConsumerState<ClubGovernancePage> {
       if (!access.active || access.clubId != widget.clubId) {
         setState(() {
           _state = ClubOpsLoadState.noPermission;
-          _error = '当前账号不属于该俱乐部';
+          _error = stringsOf(context).clubGovWrongClub;
         });
         return;
       }
@@ -148,7 +153,7 @@ class _ClubGovernancePageState extends ConsumerState<ClubGovernancePage> {
       if (!access.has(kClubMemberManage)) {
         setState(() {
           _state = ClubOpsLoadState.noPermission;
-          _error = '仅主理人与副主理人可进行成员治理';
+          _error = stringsOf(context).clubGovOwnerOnly;
         });
         return;
       }
@@ -159,7 +164,7 @@ class _ClubGovernancePageState extends ConsumerState<ClubGovernancePage> {
       setState(() {
         _loginRequired = clubLoginRequired(error);
         _state = clubOpsFailureState(error);
-        _error = clubOpsErrorMessage(error, '治理权限暂时不可用');
+        _error = clubOpsErrorMessage(error, stringsOf(context).clubGovAccessUnavailable);
       });
     }
   }
@@ -177,7 +182,7 @@ class _ClubGovernancePageState extends ConsumerState<ClubGovernancePage> {
       if (bans == null) {
         setState(() {
           _state = ClubOpsLoadState.error;
-          _error = '治理记录暂时不可用';
+          _error = stringsOf(context).clubGovRecordsUnavailable;
         });
         return;
       }
@@ -192,9 +197,7 @@ class _ClubGovernancePageState extends ConsumerState<ClubGovernancePage> {
           : null;
       String preselectedName = '';
       if (preselected != null) {
-        preselectedName = selectable
-            .firstWhere((ClubMember m) => m.memberId == preselected)
-            .displayName;
+        preselectedName = clubMemberDisplayName(context, selectable.firstWhere((ClubMember m) => m.memberId == preselected));
       }
       setState(() {
         _members = selectable;
@@ -208,7 +211,7 @@ class _ClubGovernancePageState extends ConsumerState<ClubGovernancePage> {
       if (!mounted) return;
       setState(() {
         _state = clubOpsFailureState(error);
-        _error = clubOpsErrorMessage(error, '治理记录暂时不可用');
+        _error = clubOpsErrorMessage(error, stringsOf(context).clubGovRecordsUnavailable);
       });
     }
   }
@@ -228,7 +231,7 @@ class _ClubGovernancePageState extends ConsumerState<ClubGovernancePage> {
       if (cases == null) {
         setState(() {
           _state = ClubOpsLoadState.error;
-          _error = '治理工单暂时不可用';
+          _error = stringsOf(context).clubGovCasesUnavailable;
         });
         return;
       }
@@ -241,7 +244,7 @@ class _ClubGovernancePageState extends ConsumerState<ClubGovernancePage> {
       setState(() {
         _loginRequired = clubLoginRequired(error);
         _state = clubOpsFailureState(error);
-        _error = clubOpsErrorMessage(error, '治理工单暂时不可用');
+        _error = clubOpsErrorMessage(error, stringsOf(context).clubGovCasesUnavailable);
       });
     }
   }
@@ -268,7 +271,7 @@ class _ClubGovernancePageState extends ConsumerState<ClubGovernancePage> {
     if (!mounted || value == null) return null;
     final String reason = value.trim();
     if (reasonRequired && reason.isEmpty) {
-      CyNativeNotice.show(context, '请填写理由', isError: true);
+      CyNativeNotice.show(context, stringsOf(context).clubGovReasonRequired, isError: true);
       return null;
     }
     return reason;
@@ -278,7 +281,7 @@ class _ClubGovernancePageState extends ConsumerState<ClubGovernancePage> {
     if (_actingKey.isNotEmpty) return;
     final int? memberId = _selectedMemberId;
     if (memberId == null) {
-      CyNativeNotice.show(context, '先选择一位成员', isError: true);
+      CyNativeNotice.show(context, stringsOf(context).clubGovMemberRequired, isError: true);
       return;
     }
     ClubMember? member;
@@ -289,13 +292,13 @@ class _ClubGovernancePageState extends ConsumerState<ClubGovernancePage> {
       }
     }
     if (member == null) {
-      CyNativeNotice.show(context, '成员状态已变化，请刷新', isError: true);
+      CyNativeNotice.show(context, stringsOf(context).clubGovMemberChanged, isError: true);
       return;
     }
     final String? reason = await _promptReason(
-      title: '确认封禁 ${member.displayName}',
-      placeholder: '填写封禁原因（必填）',
-      confirmText: '确认封禁',
+      title: stringsOf(context).clubGovBanTitle(clubMemberDisplayName(context, member)),
+      placeholder: stringsOf(context).clubGovBanReason,
+      confirmText: stringsOf(context).clubGovConfirmBan,
     );
     if (reason == null) return;
     final String key = 'ban:$memberId';
@@ -313,14 +316,14 @@ class _ClubGovernancePageState extends ConsumerState<ClubGovernancePage> {
             requestId: ClubOpsApi.newRequestId('cgb'),
           );
       if (!mounted) return;
-      CyNativeNotice.show(context, '已封禁并移出俱乐部');
+      CyNativeNotice.show(context, stringsOf(context).clubGovBanned);
       setState(() => _selectedMemberId = null);
       await _loadManagement();
     } catch (error) {
       if (!mounted) return;
       CyNativeNotice.show(
         context,
-        clubOpsErrorMessage(error, '封禁失败'),
+        clubOpsErrorMessage(error, stringsOf(context).clubGovBanFailed),
         isError: true,
       );
     } finally {
@@ -331,9 +334,9 @@ class _ClubGovernancePageState extends ConsumerState<ClubGovernancePage> {
   Future<void> _unbanMember(GovernanceBan row) async {
     if (_actingKey.isNotEmpty) return;
     final String? reason = await _promptReason(
-      title: '解除 ${row.targetNickname} 的封禁',
-      placeholder: '填写复核说明（可选）',
-      confirmText: '解除封禁',
+      title: stringsOf(context).clubGovUnbanTitle(row.targetNickname),
+      placeholder: stringsOf(context).clubGovReviewReason,
+      confirmText: stringsOf(context).clubGovUnbanAction,
       reasonRequired: false,
     );
     if (reason == null) return;
@@ -350,13 +353,13 @@ class _ClubGovernancePageState extends ConsumerState<ClubGovernancePage> {
             requestId: ClubOpsApi.newRequestId('cgu'),
           );
       if (!mounted) return;
-      CyNativeNotice.show(context, '已解除封禁');
+      CyNativeNotice.show(context, stringsOf(context).clubGovUnbanned);
       await _loadManagement();
     } catch (error) {
       if (!mounted) return;
       CyNativeNotice.show(
         context,
-        clubOpsErrorMessage(error, '解封失败'),
+        clubOpsErrorMessage(error, stringsOf(context).clubGovUnbanFailed),
         isError: true,
       );
     } finally {
@@ -377,13 +380,13 @@ class _ClubGovernancePageState extends ConsumerState<ClubGovernancePage> {
       }
     }
     if (member == null) {
-      CyNativeNotice.show(context, '先选择一位成员', isError: true);
+      CyNativeNotice.show(context, stringsOf(context).clubGovMemberRequired, isError: true);
       return;
     }
     final String? reason = await _promptReason(
-      title: '转让主理人给 ${member.displayName}',
-      placeholder: '填写交接原因（必填）',
-      confirmText: '确认转让',
+      title: stringsOf(context).clubGovTransferTitle(clubMemberDisplayName(context, member)),
+      placeholder: stringsOf(context).clubGovTransferReason,
+      confirmText: stringsOf(context).clubGovConfirmTransfer,
     );
     if (reason == null) return;
     final String key = 'transfer:$memberId';
@@ -398,13 +401,13 @@ class _ClubGovernancePageState extends ConsumerState<ClubGovernancePage> {
             requestId: ClubOpsApi.newRequestId('cgt'),
           );
       if (!mounted) return;
-      CyNativeNotice.show(context, '主理人已转让');
+      CyNativeNotice.show(context, stringsOf(context).clubGovTransferred);
       if (Navigator.of(context).canPop()) Navigator.of(context).pop();
     } catch (error) {
       if (!mounted) return;
       CyNativeNotice.show(
         context,
-        clubOpsErrorMessage(error, '转让失败'),
+        clubOpsErrorMessage(error, stringsOf(context).clubGovTransferFailed),
         isError: true,
       );
     } finally {
@@ -415,9 +418,9 @@ class _ClubGovernancePageState extends ConsumerState<ClubGovernancePage> {
   Future<void> _submitCase({required bool appeal}) async {
     if (_actingKey.isNotEmpty) return;
     final String? reason = await _promptReason(
-      title: appeal ? '提交封禁申诉' : '提交治理举报',
-      placeholder: appeal ? '说明申诉理由与事实（必填）' : '说明具体事实（必填）',
-      confirmText: '提交平台',
+      title: appeal ? stringsOf(context).clubGovSubmitAppeal : stringsOf(context).clubGovSubmitReport,
+      placeholder: appeal ? stringsOf(context).clubGovAppealReason : stringsOf(context).clubGovReportFacts,
+      confirmText: stringsOf(context).clubGovSubmitPlatform,
     );
     if (reason == null) return;
     final String key =
@@ -435,13 +438,13 @@ class _ClubGovernancePageState extends ConsumerState<ClubGovernancePage> {
             requestId: ClubOpsApi.newRequestId(appeal ? 'cga' : 'cgr'),
           );
       if (!mounted) return;
-      CyNativeNotice.show(context, '已提交平台处理');
+      CyNativeNotice.show(context, stringsOf(context).clubGovSubmitted);
       await _loadMyCases();
     } catch (error) {
       if (!mounted) return;
       CyNativeNotice.show(
         context,
-        clubOpsErrorMessage(error, '提交失败'),
+        clubOpsErrorMessage(error, stringsOf(context).clubGovSubmitFailed),
         isError: true,
       );
     } finally {
@@ -459,7 +462,7 @@ class _ClubGovernancePageState extends ConsumerState<ClubGovernancePage> {
     if (picked == null || !mounted) return;
     setState(() {
       _selectedMemberId = picked.memberId;
-      _selectedMemberName = picked.displayName;
+      _selectedMemberName = clubMemberDisplayName(context, picked);
     });
   }
 
@@ -475,7 +478,7 @@ class _ClubGovernancePageState extends ConsumerState<ClubGovernancePage> {
       ),
       children: <Widget>[
         Text(
-          '选择成员',
+          stringsOf(context).clubGovSelectMember,
           style: TextStyle(
             fontSize: CyTokens.typeSectionTitle,
             fontWeight: FontWeight.w700,
@@ -486,14 +489,14 @@ class _ClubGovernancePageState extends ConsumerState<ClubGovernancePage> {
         ..._members.map(
           (ClubMember member) => ClubOpsRow(
             key: Key('governance-member-${member.memberId}'),
-            title: member.displayName,
+            title: clubMemberDisplayName(context, member),
             leading: CyAvatar(
               url: member.avatar,
-              fallback: member.displayName,
+              fallback: clubMemberDisplayName(context, member),
               size: 36,
             ),
             trailing: Text(
-              _selectedMemberId == member.memberId ? '已选' : '选择',
+              _selectedMemberId == member.memberId ? stringsOf(context).clubGovSelected : stringsOf(context).clubGovSelect,
               style: TextStyle(
                 fontSize: CyTokens.typeLabel,
                 color: _selectedMemberId == member.memberId
@@ -524,7 +527,7 @@ class _ClubGovernancePageState extends ConsumerState<ClubGovernancePage> {
           ),
           children: <Widget>[
             Text(
-              '选择期限',
+              stringsOf(context).clubGovSelectDuration,
               style: TextStyle(
                 fontSize: CyTokens.typeSectionTitle,
                 fontWeight: FontWeight.w700,
@@ -535,9 +538,9 @@ class _ClubGovernancePageState extends ConsumerState<ClubGovernancePage> {
             ..._kDurationOptions.map(
               (({int days, String label}) option) => ClubOpsRow(
                 key: Key('governance-duration-${option.days}'),
-                title: option.label,
+                title: stringsOf(context).clubGovDuration(option.days),
                 trailing: Text(
-                  _selectedDurationDays == option.days ? '已选' : '选择',
+                  _selectedDurationDays == option.days ? stringsOf(context).clubGovSelected : stringsOf(context).clubGovSelect,
                   style: TextStyle(
                     fontSize: CyTokens.typeLabel,
                     color: _selectedDurationDays == option.days
@@ -555,12 +558,8 @@ class _ClubGovernancePageState extends ConsumerState<ClubGovernancePage> {
     if (days == null || !mounted) return;
     // 期限只认 7/30/90:别的值服务端会拒,这里先挡住。
     if (days != 7 && days != 30 && days != 90) return;
-    final String label = _kDurationOptions
-        .firstWhere((({int days, String label}) o) => o.days == days)
-        .label;
     setState(() {
       _selectedDurationDays = days;
-      _selectedDurationLabel = label;
     });
   }
 
@@ -590,7 +589,7 @@ class _ClubGovernancePageState extends ConsumerState<ClubGovernancePage> {
     // 而真因只是没登录 —— 登录后原地重取,人留在这一页。
     if (_loginRequired) {
       return ClubLoginGate(
-        message: '登录后查看成员治理',
+        message: stringsOf(context).clubGovLogin,
         onSignedIn: _mode == 'appeal' ? _loadMyCases : _load,
       );
     }
@@ -599,14 +598,14 @@ class _ClubGovernancePageState extends ConsumerState<ClubGovernancePage> {
         return const CySkeleton(type: CySkeletonType.card, count: 4);
       case ClubOpsLoadState.noPermission:
         return StatusView(
-          message: '你没有成员治理的权限',
-          sub: _error.isEmpty ? '成员治理只开给主理人与副主理人。' : _error,
+          message: stringsOf(context).clubGovDenied,
+          sub: _error.isEmpty ? stringsOf(context).clubGovDeniedBody : _error,
           icon: CupertinoIcons.lock,
           large: true,
         );
       case ClubOpsLoadState.networkError:
         return StatusView(
-          message: '网络连接失败',
+          message: stringsOf(context).clubGovNetworkFailed,
           sub: _error,
           icon: CupertinoIcons.exclamationmark_triangle,
           large: true,
@@ -615,14 +614,14 @@ class _ClubGovernancePageState extends ConsumerState<ClubGovernancePage> {
       case ClubOpsLoadState.error:
         if (_mode == 'report' && _reportTargetId == null) {
           return StatusView(
-            message: '缺少合法的举报目标',
+            message: stringsOf(context).clubGovInvalidTarget,
             sub: _error,
             icon: CupertinoIcons.exclamationmark_triangle,
             large: true,
           );
         }
         return StatusView(
-          message: '治理功能暂时不可用',
+          message: stringsOf(context).clubGovUnavailable,
           sub: _error,
           icon: CupertinoIcons.exclamationmark_triangle,
           large: true,
@@ -630,9 +629,9 @@ class _ClubGovernancePageState extends ConsumerState<ClubGovernancePage> {
         );
       case ClubOpsLoadState.ready:
         if (_empty) {
-          return const StatusView(
-            message: '暂无可治理成员',
-            sub: '成员加入后可在这里进行安全治理；历史记录也会保留。',
+          return StatusView(
+            message: stringsOf(context).clubGovEmptyMembers,
+            sub: stringsOf(context).clubGovEmptyMembersBody,
             icon: Icons.shield_outlined,
             large: true,
           );
@@ -648,31 +647,30 @@ class _ClubGovernancePageState extends ConsumerState<ClubGovernancePage> {
       children: <Widget>[
         if (_mode == 'report')
           _platformActionSection(
-            title: '向平台提交治理举报',
-            note: '请只提交可核实的具体事实。平台审核前，不会自动认定违规或执行封禁。',
-            buttonLabel: '填写事实并提交平台',
+            title: stringsOf(context).clubGovPlatformReport,
+            note: stringsOf(context).clubGovPlatformReportBody,
+            buttonLabel: stringsOf(context).clubGovWriteFacts,
             buttonKey: 'governance-report',
             onPressed: () => _submitCase(appeal: false),
           ),
         if (_mode == 'appeal')
           _platformActionSection(
-            title: '对当前有效封禁提出申诉',
+            title: stringsOf(context).clubGovActiveAppeal,
             note:
-                '申诉进入平台治理队列；俱乐部主理人和副主理人不能裁决。'
-                '申诉通过后解除封禁，但不会自动恢复成员身份。',
-            buttonLabel: '填写理由并提交申诉',
+                stringsOf(context).clubGovAppealExplanation,
+            buttonLabel: stringsOf(context).clubGovWriteAppeal,
             buttonKey: 'governance-appeal',
             onPressed: () => _submitCase(appeal: true),
           ),
         if (_mode == 'manage')
           ClubOpsSection(
-            title: '治理记录',
+            title: stringsOf(context).clubGovRecords,
             children: <Widget>[
               if (_bans.isEmpty)
-                const Padding(
+                Padding(
                   padding: EdgeInsets.symmetric(vertical: CyTokens.space4),
                   child: StatusView(
-                    message: '暂无治理记录',
+                    message: stringsOf(context).clubGovNoRecords,
                     icon: Icons.shield_outlined,
                   ),
                 )
@@ -686,15 +684,15 @@ class _ClubGovernancePageState extends ConsumerState<ClubGovernancePage> {
           ),
         if (_mode == 'manage' && _members.isNotEmpty)
           ClubOpsSection(
-            title: '对成员执行',
+            title: stringsOf(context).clubGovMemberActions,
             children: <Widget>[
               ClubOpsCard(
                 children: <Widget>[
                   CyCell(
                     key: const Key('governance-pick-member'),
-                    title: '选择成员',
+                    title: stringsOf(context).clubGovSelectMember,
                     trailing: Text(
-                      _selectedMemberName.isEmpty ? '未选择' : _selectedMemberName,
+                      _selectedMemberName.isEmpty ? stringsOf(context).clubGovUnselected : _selectedMemberName,
                       style: TextStyle(
                         fontSize: CyTokens.typeLabel,
                         color: palette.textTertiary,
@@ -704,9 +702,9 @@ class _ClubGovernancePageState extends ConsumerState<ClubGovernancePage> {
                   ),
                   CyCell(
                     key: const Key('governance-pick-duration'),
-                    title: '选择期限',
+                    title: stringsOf(context).clubGovSelectDuration,
                     trailing: Text(
-                      _selectedDurationLabel,
+                      stringsOf(context).clubGovDuration(_selectedDurationDays),
                       style: TextStyle(
                         fontSize: CyTokens.typeLabel,
                         color: palette.textTertiary,
@@ -716,10 +714,10 @@ class _ClubGovernancePageState extends ConsumerState<ClubGovernancePage> {
                   ),
                   ClubOpsRow(
                     key: const Key('governance-ban'),
-                    title: '封禁原因',
+                    title: stringsOf(context).clubGovBanReasonLabel,
                     enabled: _selectedMemberId != null && _actingKey.isEmpty,
                     trailing: Text(
-                      '填写原因并封禁',
+                      stringsOf(context).clubGovWriteBan,
                       style: TextStyle(
                         fontSize: CyTokens.typeLabel,
                         fontWeight: FontWeight.w600,
@@ -733,11 +731,11 @@ class _ClubGovernancePageState extends ConsumerState<ClubGovernancePage> {
                   if (_isOwner)
                     ClubOpsRow(
                       key: const Key('governance-transfer'),
-                      title: '转让主理人',
-                      meta: '转让后你将失去主理人权限',
+                      title: stringsOf(context).clubGovTransfer,
+                      meta: stringsOf(context).clubGovTransferWarning,
                       enabled: _selectedMemberId != null && _actingKey.isEmpty,
                       trailing: Text(
-                        '转让给所选成员',
+                        stringsOf(context).clubGovTransferSelected,
                         style: TextStyle(
                           fontSize: CyTokens.typeLabel,
                           fontWeight: FontWeight.w600,
@@ -755,13 +753,13 @@ class _ClubGovernancePageState extends ConsumerState<ClubGovernancePage> {
           ),
         if (_mode != 'manage')
           ClubOpsSection(
-            title: '我的平台工单',
+            title: stringsOf(context).clubGovMyCases,
             children: <Widget>[
               if (_cases.isEmpty)
-                const Padding(
+                Padding(
                   padding: EdgeInsets.symmetric(vertical: CyTokens.space4),
                   child: StatusView(
-                    message: '暂无已提交工单',
+                    message: stringsOf(context).clubGovNoCases,
                     icon: CupertinoIcons.tray,
                   ),
                 )
@@ -771,10 +769,10 @@ class _ClubGovernancePageState extends ConsumerState<ClubGovernancePage> {
                       .map(
                         (GovernanceCase item) => ClubOpsRow(
                           key: Key('governance-case-${item.id}'),
-                          title: item.typeText,
+                          title: _caseTypeLabel(item.typeText),
                           meta: _caseMeta(item),
                           metaLines: 3,
-                          value: item.statusText,
+                          value: _caseStatusLabel(item.status),
                           valueColor: _caseStatusColor(item.status),
                         ),
                       )
@@ -813,14 +811,14 @@ class _ClubGovernancePageState extends ConsumerState<ClubGovernancePage> {
 
   Widget _banRow(GovernanceBan ban, CyPalette palette) {
     final String desc =
-        '${ban.sourceText} · ${ban.bannedAtText} · ${ban.expiresText}'
-        '${ban.status == 'ACTIVE' && ban.sourceType == 'PLATFORM' ? ' · 仅平台可解封' : ''}';
+        '${ban.sourceType == 'PLATFORM' ? stringsOf(context).clubGovPlatformSource : stringsOf(context).clubGovClubSource} · ${ban.bannedAtText} · ${ban.expiresText}'
+        '${ban.status == 'ACTIVE' && ban.sourceType == 'PLATFORM' ? stringsOf(context).clubGovOnlyPlatform : ''}';
     final String meta = ban.unbanReason.isEmpty
         ? desc
-        : '$desc\n解封说明：${ban.unbanReason}';
+        : stringsOf(context).clubGovUnbanNote(desc, ban.unbanReason);
     return ClubOpsRow(
       key: Key('governance-ban-${ban.id}'),
-      title: '成员「${ban.targetNickname}」',
+      title: stringsOf(context).clubGovMemberTitle(ban.targetNickname),
       meta: meta,
       metaLines: 3,
       trailing: Column(
@@ -828,7 +826,7 @@ class _ClubGovernancePageState extends ConsumerState<ClubGovernancePage> {
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
           Text(
-            ban.statusText,
+            _banStatusLabel(ban.status),
             style: TextStyle(
               fontSize: CyTokens.typeLabel,
               color: _banStatusColor(ban.status, palette),
@@ -837,7 +835,7 @@ class _ClubGovernancePageState extends ConsumerState<ClubGovernancePage> {
           if (ban.canClubUnban)
             ClubOpsRowLink(
               key: Key('governance-unban-${ban.id}'),
-              label: '解封',
+              label: stringsOf(context).clubGovUnban,
               enabled: _actingKey.isEmpty,
               onTap: () => _unbanMember(ban),
             ),
@@ -848,12 +846,34 @@ class _ClubGovernancePageState extends ConsumerState<ClubGovernancePage> {
 
   String _caseMeta(GovernanceCase item) {
     final StringBuffer buffer = StringBuffer(item.reason);
-    buffer.write('\n提交于 ${item.createTimeText}');
+    buffer.write(stringsOf(context).clubGovSubmittedAt(item.createTimeText));
     if (item.decisionReason.isNotEmpty) {
-      buffer.write('\n平台说明：${item.decisionReason}');
+      buffer.write(stringsOf(context).clubGovPlatformNote(item.decisionReason));
     }
     return buffer.toString();
   }
+
+  String _banStatusLabel(String status) => switch (status) {
+    'ACTIVE' => stringsOf(context).clubGovActive,
+    'EXPIRED' => stringsOf(context).clubGovExpired,
+    'UNBANNED' => stringsOf(context).clubGovLifted,
+    _ => status,
+  };
+
+  String _caseStatusLabel(String status) => switch (status) {
+    'PENDING' => stringsOf(context).clubGovCasePending,
+    'APPROVED' => stringsOf(context).clubGovCaseApproved,
+    'REJECTED' => stringsOf(context).clubGovCaseRejected,
+    _ => status,
+  };
+
+  String _caseTypeLabel(String type) => switch (type) {
+    '封禁申诉' => stringsOf(context).clubGovAppealTitle,
+    '俱乐部举报' => stringsOf(context).clubGovClubReport,
+    '活动举报' => stringsOf(context).clubGovActivityReport,
+    '成员举报' => stringsOf(context).clubGovMemberReport,
+    _ => type,
+  };
 
   Color _banStatusColor(String status, CyPalette palette) {
     switch (status) {

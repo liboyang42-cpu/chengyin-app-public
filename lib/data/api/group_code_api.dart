@@ -10,8 +10,9 @@ import '../models/club_manage.dart';
 /// 判据是 HTTP 403,或回执文案里带「权限 / 无权」。后端拒绝语是
 /// 「您没有该场次的团码核销权限」(GroupCodeServiceImpl)。
 class GroupCodePermissionException implements Exception {
-  const GroupCodePermissionException(this.message);
+  const GroupCodePermissionException(this.message, {this.isLocalFallback = false});
   final String message;
+  final bool isLocalFallback;
 
   @override
   String toString() => message;
@@ -40,15 +41,15 @@ class GroupCodeApi {
       if (error.response?.statusCode != 403) rethrow;
       final dynamic data = error.response?.data;
       final String? msg = data is Map ? data['msg'] as String? : null;
-      throw GroupCodePermissionException(msg ?? '当前账号没有出码权限');
+      throw GroupCodePermissionException(msg ?? '当前账号没有出码权限', isLocalFallback: msg == null);
     }
     final code = (body['code'] as num?)?.toInt();
     if (code != 200) {
       final String msg = (body['msg'] as String?) ?? '出码失败';
       if (code == 403 || msg.contains('权限') || msg.contains('无权')) {
-        throw GroupCodePermissionException(msg);
+        throw GroupCodePermissionException(msg, isLocalFallback: body['msg'] == null);
       }
-      throw Exception(msg);
+      throw GroupCodeApiException(msg, isLocalFallback: body['msg'] == null);
     }
     final data = (body['data'] as Map<String, dynamic>?) ?? <String, dynamic>{};
     return GroupCodeIssue.fromJson(data);
@@ -65,7 +66,7 @@ class GroupCodeApi {
     );
     final List<int>? bytes = resp.data;
     if (bytes == null || bytes.isEmpty) {
-      throw Exception('码图没下载下来，请重试');
+      throw const GroupCodeEmptyDownloadException();
     }
     return Uint8List.fromList(bytes);
   }
@@ -79,7 +80,7 @@ class GroupCodeApi {
     );
     final body = resp.data ?? <String, dynamic>{};
     if ((body['code'] as num?)?.toInt() != 200) {
-      throw Exception((body['msg'] as String?) ?? '场次加载失败');
+      throw GroupCodeApiException((body['msg'] as String?) ?? '场次加载失败', isLocalFallback: body['msg'] == null);
     }
     final data = (body['data'] as Map<String, dynamic>?) ?? <String, dynamic>{};
     final raw = (data['activityList'] as List<dynamic>?) ?? <dynamic>[];
@@ -95,15 +96,38 @@ class GroupCodeApi {
   /// ★ 与据点码同一条裂缝:此前只接了 `issue`,核销端一条没接。
   /// 失败文案原样透传 —— 后端会说清是「码无效」「已核销」还是「无权核销」,
   /// 换成笼统的「核销失败」商家就不知道该怎么办。
-  Future<String> redeem(String code) async {
+  Future<String> redeem(String code) async => (await redeemWithReceipt(code)).message;
+
+  Future<GroupCodeRedemptionReceipt> redeemWithReceipt(String code) async {
     final resp = await _client.dio.post<Map<String, dynamic>>(
       '/api/verify/groupcode/redeem',
       data: FormData.fromMap(<String, dynamic>{'code': code}),
     );
     final body = resp.data ?? <String, dynamic>{};
     if ((body['code'] as num?)?.toInt() != 200) {
-      throw Exception((body['msg'] as String?) ?? '核销失败');
+      throw GroupCodeApiException((body['msg'] as String?) ?? '核销失败', isLocalFallback: body['msg'] == null);
     }
-    return (body['msg'] as String?) ?? '核销成功';
+    return GroupCodeRedemptionReceipt((body['msg'] as String?) ?? '核销成功', isLocalFallback: body['msg'] == null);
   }
+}
+
+/// A successful image download with no bytes; no server message is wrapped.
+class GroupCodeEmptyDownloadException implements Exception {
+  const GroupCodeEmptyDownloadException();
+  String get message => '码图没下载下来，请重试';
+  @override
+  String toString() => 'Exception: $message';
+}
+
+class GroupCodeApiException implements Exception {
+  const GroupCodeApiException(this.message, {this.isLocalFallback = false});
+  final String message;
+  final bool isLocalFallback;
+  @override
+  String toString() => 'Exception: $message';
+}
+class GroupCodeRedemptionReceipt {
+  const GroupCodeRedemptionReceipt(this.message, {this.isLocalFallback = false});
+  final String message;
+  final bool isLocalFallback;
 }

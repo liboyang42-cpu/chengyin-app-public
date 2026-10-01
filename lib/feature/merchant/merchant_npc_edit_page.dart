@@ -1,3 +1,5 @@
+import '../../l10n/strings.dart';
+import 'merchant_node_strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,7 +13,6 @@ import '../../core/widgets/cy_net_image.dart';
 import '../../core/widgets/cy_widgets.dart';
 import '../../core/widgets/status_view.dart';
 import 'merchant_error_view.dart';
-import '../../core/widgets/upload_hints.dart';
 import '../../data/models/merchant_npc.dart';
 import 'package:go_router/go_router.dart';
 import '../club/club_image_picker.dart';
@@ -157,7 +158,7 @@ class _MerchantNpcEditPageState extends ConsumerState<MerchantNpcEditPage> {
     //   ⚠️ 真正算数的是后端那道 —— 这里只是省一次往返。
     final String? why = next.blocker;
     if (why != null) {
-      CyNativeNotice.show(context, why, isError: true);
+      CyNativeNotice.show(context, merchantNodeLocalText(context, why), isError: true);
       return;
     }
     setState(() => _saving = true);
@@ -183,8 +184,8 @@ class _MerchantNpcEditPageState extends ConsumerState<MerchantNpcEditPage> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const CupertinoPageScaffold(
-        navigationBar: CupertinoNavigationBar(middle: Text('店铺形象')),
+      return CupertinoPageScaffold(
+        navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).merchantNodeStoreCharacter)),
         child: Material(
           color: Colors.transparent,
           child: SafeArea(bottom: false, child: CySkeleton()),
@@ -198,7 +199,7 @@ class _MerchantNpcEditPageState extends ConsumerState<MerchantNpcEditPage> {
 
     return CupertinoPageScaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      navigationBar: const CupertinoNavigationBar(middle: Text('店铺形象')),
+      navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).merchantNodeStoreCharacter)),
       child: Material(
         color: Colors.transparent,
         child: SafeArea(
@@ -208,29 +209,28 @@ class _MerchantNpcEditPageState extends ConsumerState<MerchantNpcEditPage> {
                   context,
                   _loadError!,
                   onRetry: _load,
-                  what: '店铺形象',
+                  what: stringsOf(context).merchantNodeStoreCharacter,
                 )
               : ListView(
                   padding: const EdgeInsets.all(CyTokens.space4),
                   children: <Widget>[
                     if (_draft.configured) _statusBanner(p, t),
                     Text(
-                      '给店铺配一个 AI 形象。玩家在你的主页可以直接问它'
-                      '「有什么推荐」,它按你填的店铺知识来回答。',
+                      stringsOf(context).merchantNodeStoreIntro,
                       style: t.bodySmall?.copyWith(color: p.textSecondary),
                     ),
                     const SizedBox(height: CyTokens.space4),
 
-                    const CySectionTitle('形象头像'),
+                    CySectionTitle(stringsOf(context).merchantNodeAvatar),
                     const SizedBox(height: CyTokens.space2),
                     _avatarBlock(),
                     const SizedBox(height: CyTokens.space4),
 
-                    _field('name', '形象名字', hint: '比如「老周」「小店长」'),
+                    _field('name', stringsOf(context).merchantNodeAvatarName, hint: stringsOf(context).merchantNodeAvatarNameHint),
                     _field(
                       'greeting',
-                      '招呼语(可空)',
-                      hint: '玩家点开时它先说的那句',
+                      stringsOf(context).merchantNodeGreetingOptional,
+                      hint: stringsOf(context).merchantNodeGreetingHint,
                       maxLines: 2,
                     ),
 
@@ -238,45 +238,43 @@ class _MerchantNpcEditPageState extends ConsumerState<MerchantNpcEditPage> {
                     // 分类名跟小程序 `pages/merchant/decor/ai-npc/index.wxml:68`
                     // 的字段标题「性格设定」逐字一致 —— 两端同一个人格字段叫两个名字,
                     // 商家在小程序里填过的那栏,到 App 会认不出来。
-                    const CySectionTitle('性格设定'),
+                    CySectionTitle(stringsOf(context).merchantNodePersonality),
                     const SizedBox(height: CyTokens.space1),
                     Text(
-                      '写它的口吻和性格,不要写菜单 —— 菜单写在下面那栏。',
+                      stringsOf(context).merchantNodePersonalityHint,
                       style: t.bodySmall?.copyWith(color: p.textSecondary),
                     ),
                     const SizedBox(height: CyTokens.space2),
                     _field(
                       'persona',
                       '',
-                      hint: '例:你是老周,开了十年咖啡店,说话慢,喜欢先问客人今天累不累。',
+                      hint: stringsOf(context).merchantNodePersonalityExample,
                       maxLines: 5,
                     ),
 
                     const SizedBox(height: CyTokens.space2),
-                    const CySectionTitle('店铺知识'),
+                    CySectionTitle(stringsOf(context).merchantNodeKnowledge),
                     const SizedBox(height: CyTokens.space1),
                     Text(
-                      '它只会用这里写的内容回答。没写的东西它不会编,'
-                      '会直说「到店问问」。',
+                      stringsOf(context).merchantNodeKnowledgeHint,
                       style: t.bodySmall?.copyWith(color: p.textSecondary),
                     ),
                     const SizedBox(height: CyTokens.space2),
                     _field(
                       'knowledge',
                       '',
-                      hint: '例:招牌是椰香拿铁 32 元,不含酒精;'
-                          '周二到周日 10:00-22:00,周一休息;二楼有安静的位置。',
+                      hint: stringsOf(context).merchantNodeKnowledgeExample,
                       maxLines: 8,
                     ),
 
                     if (_avatar3dAvailable && _draft.configured) ...<Widget>[
                       const SizedBox(height: CyTokens.space2),
-                      const CySectionTitle('它的样子'),
+                      CySectionTitle(stringsOf(context).merchantNodeAppearance),
                       const SizedBox(height: CyTokens.space1),
                       Text(
                         _draft.modelUrl == null
-                            ? '拍一张照片,让形象长得像你。'
-                            : '已经生成过 3D 形象。重新生成会替换现在这个,并重新进入审核。',
+                            ? stringsOf(context).merchantNodePhotoAppearance
+                            : stringsOf(context).merchantNodeRegenerateAppearanceHint,
                         style: t.bodySmall?.copyWith(color: p.textSecondary),
                       ),
                       const SizedBox(height: CyTokens.space2),
@@ -293,13 +291,13 @@ class _MerchantNpcEditPageState extends ConsumerState<MerchantNpcEditPage> {
                           sfSymbol: 'cube',
                           fallback: CupertinoIcons.cube,
                         ),
-                        label: _draft.modelUrl == null ? '生成 3D 形象' : '重新生成',
+                        label: _draft.modelUrl == null ? stringsOf(context).merchantNodeGenerate3d : stringsOf(context).merchantNodeRegenerate,
                       ),
                     ],
 
                     if (_voiceAvailable) ...<Widget>[
                       const SizedBox(height: CyTokens.space2),
-                      const CySectionTitle('角色声音'),
+                      CySectionTitle(stringsOf(context).merchantNodeRoleVoice),
                       const SizedBox(height: CyTokens.space1),
                       _voiceBlock(p, t),
                     ],
@@ -308,21 +306,21 @@ class _MerchantNpcEditPageState extends ConsumerState<MerchantNpcEditPage> {
                     // ★ 把「保存 = 回到待审」写在按钮上方,不是藏在提示里。
                     Text(
                       _draft.isApproved
-                          ? '保存后会重新进入审核,审核期间玩家看不到这个形象。'
-                          : '保存后进入审核,通过后玩家才能看到。',
+                          ? stringsOf(context).merchantNodeSaveReviewAgain
+                          : stringsOf(context).merchantNodeSaveReview,
                       style: t.bodySmall?.copyWith(color: p.textSecondary),
                     ),
                     const SizedBox(height: CyTokens.space2),
                     CyNativeButton(
                       key: const Key('merchant-npc-save'),
                       onPressed: _saving || !cur.canSubmit ? null : _save,
-                      label: _saving ? '提交中…' : '提交审核',
+                      label: _saving ? stringsOf(context).merchantNodeSubmitting : stringsOf(context).merchantNodeSubmitReview,
                       loading: _saving,
                     ),
                     if (!cur.canSubmit) ...<Widget>[
                       const SizedBox(height: CyTokens.space2),
                       Text(
-                        cur.blocker!,
+                        merchantNodeLocalText(context, cur.blocker!),
                         style: t.bodySmall?.copyWith(color: p.textSecondary),
                       ),
                     ],
@@ -340,7 +338,7 @@ class _MerchantNpcEditPageState extends ConsumerState<MerchantNpcEditPage> {
     if (!_draft.configured) {
       // 还没有形象就没有可挂声音的对象。说清先后顺序,不给一个必然失败的入口。
       return Text(
-        '先把上面的形象提交一次,之后就可以给它录声音。',
+        stringsOf(context).merchantNodeVoiceFirstSubmit,
         style: t.bodySmall?.copyWith(color: p.textSecondary),
       );
     }
@@ -365,7 +363,7 @@ class _MerchantNpcEditPageState extends ConsumerState<MerchantNpcEditPage> {
               sfSymbol: 'mic',
               fallback: CupertinoIcons.mic,
             ),
-            label: '录我的声音',
+            label: stringsOf(context).merchantNodeRecordMyVoice,
           ),
         ],
       );
@@ -374,7 +372,7 @@ class _MerchantNpcEditPageState extends ConsumerState<MerchantNpcEditPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Text(
-          '已经录过声音了。重录会替换掉现在这个,并重新进入审核。',
+          stringsOf(context).merchantNodeRecordedHint,
           style: t.bodySmall?.copyWith(color: p.textSecondary),
         ),
         const SizedBox(height: CyTokens.space2),
@@ -391,14 +389,14 @@ class _MerchantNpcEditPageState extends ConsumerState<MerchantNpcEditPage> {
                           await context.push('/merchant/npc/voice');
                       if (done == true && mounted) await _load();
                     },
-              child: const Text('重录'),
+              child: Text(stringsOf(context).merchantNodeRerecord),
             ),
             CupertinoButton(
               key: const Key('merchant-npc-voice-revoke'),
               padding: EdgeInsets.zero,
               minimumSize: const Size(88, 44),
               onPressed: _revoking ? null : _revokeVoice,
-              child: Text(_revoking ? '撤回中…' : '撤回并删除'),
+              child: Text(_revoking ? stringsOf(context).merchantNodeRevoking : stringsOf(context).merchantNodeRevokeDelete),
             ),
           ],
         ),
@@ -431,7 +429,7 @@ class _MerchantNpcEditPageState extends ConsumerState<MerchantNpcEditPage> {
 
   Widget _statusBanner(CyPalette p, TextTheme t) {
     // 状态文案来自后端,这里只决定用什么颜色。
-    final String text = _draft.statusText ?? '审核中';
+    final String text = _draft.statusText ?? stringsOf(context).merchantNodeReviewing;
     return Padding(
       padding: const EdgeInsets.only(bottom: CyTokens.space3),
       child: Container(
@@ -470,7 +468,7 @@ class _MerchantNpcEditPageState extends ConsumerState<MerchantNpcEditPage> {
           sfSymbol: 'person.crop.circle',
           fallback: CupertinoIcons.person_crop_circle,
         ),
-        label: _uploading ? '上传中…' : uploadHint('上传形象头像', kHint1x1),
+        label: _uploading ? stringsOf(context).merchantNodeUploading : stringsOf(context).merchantNodeUploadAvatarSquare,
         loading: _uploading,
       );
     }
@@ -485,7 +483,7 @@ class _MerchantNpcEditPageState extends ConsumerState<MerchantNpcEditPage> {
           key: const Key('merchant-npc-avatar-replace'),
           onPressed: _uploading ? null : _pickAvatar,
           padding: EdgeInsets.zero,
-          child: const Text('换一张'),
+          child: Text(stringsOf(context).merchantNodeChangeImage),
         ),
       ],
     );

@@ -1,3 +1,5 @@
+import '../../l10n/strings.dart';
+import 'merchant_crm_strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -73,13 +75,13 @@ class CrmInlineError extends StatelessWidget {
     super.key,
     required this.title,
     this.sub = '',
-    this.actionLabel = '重试',
+    this.actionLabel,
     this.onAction,
   });
 
   final String title;
   final String sub;
-  final String actionLabel;
+  final String? actionLabel;
   final VoidCallback? onAction;
 
   @override
@@ -111,7 +113,7 @@ class CrmInlineError extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: CyTokens.space2),
               minimumSize: const Size(44, 44),
               onPressed: onAction,
-              child: Text(actionLabel),
+              child: Text(actionLabel ?? stringsOf(context).merchantCrmPanelRetry),
             ),
         ],
       ),
@@ -145,13 +147,13 @@ class CrmSegmentChips extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(right: CyTokens.space2),
               child: CyChip(
-                label: option.label,
+                label: merchantCrmLocalText(context, option.label),
                 selected: option.key == segment,
                 onTap: () => onTap(option.key),
               ),
             ),
           CyChip(
-            label: toolsOpen ? '收起' : '管理',
+            label: toolsOpen ? stringsOf(context).merchantCrmPanelCollapse : stringsOf(context).merchantCrmPanelManage,
             selected: toolsOpen,
             onTap: onToggleTools,
           ),
@@ -193,17 +195,17 @@ class CrmToolsRow extends StatelessWidget {
       runSpacing: CyTokens.space2,
       children: <Widget>[
         CrmPillButton(
-          label: filterOpen ? '收起筛选' : '更多筛选',
+          label: filterOpen ? stringsOf(context).merchantCrmPanelCloseFilters : stringsOf(context).merchantCrmPanelFilters,
           onTap: onToggleFilters,
         ),
         if (canSegment)
           CrmPillButton(
-            label: selecting ? '取消批量' : '批量标签',
+            label: selecting ? stringsOf(context).merchantCrmPanelCancelBatch : stringsOf(context).merchantCrmPanelBatch,
             onTap: onToggleSelecting,
           ),
         if (canMarket)
           CrmPillButton(
-            label: campaignOpen ? '收起触达' : '合规触达',
+            label: campaignOpen ? stringsOf(context).merchantCrmPanelCloseCampaign : stringsOf(context).merchantCrmPanelCampaign,
             primary: true,
             onTap: onToggleCampaign,
           ),
@@ -307,42 +309,42 @@ class CrmFilterPanel extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        const CrmPanelLabel('客户来源'),
+        CrmPanelLabel(stringsOf(context).merchantCrmPanelSource),
         Wrap(
           spacing: CyTokens.space2,
           runSpacing: CyTokens.space2,
           children: <Widget>[
             CyChip(
-              label: '全部',
+              label: stringsOf(context).merchantCrmPanelAll,
               selected: sourceType == null,
               onTap: () => onSourceTap(null),
             ),
             CyChip(
-              label: '主题',
+              label: stringsOf(context).merchantCrmPanelTheme,
               selected: sourceType == 1,
               onTap: () => onSourceTap(1),
             ),
             CyChip(
-              label: '活动',
+              label: stringsOf(context).merchantCrmPanelActivity,
               selected: sourceType == 2,
               onTap: () => onSourceTap(2),
             ),
           ],
         ),
-        const CrmPanelLabel('来源时间'),
+        CrmPanelLabel(stringsOf(context).merchantCrmPanelSourceTime),
         Row(
           children: <Widget>[
             Expanded(
               child: CrmDateField(
                 value: sourceStart,
-                placeholder: '开始日期',
+                placeholder: stringsOf(context).merchantCrmPanelStart,
                 onTap: onPickStart,
               ),
             ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: CyTokens.space2),
               child: Text(
-                '至',
+                stringsOf(context).merchantCrmPanelTo,
                 style: CyType.footnote.copyWith(
                   color: CyPalette.of(context).textSecondary,
                 ),
@@ -351,14 +353,14 @@ class CrmFilterPanel extends StatelessWidget {
             Expanded(
               child: CrmDateField(
                 value: sourceEnd,
-                placeholder: '结束日期',
+                placeholder: stringsOf(context).merchantCrmPanelEnd,
                 onTap: onPickEnd,
               ),
             ),
           ],
         ),
         if (availableTags.isNotEmpty) ...<Widget>[
-          const CrmPanelLabel('客户标签'),
+          CrmPanelLabel(stringsOf(context).merchantCrmPanelTags),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
@@ -366,7 +368,7 @@ class CrmFilterPanel extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.only(right: CyTokens.space2),
                   child: CyChip(
-                    label: '全部标签',
+                    label: stringsOf(context).merchantCrmPanelAllTags,
                     selected: tagId == null,
                     onTap: () => onTagTap(null),
                   ),
@@ -387,22 +389,22 @@ class CrmFilterPanel extends StatelessWidget {
         const SizedBox(height: CyTokens.space3),
         Align(
           alignment: Alignment.centerLeft,
-          child: CrmPillButton(label: '清空筛选', onTap: onClearFilters),
+          child: CrmPillButton(label: stringsOf(context).merchantCrmPanelClear, onTap: onClearFilters),
         ),
         if (canSegment) ...<Widget>[
-          const CrmPanelLabel('保存分群'),
+          CrmPanelLabel(stringsOf(context).merchantCrmPanelSaveSegment),
           Row(
             children: <Widget>[
               Expanded(
                 child: CrmTextField(
                   controller: segmentName,
-                  placeholder: '命名当前筛选',
+                  placeholder: stringsOf(context).merchantCrmPanelNameFilter,
                   maxLength: 30,
                 ),
               ),
               const SizedBox(width: CyTokens.space2),
               CrmPillButton(
-                label: '保存分群',
+                label: stringsOf(context).merchantCrmPanelSaveSegment,
                 primary: true,
                 loading: segmentSaving,
                 onTap: segmentSaving ? null : onSaveSegment,
@@ -411,7 +413,7 @@ class CrmFilterPanel extends StatelessWidget {
           ),
         ],
         if (savedSegments.isNotEmpty) ...<Widget>[
-          const CrmPanelLabel('已保存分群'),
+          CrmPanelLabel(stringsOf(context).merchantCrmPanelSegments),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
@@ -420,7 +422,7 @@ class CrmFilterPanel extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.only(right: CyTokens.space2),
                     child: CyChip(
-                      label: segment.name,
+                      label: merchantCrmSegmentName(context, segment),
                       selected: false,
                       onTap: () => onApplySegment(segment),
                     ),
@@ -431,7 +433,7 @@ class CrmFilterPanel extends StatelessWidget {
         ],
         if (savedSegmentsError.isNotEmpty)
           CrmInlineError(
-            title: '保存分群暂未更新',
+            title: stringsOf(context).merchantCrmPanelSegmentsError,
             sub: savedSegmentsError,
             onAction: onRetrySavedSegments,
           ),
@@ -590,7 +592,7 @@ class CrmBatchBar extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Text(
-          '已选 $selectedCount / $kCrmBatchTagLimit',
+          stringsOf(context).merchantCrmPanelSelectionCount(selectedCount, kCrmBatchTagLimit),
           style: CyType.footnote.copyWith(color: p.textSecondary),
         ),
         const SizedBox(height: CyTokens.space2),
@@ -599,13 +601,13 @@ class CrmBatchBar extends StatelessWidget {
             Expanded(
               child: CrmTextField(
                 controller: tagName,
-                placeholder: '输入标签名称',
+                placeholder: stringsOf(context).merchantCrmPanelTagHint,
                 maxLength: 16,
               ),
             ),
             const SizedBox(width: CyTokens.space2),
             CrmPillButton(
-              label: '添加',
+              label: stringsOf(context).merchantCrmPanelAdd,
               primary: true,
               loading: submitting,
               onTap: submitting ? null : onSubmit,
@@ -690,44 +692,43 @@ class CrmCampaignPanel extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Text(
-          '客户合规触达',
+          stringsOf(context).merchantCrmPanelCampaignTitle,
           style: CyType.headline.copyWith(color: p.textPrimary),
         ),
         const SizedBox(height: CyTokens.space1),
         Text(
-          '仅使用服务端保存分群；客户同意默认关闭，退订立即生效。',
+          stringsOf(context).merchantCrmPolicyConsent,
           style: CyType.caption1.copyWith(color: p.textSecondary),
         ),
         if (notificationDeliveryStatus.isNotEmpty ||
             couponDeliveryStatus.isNotEmpty) ...<Widget>[
           const SizedBox(height: CyTokens.space1),
           Text(
-            '站内消息：${crmDeliveryStatusText(notificationDeliveryStatus)}'
-            ' · 优惠券：${crmDeliveryStatusText(couponDeliveryStatus)}',
+            stringsOf(context).merchantCrmResidualDeliveryChannels(merchantCrmDeliveryPolicy(context, notificationDeliveryStatus), merchantCrmDeliveryPolicy(context, couponDeliveryStatus)),
             style: CyType.caption1.copyWith(color: p.textTertiary),
           ),
         ],
-        const CrmPanelLabel('渠道'),
+        CrmPanelLabel(stringsOf(context).merchantCrmPanelChannel),
         Wrap(
           spacing: CyTokens.space2,
           runSpacing: CyTokens.space2,
           children: <Widget>[
             CyChip(
-              label: kCrmChannelText['IN_APP']!,
+              label: stringsOf(context).merchantCrmPanelInAppChannel,
               selected: channel == 'IN_APP',
               onTap: () => onChannelTap('IN_APP'),
             ),
             if (canCoupon)
               CyChip(
-                label: kCrmChannelText['COUPON']!,
+                label: stringsOf(context).merchantCrmPanelCouponChannel,
                 selected: channel == 'COUPON',
                 onTap: () => onChannelTap('COUPON'),
               ),
           ],
         ),
-        const CrmPanelLabel('保存分群'),
+        CrmPanelLabel(stringsOf(context).merchantCrmPanelSaveSegment),
         CrmPickerRow(
-          value: segmentName.isEmpty ? '请先保存并选择分群' : segmentName,
+          value: segmentName.isEmpty ? stringsOf(context).merchantCrmPanelSegmentHint : segmentName,
           enabled: !busy,
           onTap: onPickSegment,
         ),
@@ -736,34 +737,34 @@ class CrmCampaignPanel extends StatelessWidget {
         // 触达选出的分群正是这一份,读不到还让用户干点一个空选择器最坏。
         if (savedSegmentsError.isNotEmpty)
           CrmInlineError(
-            title: '保存分群暂未更新',
+            title: stringsOf(context).merchantCrmPanelSegmentsError,
             sub: savedSegmentsError,
             onAction: onRetrySavedSegments,
           ),
         if (channel == 'COUPON') ...<Widget>[
-          const CrmPanelLabel('当前商家有效券'),
+          CrmPanelLabel(stringsOf(context).merchantCrmPanelCoupons),
           CrmPickerRow(
-            value: couponName.isEmpty ? '暂无可发优惠券' : couponName,
+            value: couponName.isEmpty ? stringsOf(context).merchantCrmPanelCouponEmpty : couponName,
             enabled: !busy,
             onTap: onPickCoupon,
           ),
           if (couponCatalogError.isNotEmpty)
             CrmInlineError(
-              title: '优惠券暂未更新',
+              title: stringsOf(context).merchantCrmPanelCouponError,
               sub: couponCatalogError,
               onAction: onRetryCoupons,
             ),
         ],
-        const CrmPanelLabel('触达标题'),
+        CrmPanelLabel(stringsOf(context).merchantCrmPanelTitle),
         CrmTextField(
           controller: title,
-          placeholder: '触达标题',
+          placeholder: stringsOf(context).merchantCrmPanelTitle,
           maxLength: 60,
         ),
-        const CrmPanelLabel('触达内容'),
+        CrmPanelLabel(stringsOf(context).merchantCrmPanelContent),
         CrmTextArea(
           controller: content,
-          placeholder: '触达内容（不填写手机号等敏感信息）',
+          placeholder: stringsOf(context).merchantCrmPanelContentHint,
           maxLength: 500,
         ),
         const SizedBox(height: CyTokens.space3),
@@ -772,12 +773,12 @@ class CrmCampaignPanel extends StatelessWidget {
           runSpacing: CyTokens.space2,
           children: <Widget>[
             CrmPillButton(
-              label: '预览人数',
+              label: stringsOf(context).merchantCrmPanelPreviewCount,
               loading: previewing,
               onTap: busy ? null : onPreview,
             ),
             CrmPillButton(
-              label: '创建并发送',
+              label: stringsOf(context).merchantCrmPanelCreateSend,
               primary: true,
               loading: sending,
               onTap: busy ? null : onSend,
@@ -807,15 +808,15 @@ class CrmCampaignPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Text(
-            '分群 ${value.totalCount} 人（单次上限 ${value.recipientLimit}）',
+            stringsOf(context).merchantCrmPanelSegmentCount(value.totalCount, value.recipientLimit),
             style: CyType.footnote.copyWith(color: p.textSecondary),
           ),
           Text(
-            '已同意 ${value.consentedCount} · 今日频控 ${value.frequencyLimitedCount}',
+            stringsOf(context).merchantCrmPanelConsentedCount(value.consentedCount, value.frequencyLimitedCount),
             style: CyType.footnote.copyWith(color: p.textSecondary),
           ),
           Text(
-            '本次预计可触达 ${value.deliverableCount} 人',
+            stringsOf(context).merchantCrmPanelReachableCount(value.deliverableCount),
             style: CyType.footnote.copyWith(color: p.textPrimary),
           ),
         ],
@@ -835,22 +836,22 @@ class CrmCampaignPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Text(
-            value.statusText,
+            merchantCrmCampaignStatus(context, value),
             style: CyType.headline.copyWith(color: p.textPrimary),
           ),
           Text(
-            '成功 ${value.deliveredCount} · 客户未同意或已退订 ${value.noConsentCount}',
+            stringsOf(context).merchantCrmPanelDeliveredCount(value.deliveredCount, value.noConsentCount),
             style: CyType.footnote.copyWith(color: p.textSecondary),
           ),
           Text(
-            '今日频控 ${value.frequencySkippedCount} · 失败 ${value.failedCount}',
+            stringsOf(context).merchantCrmPanelFailureCount(value.frequencySkippedCount, value.failedCount),
             style: CyType.footnote.copyWith(color: p.textSecondary),
           ),
           if (value.isPartialFailed && value.retryableCount > 0)
             Padding(
               padding: const EdgeInsets.only(top: CyTokens.space2),
               child: CrmPillButton(
-                label: '重试可重试 ${value.retryableCount} 人',
+                label: stringsOf(context).merchantCrmPanelRetryCount(value.retryableCount),
                 loading: saving,
                 onTap: saving ? null : onRetryTask,
               ),
@@ -862,21 +863,21 @@ class CrmCampaignPanel extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   Text(
-                    receipt.customerName,
+                    receipt.hasNameFallback ? stringsOf(context).merchantCrmUnnamed : receipt.customerName,
                     style: CyType.footnote.copyWith(color: p.textPrimary),
                   ),
                   Text(
-                    receipt.statusText(),
+                    merchantCrmRecipientStatus(context, receipt),
                     style: CyType.caption1.copyWith(color: p.textSecondary),
                   ),
                   if (receipt.messageReceiptId != null)
                     Text(
-                      '消息回执 #${receipt.messageReceiptId}',
+                      stringsOf(context).merchantCrmPanelMessageReceipt(receipt.messageReceiptId!),
                       style: CyType.caption1.copyWith(color: p.textTertiary),
                     ),
                   if (receipt.couponHistoryId != null)
                     Text(
-                      '优惠券回执 #${receipt.couponHistoryId}',
+                      stringsOf(context).merchantCrmPanelCouponReceipt(receipt.couponHistoryId!),
                       style: CyType.caption1.copyWith(color: p.textTertiary),
                     ),
                 ],
@@ -892,7 +893,7 @@ class CrmCampaignPanel extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        const CrmPanelLabel('最近任务'),
+        CrmPanelLabel(stringsOf(context).merchantCrmPanelRecent),
         for (final CrmCampaignTask item in campaigns)
           CupertinoButton(
             padding: EdgeInsets.zero,
@@ -904,7 +905,7 @@ class CrmCampaignPanel extends StatelessWidget {
                 children: <Widget>[
                   Expanded(
                     child: Text(
-                      item.listTitle,
+                      merchantCrmCampaignTitle(context, item),
                       style: CyType.footnote.copyWith(color: p.textPrimary),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -1060,7 +1061,7 @@ class _CrmPickerSheet extends StatelessWidget {
                   vertical: CyTokens.space4,
                 ),
                 child: Text(
-                  '还没有可选项',
+                  stringsOf(context).merchantCrmPanelOptionsEmpty,
                   textAlign: TextAlign.center,
                   style: CyType.footnote.copyWith(color: p.textSecondary),
                 ),
@@ -1180,6 +1181,7 @@ class _CrmBroadcastSheetState extends ConsumerState<CrmBroadcastSheet> {
   final TextEditingController _text = TextEditingController();
   int _targetCount = 0;
   String _previewText = '';
+  bool _hasServerPreview = false;
   CrmBroadcastResult? _result;
   String _error = '';
   bool _sending = false;
@@ -1205,6 +1207,14 @@ class _CrmBroadcastSheetState extends ConsumerState<CrmBroadcastSheet> {
     _requestId = null;
     _error = '';
   });
+
+  String get _displayPreviewText {
+    if (_hasServerPreview) return _previewText;
+    if (_scope == 'all') return stringsOf(context).merchantCrmResidualEstimate(widget.castCount);
+    final count = _groups.where((group) => group.picked).length;
+    if (count == 0) return stringsOf(context).merchantCrmResidualNotSelected;
+    return _scope == 'team' ? stringsOf(context).merchantCrmResidualTeamEstimate(_targetCount, count) : stringsOf(context).merchantCrmResidualRoleEstimate(_targetCount, count);
+  }
 
   bool get _dirty => _result == null && _text.text.trim().isNotEmpty;
 
@@ -1251,6 +1261,7 @@ class _CrmBroadcastSheetState extends ConsumerState<CrmBroadcastSheet> {
 
   /// 本地估算文案(快照 `refreshCastPreview`)。真值由服务端预览给。
   void _refreshEstimate() {
+    _hasServerPreview = false;
     if (_scope == 'all') {
       setState(() {
         _targetCount = widget.castCount;
@@ -1309,23 +1320,23 @@ class _CrmBroadcastSheetState extends ConsumerState<CrmBroadcastSheet> {
       if (!mounted) return;
       setState(() {
         _sending = false;
-        _error = e.message;
+        _error = merchantCrmErrorText(context, e);
       });
       return;
     }
     if (!mounted) return;
     setState(() {
       _sending = false;
-      _previewText = crmBroadcastPreviewText(preview);
+      _previewText = merchantCrmBroadcastPreviewText(context, preview);
+      _hasServerPreview = true;
     });
     if (crmBroadcastDailyExhausted(preview)) {
       await cyConfirm(
         context,
-        title: '今天的广播次数用完了',
+        title: stringsOf(context).merchantCrmPanelDailyLimit,
         content:
-            '每个商家每天最多发 ${preview.merchantDailyLimit} 条广播，'
-            '今天已经发满，明天再来。',
-        confirmText: '知道了',
+            stringsOf(context).merchantCrmPolicyDailyLimit(preview.merchantDailyLimit),
+        confirmText: stringsOf(context).merchantCrmPanelGotIt,
         showCancel: false,
       );
       return;
@@ -1333,19 +1344,19 @@ class _CrmBroadcastSheetState extends ConsumerState<CrmBroadcastSheet> {
     if (preview.deliverableCount <= 0) {
       await cyConfirm(
         context,
-        title: '这批客户现在收不到',
+        title: stringsOf(context).merchantCrmPanelUnreachable,
         content: _previewText,
-        confirmText: '知道了',
+        confirmText: stringsOf(context).merchantCrmPanelGotIt,
         showCancel: false,
       );
       return;
     }
     final bool confirmed = await cyConfirm(
       context,
-      title: '确认发送',
-      content: '$_previewText\n发送后无法撤回。',
-      confirmText: '发送',
-      cancelText: '再想想',
+      title: stringsOf(context).merchantCrmPanelConfirmSend,
+      content: stringsOf(context).merchantCrmPolicyIrreversible(_previewText),
+      confirmText: stringsOf(context).merchantCrmPanelSend,
+      cancelText: stringsOf(context).merchantCrmPanelReconsider,
     );
     if (!confirmed || !mounted) return;
     await _sendConfirmed(payload, content);
@@ -1377,7 +1388,7 @@ class _CrmBroadcastSheetState extends ConsumerState<CrmBroadcastSheet> {
       if (!mounted) return;
       setState(() {
         _sending = false;
-        _error = e.message;
+        _error = merchantCrmErrorText(context, e);
       });
     }
   }
@@ -1413,17 +1424,17 @@ class _CrmBroadcastSheetState extends ConsumerState<CrmBroadcastSheet> {
                       runSpacing: CyTokens.space2,
                       children: <Widget>[
                         CyChip(
-                          label: '全部',
+                          label: stringsOf(context).merchantCrmPanelAll,
                           selected: _scope == 'all',
                           onTap: _sending ? null : () => _onScope('all'),
                         ),
                         CyChip(
-                          label: '队伍',
+                          label: stringsOf(context).merchantCrmPanelTeams,
                           selected: _scope == 'team',
                           onTap: _sending ? null : () => _onScope('team'),
                         ),
                         CyChip(
-                          label: '角色',
+                          label: stringsOf(context).merchantCrmPanelRoles,
                           selected: _scope == 'role',
                           onTap: _sending ? null : () => _onScope('role'),
                         ),
@@ -1444,10 +1455,10 @@ class _CrmBroadcastSheetState extends ConsumerState<CrmBroadcastSheet> {
                           ),
                         ),
                     ],
-                    const CrmPanelLabel('内容（站内消息）'),
+                    CrmPanelLabel(stringsOf(context).merchantCrmPanelInAppContent),
                     CrmTextArea(
                       controller: _text,
-                      placeholder: '第 3 站商家临时排队,先去第 4 站,回头再补。',
+                      placeholder: stringsOf(context).merchantCrmPanelBroadcastHint,
                       maxLength: 120,
                     ),
                     Padding(
@@ -1469,7 +1480,7 @@ class _CrmBroadcastSheetState extends ConsumerState<CrmBroadcastSheet> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
                           Text(
-                            '发送前预览',
+                            stringsOf(context).merchantCrmPanelPreview,
                             style: CyType.footnote.copyWith(
                               color: p.textPrimary,
                             ),
@@ -1477,7 +1488,7 @@ class _CrmBroadcastSheetState extends ConsumerState<CrmBroadcastSheet> {
                           const SizedBox(width: CyTokens.space2),
                           Expanded(
                             child: Text(
-                              _previewText,
+                              _displayPreviewText,
                               textAlign: TextAlign.right,
                               style: CyType.caption1.copyWith(
                                 color: p.textSecondary,
@@ -1523,11 +1534,11 @@ class _CrmBroadcastSheetState extends ConsumerState<CrmBroadcastSheet> {
           minimumSize: const Size(44, 44),
           // maybePop 走守卫:写了内容才会拦一次(快照 `onCastRequestClose`)。
           onPressed: () => Navigator.of(context).maybePop(),
-          child: Text('取消', style: CyType.footnote.copyWith(color: p.brand)),
+          child: Text(stringsOf(context).merchantCrmPanelCancel, style: CyType.footnote.copyWith(color: p.brand)),
         ),
         Expanded(
           child: Text(
-            '定向广播',
+            stringsOf(context).merchantCrmPanelBroadcast,
             textAlign: TextAlign.center,
             style: CyType.headline.copyWith(color: p.textPrimary),
           ),
@@ -1557,14 +1568,14 @@ class _CrmBroadcastSheetState extends ConsumerState<CrmBroadcastSheet> {
                   style: CyType.footnote.copyWith(color: p.textPrimary),
                 ),
                 Text(
-                  '${group.count} 人',
+                  stringsOf(context).merchantCrmPanelGroupCount(group.count),
                   style: CyType.caption1.copyWith(color: p.textSecondary),
                 ),
               ],
             ),
           ),
           Text(
-            group.picked ? '已选' : '选择',
+            group.picked ? stringsOf(context).merchantCrmPanelSelected : stringsOf(context).merchantCrmPanelSelect,
             style: CyType.footnote.copyWith(
               color: group.picked ? p.brand : p.textSecondary,
               fontWeight: FontWeight.w600,
@@ -1580,14 +1591,14 @@ class _CrmBroadcastSheetState extends ConsumerState<CrmBroadcastSheet> {
     child: Column(
       children: <Widget>[
         Text(
-          _scope == 'team' ? '这批客户没有队伍' : '这批客户没有角色',
+          _scope == 'team' ? stringsOf(context).merchantCrmPanelNoTeams : stringsOf(context).merchantCrmPanelNoRoles,
           style: CyType.headline.copyWith(color: p.textPrimary),
         ),
         const SizedBox(height: CyTokens.space1),
         Text(
           _scope == 'team'
-              ? '当前筛选出的人都是单独报名的,没有进过队伍;先用「全部」发给他们'
-              : '只有活动局才会给玩家分角色,当前这批人没有;先用「全部」发给他们',
+              ? stringsOf(context).merchantCrmPanelNoTeamsHint
+              : stringsOf(context).merchantCrmPanelNoRolesHint,
           textAlign: TextAlign.center,
           style: CyType.caption1.copyWith(color: p.textSecondary),
         ),
@@ -1603,23 +1614,21 @@ class _CrmBroadcastSheetState extends ConsumerState<CrmBroadcastSheet> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Text(
-            result.statusText,
+            merchantCrmBroadcastStatus(context, result),
             style: CyType.headline.copyWith(color: p.textPrimary),
           ),
           const SizedBox(height: CyTokens.space1),
           Text(
-            '送达 ${result.deliveredCount} 位 · '
-            '未同意跳过 ${result.noConsentCount} 位',
+            stringsOf(context).merchantCrmResidualDelivered(result.deliveredCount, result.noConsentCount),
             style: CyType.caption1.copyWith(color: p.textSecondary),
           ),
           Text(
-            '今日已收跳过 ${result.frequencySkippedCount} 位 · '
-            '失败 ${result.failedCount} 位',
+            stringsOf(context).merchantCrmResidualSkipped(result.frequencySkippedCount, result.failedCount),
             style: CyType.caption1.copyWith(color: p.textSecondary),
           ),
           const SizedBox(height: CyTokens.space1),
           Text(
-            '结果已留痕；未送达的客户不会收到这条通知。',
+            stringsOf(context).merchantCrmPolicyDeliveryRecord,
             style: CyType.caption1.copyWith(color: p.textTertiary),
           ),
         ],
@@ -1636,12 +1645,12 @@ class _CrmBroadcastSheetState extends ConsumerState<CrmBroadcastSheet> {
     ),
     child: _result != null
         ? CrmPillButton(
-            label: '完成',
+            label: stringsOf(context).merchantCrmPanelDone,
             primary: true,
             onTap: () => Navigator.of(context).pop(),
           )
         : CrmPillButton(
-            label: '发送',
+            label: stringsOf(context).merchantCrmPanelSend,
             primary: true,
             loading: _sending,
             onTap: canSend ? _send : null,

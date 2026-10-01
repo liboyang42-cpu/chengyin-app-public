@@ -1,3 +1,5 @@
+import '../../l10n/strings.dart';
+import 'merchant_directory_strings.dart';
 import '../../core/theme/cy_palette.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -40,7 +42,7 @@ class _MerchantCoopPageState extends ConsumerState<MerchantCoopPage> {
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      navigationBar: const CupertinoNavigationBar(middle: Text('合作中心')),
+      navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).merchantDirectoryCenter)),
       child: Material(
         color: Colors.transparent,
         child: SafeArea(
@@ -56,9 +58,9 @@ class _MerchantCoopPageState extends ConsumerState<MerchantCoopPage> {
                 ),
                 child: CyTabs(
                   variant: CyTabsVariant.segmented,
-                  tabs: const <CyTab>[
-                    CyTab(key: 'available', label: '可承接'),
-                    CyTab(key: 'invites', label: '邀约我的'),
+                  tabs: <CyTab>[
+                    CyTab(key: 'available', label: stringsOf(context).merchantDirectoryAvailable),
+                    CyTab(key: 'invites', label: stringsOf(context).merchantDirectoryInvites),
                   ],
                   active: _active,
                   onChanged: (String value) => setState(() {
@@ -102,9 +104,9 @@ class _AvailableTab extends ConsumerWidget {
       ),
       data: (List<RecruitingRoute> rows) {
         if (rows.isEmpty) {
-          return const StatusView(
-            message: '暂无开放路线',
-            sub: '平台或俱乐部开放新的路线后会显示在这里',
+          return StatusView(
+            message: stringsOf(context).merchantDirectoryNoRoutes,
+            sub: stringsOf(context).merchantDirectoryNoRoutesHint,
             large: true,
           );
         }
@@ -113,10 +115,10 @@ class _AvailableTab extends ConsumerWidget {
           child: ListView(
             padding: const EdgeInsets.all(CyTokens.pageX),
             children: <Widget>[
-              Text('找到适合店铺的城市合作', style: textTheme.titleMedium),
+              Text(stringsOf(context).merchantDirectoryFindPartnership, style: textTheme.titleMedium),
               const SizedBox(height: CyTokens.space1),
               Text(
-                '路线申请会在同一流程里提交承接说明与玩家到店点位。',
+                stringsOf(context).merchantDirectoryApplicationHint,
                 style: textTheme.bodySmall?.copyWith(
                   color: CyPalette.of(context).textSecondary,
                 ),
@@ -124,9 +126,9 @@ class _AvailableTab extends ConsumerWidget {
               const SizedBox(height: CyTokens.space3),
               ...rows.map(
                 (RecruitingRoute r) => CyCell(
-                  title: r.name,
+                  title: r.hasNameFallback ? stringsOf(context).merchantDirectoryUnnamedRoute : r.name,
                   // ★ 后端没下发截止日就不显示这一行,不编「长期开放」。
-                  subtitle: r.deadlineText,
+                  subtitle: merchantDirectoryRouteDeadline(context, r),
                   // ★ 进的是**商家承接页**,不是玩家版主题详情 ——
                   //   商家点进"可承接路线"想做的是承接,不是买票。
                   onTap: () => context.push('/merchant/recruit/${r.id}'),
@@ -155,9 +157,9 @@ class _InvitesTab extends ConsumerWidget {
       ),
       data: (List<MerchantInvite> rows) {
         if (rows.isEmpty) {
-          return const StatusView(
-            message: '还没有邀约',
-            sub: '平台邀请你承接活动时,会出现在这里',
+          return StatusView(
+            message: stringsOf(context).merchantDirectoryNoInvites,
+            sub: stringsOf(context).merchantDirectoryNoInvitesHint,
             large: true,
           );
         }
@@ -197,7 +199,7 @@ class _MerchantInviteTileState extends ConsumerState<MerchantInviteTile> {
           .respondInvite(widget.invite.id, accept: accept);
       ref.invalidate(merchantInvitesProvider);
       if (!mounted) return;
-      CyNativeNotice.show(context, accept ? '已接受' : '已拒绝');
+      CyNativeNotice.show(context, accept ? stringsOf(context).merchantDirectoryAccepted : stringsOf(context).merchantDirectoryDeclined);
     } catch (e) {
       if (!mounted) return;
       CyNativeNotice.show(
@@ -227,10 +229,10 @@ class _MerchantInviteTileState extends ConsumerState<MerchantInviteTile> {
         children: <Widget>[
           Row(
             children: <Widget>[
-              CyTag(label: invite.stateText),
+              CyTag(label: merchantDirectoryLocalText(context, invite.stateText)),
               const SizedBox(width: CyTokens.space2),
               Text(
-                '来自 平台',
+                stringsOf(context).merchantDirectoryFromPlatform,
                 style: textTheme.bodySmall?.copyWith(
                   color: CyPalette.of(context).textSecondary,
                 ),
@@ -238,7 +240,7 @@ class _MerchantInviteTileState extends ConsumerState<MerchantInviteTile> {
             ],
           ),
           const SizedBox(height: CyTokens.space2),
-          Text(invite.title, style: textTheme.titleMedium),
+          Text(invite.hasTitleFallback ? stringsOf(context).merchantDirectoryOfficialActivity : invite.title, style: textTheme.titleMedium),
           if ((invite.eventTitle ?? '').isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: CyTokens.space1),
@@ -257,7 +259,7 @@ class _MerchantInviteTileState extends ConsumerState<MerchantInviteTile> {
             ),
           ),
           Text(
-            invite.deadlineText,
+            merchantDirectoryInviteDeadline(context, invite),
             style: textTheme.bodySmall?.copyWith(
               color: CyPalette.of(context).textTertiary,
             ),
@@ -270,7 +272,7 @@ class _MerchantInviteTileState extends ConsumerState<MerchantInviteTile> {
                 Expanded(
                   child: CyNativeButton(
                     onPressed: _busy ? null : () => _respond(false),
-                    label: '拒绝',
+                    label: stringsOf(context).merchantDirectoryReject,
                     role: CyNativeButtonRole.secondary,
                   ),
                 ),
@@ -278,7 +280,7 @@ class _MerchantInviteTileState extends ConsumerState<MerchantInviteTile> {
                 Expanded(
                   child: CyNativeButton(
                     onPressed: _busy ? null : () => _respond(true),
-                    label: '接受合作',
+                    label: stringsOf(context).merchantDirectoryAccept,
                     loading: _busy,
                   ),
                 ),

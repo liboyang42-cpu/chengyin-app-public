@@ -1,4 +1,6 @@
 import 'package:flutter/cupertino.dart';
+import '../../l10n/strings.dart';
+import 'merchant_operations_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -140,7 +142,7 @@ class _MerchantAftercareListPageState extends State<MerchantAftercareListPage> {
               tabs: MerchantAftercareBucket.values
                   .map(
                     (MerchantAftercareBucket bucket) =>
-                        CyTab(key: bucket.wire, label: bucket.label),
+                        CyTab(key: bucket.wire, label: merchantOperationModelText(context, bucket.label)),
                   )
                   .toList(growable: false),
               active: _bucket.wire,
@@ -153,7 +155,7 @@ class _MerchantAftercareListPageState extends State<MerchantAftercareListPage> {
     );
     return CupertinoPageScaffold(
       backgroundColor: CyPalette.of(context).bgPage,
-      navigationBar: const CupertinoNavigationBar(middle: Text('退款售后')),
+      navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).merchantOperationsRefundsAndAfterSales)),
       child: Material(
         color: Colors.transparent,
         child: SafeArea(bottom: false, child: content),
@@ -170,37 +172,37 @@ class _MerchantAftercareListPageState extends State<MerchantAftercareListPage> {
       return StatusView(
         icon: CupertinoIcons.lock,
         message: error.message,
-        sub: '请联系店主调整经营团队权限',
+        sub: stringsOf(context).merchantOperationsContactTheStoreOwnerToUpdateTeamPermissions,
         large: true,
       );
     }
     if (error is MerchantAftercareApiException && error.isForbidden) {
-      return const StatusView(
+      return StatusView(
         icon: CupertinoIcons.lock,
-        message: '当前岗位没有售后查看权限',
-        sub: '请联系店主调整经营团队权限',
+        message: stringsOf(context).merchantOperationsYourRoleCannotViewAfterSalesRequests,
+        sub: stringsOf(context).merchantOperationsContactTheStoreOwnerToUpdateTeamPermissions,
         large: true,
       );
     }
     if (error != null) {
       return StatusView(
         icon: CupertinoIcons.exclamationmark_triangle,
-        message: '售后列表没能加载出来',
+        message: stringsOf(context).merchantOperationsCouldNotLoadAfterSalesRequests,
         sub: error.toString(),
         large: true,
         onRetry: _loadFirstPage,
-        retryLabel: '重新加载',
+        retryLabel: stringsOf(context).merchantOperationsReload,
       );
     }
     if (_items.isEmpty) {
       return StatusView(
         icon: CupertinoIcons.doc_text,
         message: switch (_bucket) {
-          MerchantAftercareBucket.pending => '没有待回应售后',
-          MerchantAftercareBucket.processing => '没有处理中的售后',
-          MerchantAftercareBucket.completed => '还没有已完成售后',
+          MerchantAftercareBucket.pending => stringsOf(context).merchantOperationsNoAfterSalesRequestsAwaitingResponse,
+          MerchantAftercareBucket.processing => stringsOf(context).merchantOperationsNoAfterSalesRequestsInProgress,
+          MerchantAftercareBucket.completed => stringsOf(context).merchantOperationsNoCompletedAfterSalesRequestsYet,
         },
-        sub: '退款申请会按平台审核与款项真实状态显示在这里',
+        sub: stringsOf(context).merchantOperationsRefundRequestsAppearHereWithTheirPlatformReviewAndActualPaymentSt,
         large: true,
       );
     }
@@ -230,7 +232,7 @@ class _MerchantAftercareListPageState extends State<MerchantAftercareListPage> {
           itemBuilder: (BuildContext context, int index) {
             if (index == 0) {
               return Text(
-                '共 $_total 笔',
+                stringsOf(context).merchantOperationsRequestCount(_total),
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: CyPalette.of(context).textSecondary,
                 ),
@@ -242,7 +244,7 @@ class _MerchantAftercareListPageState extends State<MerchantAftercareListPage> {
                   padding: const EdgeInsets.all(CyTokens.space3),
                   child: _loadingMore
                       ? const CupertinoActivityIndicator()
-                      : Text(_hasMore ? '上滑加载更多' : '已经到底了'),
+                      : Text(_hasMore ? stringsOf(context).merchantOperationsScrollUpToLoadMore : stringsOf(context).merchantOperationsEndOfList),
                 ),
               );
             }
@@ -270,7 +272,7 @@ class _AftercareCard extends StatelessWidget {
     final TextTheme textTheme = Theme.of(context).textTheme;
     return Semantics(
       button: true,
-      label: '打开售后 ${item.refundNoText}',
+      label: stringsOf(context).merchantOperationsOpenRequest(item.refundNoText),
       child: CupertinoButton(
         key: Key('aftercare-item-${item.refundId}'),
         padding: EdgeInsets.zero,
@@ -297,7 +299,7 @@ class _AftercareCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
                         Text(
-                          item.sourceText,
+                          merchantOperationModelText(context, item.sourceText),
                           style: textTheme.bodySmall?.copyWith(
                             color: palette.textSecondary,
                           ),
@@ -314,7 +316,7 @@ class _AftercareCard extends StatelessWidget {
                   ),
                   const SizedBox(width: CyTokens.space3),
                   Text(
-                    item.refundAmountText,
+                    (item.refundAmount == null ? stringsOf(context).merchantOperationsAmountToBeConfirmed : item.refundAmountText),
                     style: textTheme.titleMedium?.copyWith(
                       fontFeatures: const <FontFeature>[
                         FontFeature.tabularFigures(),
@@ -329,9 +331,9 @@ class _AftercareCard extends StatelessWidget {
                 runSpacing: CyTokens.space1,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: <Widget>[
-                  _StatusPill(label: item.processingText),
+                  _StatusPill(label: merchantOperationModelText(context, item.processingText)),
                   Text(
-                    item.merchantOpinionText,
+                    merchantOperationModelText(context, item.merchantOpinionText),
                     style: textTheme.bodySmall?.copyWith(
                       color: palette.textSecondary,
                     ),
@@ -349,14 +351,14 @@ class _AftercareCard extends StatelessWidget {
                 children: <Widget>[
                   Expanded(
                     child: Text(
-                      _minute(item.createTime) ?? '时间待确认',
+                      _minute(item.createTime) ?? stringsOf(context).merchantOperationsTimeToBeConfirmed,
                       style: textTheme.bodySmall?.copyWith(
                         color: palette.textSecondary,
                       ),
                     ),
                   ),
                   Text(
-                    item.canRespond ? '去回应' : '查看详情',
+                    item.canRespond ? stringsOf(context).merchantOperationsRespond : stringsOf(context).merchantOperationsViewDetails,
                     style: textTheme.bodySmall?.copyWith(
                       color: palette.textPrimary,
                       fontWeight: FontWeight.w600,

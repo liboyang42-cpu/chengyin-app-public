@@ -1,3 +1,6 @@
+import 'club_customer_labels.dart';
+import 'club_occurrence_labels.dart';
+import '../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -66,12 +69,12 @@ enum _CancellationState {
 enum _RosterState { idle, loading, ready, error }
 
 class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
-  static const List<({String key, String label})> _rosterTabs =
+  List<({String key, String label})> get _rosterTabs =>
       <({String key, String label})>[
-        (key: 'registered', label: '已报名'),
-        (key: 'waitlist', label: '候补'),
-        (key: 'arrived', label: '已到场'),
-        (key: 'noShow', label: '未到场'),
+        (key: 'registered', label: stringsOf(context).clubEventRegistered),
+        (key: 'waitlist', label: stringsOf(context).clubEventWaitlist),
+        (key: 'arrived', label: stringsOf(context).clubEventArrived),
+        (key: 'noShow', label: stringsOf(context).clubEventNoShow),
       ];
 
   ClubOpsLoadState _state = ClubOpsLoadState.loading;
@@ -173,7 +176,7 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
         allowed: (ClubOpsAccess a) =>
             a.has(kClubActivityManage) ||
             (_activityId != null && a.has(kClubEventCheckin)),
-        deniedMessage: '当前角色没有活动运营或本场核销权限',
+        deniedMessage: stringsOf(context).clubEventDeniedReason,
       );
       if (denied != null) {
         setState(() {
@@ -199,7 +202,7 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
       setState(() {
         _loginRequired = clubLoginRequired(error);
         _state = clubOpsFailureState(error);
-        _error = clubOpsErrorMessage(error, '活动权限暂时不可用');
+        _error = clubOpsErrorMessage(error, stringsOf(context).clubEventAccessUnavailable);
       });
     }
   }
@@ -247,7 +250,7 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() => _leadLoadWarning = '负责人名单暂时不可用，将沿用主理人默认值');
+      setState(() => _leadLoadWarning = stringsOf(context).clubEventLeadsUnavailable);
     }
   }
 
@@ -272,7 +275,7 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
       if (!mounted) return;
       setState(() {
         _seriesState = _SeriesState.error;
-        _seriesError = clubOpsErrorMessage(error, '系列列表加载失败');
+        _seriesError = clubOpsErrorMessage(error, stringsOf(context).clubEventSeriesFailed);
       });
     }
   }
@@ -281,7 +284,7 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
     for (final EventOpsTopic topic in _topics) {
       if (topic.id == series.topicId) return topic.name;
     }
-    return '主题 #${series.topicId}';
+    return stringsOf(context).clubEventTopicNumber(series.topicId);
   }
 
   Future<void> _toggleSeriesDates(EventSeries series) async {
@@ -348,7 +351,7 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
       if (!mounted) return;
       CyNativeNotice.show(
         context,
-        clubOpsErrorMessage(error, '系列详情加载失败'),
+        clubOpsErrorMessage(error, stringsOf(context).clubEventSeriesDetailsFailed),
         isError: true,
       );
     } finally {
@@ -381,7 +384,7 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
       initialDateTime: DateTime.tryParse(_startDate) ?? now,
       minimumDate: DateTime(now.year, now.month, now.day),
       maximumDate: now.add(const Duration(days: 365)),
-      title: '首次日期',
+      title: stringsOf(context).clubEventFirstDate,
     );
     if (picked == null || !mounted) return;
     setState(() => _startDate = _dateWire(picked));
@@ -403,7 +406,7 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
       initialDateTime: initial,
       minimumDate: DateTime(now.year, now.month, now.day),
       maximumDate: DateTime(now.year, now.month, now.day, 23, 59),
-      title: '集合时刻',
+      title: stringsOf(context).clubEventMeetingTime,
     );
     if (picked == null || !mounted) return;
     String two(int value) => value.toString().padLeft(2, '0');
@@ -418,7 +421,7 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
       initialDateTime: DateTime.tryParse(_customDates[index]) ?? now,
       minimumDate: DateTime(now.year, now.month, now.day),
       maximumDate: now.add(const Duration(days: 365)),
-      title: '日期',
+      title: stringsOf(context).clubEventDate,
     );
     if (picked == null || !mounted) return;
     setState(() => _customDates[index] = _dateWire(picked));
@@ -429,12 +432,12 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
     final int? editingId = _editingSeriesId;
     final int? topicId = editingId != null ? _editingTopicId : _topicId;
     if (topicId == null || topicId <= 0) {
-      CyNativeNotice.show(context, '暂无可开场的主题', isError: true);
+      CyNativeNotice.show(context, stringsOf(context).clubEventNoTopics, isError: true);
       return;
     }
     final int? version = _expectedVersion;
     if (editingId != null && (version == null || version < 0)) {
-      CyNativeNotice.show(context, '系列版本缺失，请重新进入编辑', isError: true);
+      CyNativeNotice.show(context, stringsOf(context).clubEventMissingVersion, isError: true);
       return;
     }
     final int? count = int.tryParse(_countCtrl.text.trim());
@@ -444,26 +447,26 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
         : int.tryParse(_capacityCtrl.text.trim());
     if (_recurrenceType == 'WEEKLY' &&
         (count == null || count < 1 || count > 64)) {
-      CyNativeNotice.show(context, '每周场次数需为 1–64', isError: true);
+      CyNativeNotice.show(context, stringsOf(context).clubEventCountInvalid, isError: true);
       return;
     }
     if (_capacityCtrl.text.trim().isNotEmpty &&
         (capacity == null || capacity < 1 || capacity > 10000)) {
-      CyNativeNotice.show(context, '容量需为 1–10000', isError: true);
+      CyNativeNotice.show(context, stringsOf(context).clubEventCapacityInvalid, isError: true);
       return;
     }
     if (offerMinutes < 5 || offerMinutes > 1440) {
-      CyNativeNotice.show(context, '候补窗口需为 5–1440 分钟', isError: true);
+      CyNativeNotice.show(context, stringsOf(context).clubEventWindowInvalid, isError: true);
       return;
     }
     final List<String> customDates =
         _customDates.where((String d) => d.isNotEmpty).toSet().toList()..sort();
     if (_recurrenceType == 'CUSTOM_DATES' && customDates.isEmpty) {
-      CyNativeNotice.show(context, '请至少选择一个日期', isError: true);
+      CyNativeNotice.show(context, stringsOf(context).clubEventDatesRequired, isError: true);
       return;
     }
     if (!RegExp(r'^([01]\d|2[0-3]):[0-5]\d$').hasMatch(_startTime)) {
-      CyNativeNotice.show(context, '请选择集合时刻', isError: true);
+      CyNativeNotice.show(context, stringsOf(context).clubEventTimeRequired, isError: true);
       return;
     }
     setState(() => _submitting = true);
@@ -493,12 +496,12 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
         await ref.read(clubOpsApiProvider).createSeries(payload);
       }
       if (!mounted) return;
-      CyNativeNotice.show(context, editingId != null ? '未来场次已更新' : '系列场次已创建');
+      CyNativeNotice.show(context, editingId != null ? stringsOf(context).clubEventUpdated : stringsOf(context).clubEventCreated);
       _resetSeriesForm();
       await _loadSeries();
     } on ClubOpsConflictException {
       if (!mounted) return;
-      CyNativeNotice.show(context, '系列已被更新，正在刷新', isError: true);
+      CyNativeNotice.show(context, stringsOf(context).clubEventVersionChanged, isError: true);
       await _loadSeries();
       if (editingId != null) {
         EventSeries? row;
@@ -514,7 +517,7 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
       if (!mounted) return;
       CyNativeNotice.show(
         context,
-        clubOpsErrorMessage(error, editingId != null ? '更新失败' : '创建失败'),
+        clubOpsErrorMessage(error, editingId != null ? stringsOf(context).clubEventUpdateFailed : stringsOf(context).clubEventCreateFailed),
         isError: true,
       );
     } finally {
@@ -541,14 +544,14 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
       if (status == null) {
         setState(() {
           _cancellationState = _CancellationState.readbackError;
-          _cancellationError = '取消状态回读失败，请重试';
+          _cancellationError = stringsOf(context).clubEventReadbackFailed;
         });
         return;
       }
       if (cancelResult != null && !status.cancelled) {
         setState(() {
           _cancellationState = _CancellationState.readbackError;
-          _cancellationError = '取消请求已受理，但独立回读尚未确认取消，请重试回读';
+          _cancellationError = stringsOf(context).clubEventCancellationUnconfirmed;
         });
         return;
       }
@@ -566,7 +569,7 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
       if (cancelResult != null && status.cancelled) {
         _cancellationRequestId = '';
         _cancellationRequestReason = '';
-        CyNativeNotice.show(context, '本场取消已确认');
+        CyNativeNotice.show(context, stringsOf(context).clubEventCancelledConfirmed);
         await _loadSeries();
         if (_canCheckin) await _loadRoster();
       }
@@ -574,7 +577,7 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
       if (!mounted) return;
       setState(() {
         _cancellationState = _CancellationState.readbackError;
-        _cancellationError = clubOpsErrorMessage(error, '取消状态回读失败，请重试');
+        _cancellationError = clubOpsErrorMessage(error, stringsOf(context).clubEventReadbackFailed);
       });
     }
   }
@@ -588,24 +591,24 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
     }
     final String? raw = await showCySystemTextInputAlert(
       context: context,
-      title: '取消本场活动',
-      placeholder: '请输入取消原因（至少 2 个字）',
-      confirmText: '确认取消',
+      title: stringsOf(context).clubEventCancelTitle,
+      placeholder: stringsOf(context).clubEventCancelReasonHint,
+      confirmText: stringsOf(context).clubEventConfirmCancel,
       keyboardKind: CySystemKeyboardKind.text,
     );
     if (raw == null || !mounted) return;
     final String reason = raw.trim();
     if (reason.length < 2 || reason.length > 255) {
-      CyNativeNotice.show(context, '取消原因需为 2–255 个字', isError: true);
+      CyNativeNotice.show(context, stringsOf(context).clubEventCancelReasonInvalid, isError: true);
       return;
     }
     // 原因合法后不直接发请求:先过 T2 居中二次确认(只能点按钮)。
     final bool confirmed = await cyConfirm(
       context,
-      title: '确认取消本场？',
-      content: '会下架本场、处理退款并终止候补。已核销的部分不退。',
-      confirmText: '取消本场',
-      cancelText: '再想想',
+      title: stringsOf(context).clubEventCancelConfirmation,
+      content: stringsOf(context).clubEventCancelPolicy,
+      confirmText: stringsOf(context).clubEventCancelSession,
+      cancelText: stringsOf(context).clubEventReconsider,
       danger: true,
     );
     if (!confirmed || !mounted) return;
@@ -643,7 +646,7 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
       if (result == null) {
         setState(() {
           _cancellationState = _CancellationState.error;
-          _cancellationError = '取消失败，请稍后重试';
+          _cancellationError = stringsOf(context).clubEventCancelFailed;
         });
         return;
       }
@@ -653,7 +656,7 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
       if (!mounted) return;
       setState(() {
         _cancellationState = _CancellationState.error;
-        _cancellationError = clubOpsErrorMessage(error, '网络结果未知，可用同一原因安全重试');
+        _cancellationError = clubOpsErrorMessage(error, stringsOf(context).clubEventCancelUnknown);
       });
     } finally {
       if (mounted) setState(() => _cancellationSubmitting = false);
@@ -677,7 +680,7 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
       if (roster == null) {
         setState(() {
           _rosterState = _RosterState.error;
-          _rosterError = '名册数据不完整';
+          _rosterError = stringsOf(context).clubEventRosterIncomplete;
         });
         return;
       }
@@ -689,7 +692,7 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
       if (!mounted) return;
       setState(() {
         _rosterState = _RosterState.error;
-        _rosterError = clubOpsErrorMessage(error, '名册加载失败');
+        _rosterError = clubOpsErrorMessage(error, stringsOf(context).clubEventRosterFailed);
       });
     }
   }
@@ -714,9 +717,9 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
     final bool arrived = _rosterTab != 'arrived';
     final String? raw = await showCySystemTextInputAlert(
       context: context,
-      title: arrived ? '更正为已到场' : '更正为未到场',
-      placeholder: '请输入更正原因（至少 2 个字）',
-      confirmText: '提交',
+      title: arrived ? stringsOf(context).clubEventCorrectArrived : stringsOf(context).clubEventCorrectNoShow,
+      placeholder: stringsOf(context).clubEventCorrectionReasonHint,
+      confirmText: stringsOf(context).clubEventSubmit,
       keyboardKind: CySystemKeyboardKind.text,
     );
     if (raw == null || !mounted) return;
@@ -754,11 +757,11 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
       if (!mounted) return;
       if (accepted) {
         _attendanceRequestIds.remove(intentKey);
-        CyNativeNotice.show(context, '签到已更正');
+        CyNativeNotice.show(context, stringsOf(context).clubEventAttendanceCorrected);
         await _loadRoster();
         return;
       }
-      CyNativeNotice.show(context, '更正失败', isError: true);
+      CyNativeNotice.show(context, stringsOf(context).clubEventCorrectionFailed, isError: true);
     } catch (error) {
       if (!mounted) return;
       if (error is ClubOpsRejectedException) {
@@ -766,7 +769,7 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
       }
       CyNativeNotice.show(
         context,
-        clubOpsErrorMessage(error, '更正失败'),
+        clubOpsErrorMessage(error, stringsOf(context).clubEventCorrectionFailed),
         isError: true,
       );
     } finally {
@@ -780,7 +783,7 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      navigationBar: const CupertinoNavigationBar(middle: Text('活动运营')),
+      navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).clubEventTitle)),
       child: Material(
         color: Colors.transparent,
         child: SafeArea(
@@ -788,15 +791,15 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              const CyPageTitle('活动运营'),
+              CyPageTitle(stringsOf(context).clubEventTitle),
               Expanded(child: _body()),
               if (_state == ClubOpsLoadState.ready && _canManage)
                 CyFooterBar(
                   primary: CyNativeButton(
                     key: const Key('event-ops-submit'),
                     label: _submitting
-                        ? '正在提交…'
-                        : (_editingSeriesId != null ? '保存未来场次' : '创建系列场次'),
+                        ? stringsOf(context).clubEventSubmitting
+                        : (_editingSeriesId != null ? stringsOf(context).clubEventSaveFuture : stringsOf(context).clubEventCreateSeries),
                     width: double.infinity,
                     onPressed: _submitting ? null : _submitSeries,
                   ),
@@ -812,21 +815,21 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
     // 游客先登录:401 说成「你没有活动运营的权限」会让人去查自己的角色,
     // 而真因只是没登录 —— 登录后原地重取,人留在这一页。
     if (_loginRequired) {
-      return ClubLoginGate(message: '登录后查看活动运营', onSignedIn: _loadAccess);
+      return ClubLoginGate(message: stringsOf(context).clubEventLogin, onSignedIn: _loadAccess);
     }
     switch (_state) {
       case ClubOpsLoadState.loading:
         return const CySkeleton(type: CySkeletonType.card, count: 4);
       case ClubOpsLoadState.noPermission:
         return StatusView(
-          message: '你没有活动运营的权限',
-          sub: _error.isEmpty ? '场次编排、签到与出勤更正需要「活动运营」或「本场核销」权限。' : _error,
+          message: stringsOf(context).clubEventDenied,
+          sub: _error.isEmpty ? stringsOf(context).clubEventDeniedBody : _error,
           icon: CupertinoIcons.lock,
           large: true,
         );
       case ClubOpsLoadState.networkError:
         return StatusView(
-          message: '网络连接失败',
+          message: stringsOf(context).clubEventNetworkFailed,
           sub: _error,
           icon: CupertinoIcons.exclamationmark_triangle,
           large: true,
@@ -834,7 +837,7 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
         );
       case ClubOpsLoadState.error:
         return StatusView(
-          message: '活动运营暂时不可用',
+          message: stringsOf(context).clubEventUnavailable,
           sub: _error,
           icon: CupertinoIcons.exclamationmark_triangle,
           large: true,
@@ -858,29 +861,29 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
   Widget _seriesSection() {
     final CyPalette palette = CyPalette.of(context);
     return ClubOpsSection(
-      title: '日期清单',
-      note: '编辑只影响未来且无报名、无结算事实的场次',
+      title: stringsOf(context).clubEventDates,
+      note: stringsOf(context).clubEventEditScope,
       children: <Widget>[
         if (_seriesState == _SeriesState.loading)
           const Padding(
-            padding: EdgeInsets.only(top: CyTokens.space3),
+            padding: const EdgeInsets.only(top: CyTokens.space3),
             child: CySkeleton(type: CySkeletonType.card, count: 2),
           )
         else if (_seriesState == _SeriesState.error)
           Padding(
             padding: const EdgeInsets.only(top: CyTokens.space3),
             child: StatusView(
-              message: '系列列表加载失败',
+              message: stringsOf(context).clubEventSeriesFailed,
               sub: _seriesError,
               onRetry: _loadSeries,
             ),
           )
         else if (_seriesState == _SeriesState.empty)
-          const Padding(
-            padding: EdgeInsets.only(top: CyTokens.space3),
+          Padding(
+            padding: const EdgeInsets.only(top: CyTokens.space3),
             child: StatusView(
-              message: '还没有系列场次',
-              sub: '从下方创建第一组场次',
+              message: stringsOf(context).clubEventNoSeries,
+              sub: stringsOf(context).clubEventNoSeriesBody,
               icon: CupertinoIcons.calendar,
             ),
           )
@@ -891,11 +894,10 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
                 ClubOpsRow(
                   key: Key('event-ops-series-${series.id}'),
                   title:
-                      '${_seriesTitle(series)} · ${EventSeries.recurrenceLabel(series.recurrenceType)}',
+                      '${_seriesTitle(series)} · ${_recurrenceLabel(context, series.recurrenceType)}',
                   meta:
-                      '版本 ${series.version} · 候补${series.waitlistEnabled ? '开启' : '关闭'}'
-                      ' · ${series.futureDates.length} 个可编辑日期',
-                  value: _editingSeriesId == series.id ? '编辑中' : '编辑未来场次',
+                      stringsOf(context).clubEventSeriesSummary(series.version.toString(), series.waitlistEnabled ? stringsOf(context).clubEventWaitlistOn : stringsOf(context).clubEventWaitlistOff, series.futureDates.length),
+                  value: _editingSeriesId == series.id ? stringsOf(context).clubEventEditing : stringsOf(context).clubEventEditFuture,
                   valueColor: _editingSeriesId == series.id
                       ? palette.brand
                       : palette.textTertiary,
@@ -904,7 +906,7 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
                 ),
                 ClubOpsRow(
                   key: Key('event-ops-series-dates-${series.id}'),
-                  title: '日期清单（含已过去与已取消的场次）',
+                  title: stringsOf(context).clubEventAllDates,
                   trailing: Icon(
                     _expandedSeriesId == series.id
                         ? CupertinoIcons.chevron_up
@@ -937,7 +939,7 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
         return const CySkeleton(type: CySkeletonType.card, count: 2);
       case _OccurrenceState.error:
         return Text(
-          '日期清单没加载出来，稍后再试一次。',
+          stringsOf(context).clubEventDatesFailed,
           style: TextStyle(
             fontSize: CyTokens.typeCaption,
             color: palette.textTertiary,
@@ -945,7 +947,7 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
         );
       case _OccurrenceState.empty:
         return Text(
-          '这个系列还没有物化出场次。',
+          stringsOf(context).clubEventNoMaterializedSessions,
           style: TextStyle(
             fontSize: CyTokens.typeCaption,
             color: palette.textTertiary,
@@ -966,14 +968,14 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: <Widget>[
                             Text(
-                              occ.dateText,
+                              clubOccurrenceDate(context, occ),
                               style: TextStyle(
                                 fontSize: CyTokens.typeLabel,
                                 color: palette.textPrimary,
                               ),
                             ),
                             Text(
-                              occ.meta,
+                              clubOccurrenceMeta(context, occ),
                               style: TextStyle(
                                 fontSize: CyTokens.typeCaption,
                                 color: palette.textTertiary,
@@ -983,7 +985,7 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
                         ),
                       ),
                       Text(
-                        occ.badge,
+                        clubOccurrenceBadge(context, occ),
                         style: TextStyle(
                           fontSize: CyTokens.typeCaption,
                           color: occ.badgeKind == 'cancelled'
@@ -1006,14 +1008,14 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
     final CyPalette palette = CyPalette.of(context);
     final bool editing = _editingSeriesId != null;
     return ClubOpsSection(
-      title: editing ? '编辑未来场次' : '创建系列场次',
+      title: editing ? stringsOf(context).clubEventEditFuture : stringsOf(context).clubEventCreateSeries,
       children: <Widget>[
         if (_topics.isEmpty)
-          const Padding(
-            padding: EdgeInsets.only(top: CyTokens.space3),
+          Padding(
+            padding: const EdgeInsets.only(top: CyTokens.space3),
             child: StatusView(
-              message: '暂无可开场的主题',
-              sub: '先发布一个俱乐部主题，或完成商家合作后再开场。',
+              message: stringsOf(context).clubEventNoTopics,
+              sub: stringsOf(context).clubEventNoTopicsBody,
               icon: Icons.route_outlined,
             ),
           )
@@ -1031,10 +1033,10 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     CyField(
-                      label: '主题',
+                      label: stringsOf(context).clubEventTopic,
                       child: editing
                           ? Text(
-                              '主题 #$_editingTopicId · 已锁定',
+                              stringsOf(context).clubEventLockedTopic(_editingTopicId.toString()),
                               style: TextStyle(
                                 fontSize: CyTokens.typeBody,
                                 color: palette.textSecondary,
@@ -1043,7 +1045,7 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
                           : _topicPicker(palette),
                     ),
                     CyField(
-                      label: '重复方式',
+                      label: stringsOf(context).clubEventRecurrence,
                       child: Row(
                         children: EventSeries.recurrences
                             .map(
@@ -1056,7 +1058,7 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
                                     key: Key(
                                       'event-ops-recurrence-${item.value}',
                                     ),
-                                    label: item.label,
+                                    label: _recurrenceLabel(context, item.value),
                                     active: _recurrenceType == item.value,
                                     onTap: _submitting
                                         ? null
@@ -1072,7 +1074,7 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
                     ),
                     if (_recurrenceType != 'CUSTOM_DATES')
                       CyField(
-                        label: '首次日期',
+                        label: stringsOf(context).clubEventFirstDate,
                         child: _fieldPicker(
                           key: const Key('event-ops-start-date'),
                           text: _startDate,
@@ -1081,7 +1083,7 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
                       ),
                     if (_recurrenceType == 'WEEKLY')
                       CyField(
-                        label: '场次数',
+                        label: stringsOf(context).clubEventSessionCount,
                         child: _numberField(
                           key: const Key('event-ops-count'),
                           controller: _countCtrl,
@@ -1090,7 +1092,7 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
                       ),
                     if (_recurrenceType == 'CUSTOM_DATES') ...<Widget>[
                       CyField(
-                        label: '日期清单',
+                        label: stringsOf(context).clubEventDates,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: <Widget>[
@@ -1114,7 +1116,7 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
                                     ),
                                     const SizedBox(width: CyTokens.space1_5),
                                     ClubOpsRowLink(
-                                      label: '移除',
+                                      label: stringsOf(context).clubEventRemove,
                                       enabled:
                                           !_submitting &&
                                           _customDates.length > 1,
@@ -1135,7 +1137,7 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
                       ),
                     ],
                     CyField(
-                      label: '集合时刻',
+                      label: stringsOf(context).clubEventMeetingTime,
                       child: _fieldPicker(
                         key: const Key('event-ops-start-time'),
                         text: _startTime,
@@ -1143,7 +1145,7 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
                       ),
                     ),
                     Text(
-                      '退款窗口按「集合时刻前 24 小时」计算。',
+                      stringsOf(context).clubEventRefundWindow,
                       style: TextStyle(
                         fontSize: CyTokens.typeCaption,
                         color: palette.textTertiary,
@@ -1151,7 +1153,7 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
                     ),
                     if (!editing) ...<Widget>[
                       const SizedBox(height: CyTokens.space3),
-                      CyField(label: '默认负责人', child: _leadPicker(palette)),
+                      CyField(label: stringsOf(context).clubEventDefaultLead, child: _leadPicker(palette)),
                       if (_leadLoadWarning.isNotEmpty)
                         Text(
                           _leadLoadWarning,
@@ -1163,15 +1165,15 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
                     ],
                     const SizedBox(height: CyTokens.space3),
                     CyField(
-                      label: '容量（可选）',
+                      label: stringsOf(context).clubEventCapacity,
                       child: _numberField(
                         key: const Key('event-ops-capacity'),
                         controller: _capacityCtrl,
-                        placeholder: '沿用票种',
+                        placeholder: stringsOf(context).clubEventUseTicketCapacity,
                       ),
                     ),
                     Text(
-                      '自定义容量只适用于恰有一个票种的合作主题；多票种继续沿用原票种容量。',
+                      stringsOf(context).clubEventCapacityScope,
                       style: TextStyle(
                         fontSize: CyTokens.typeCaption,
                         height: 1.5,
@@ -1187,7 +1189,7 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: <Widget>[
                                 Text(
-                                  '满员后开启候补',
+                                  stringsOf(context).clubEventEnableWaitlist,
                                   style: TextStyle(
                                     fontSize: CyTokens.typeBody,
                                     fontWeight: FontWeight.w600,
@@ -1195,7 +1197,7 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
                                   ),
                                 ),
                                 Text(
-                                  '按活动 + 票种先进先出',
+                                  stringsOf(context).clubEventWaitlistOrder,
                                   style: TextStyle(
                                     fontSize: CyTokens.typeCaption,
                                     color: palette.textTertiary,
@@ -1219,7 +1221,7 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
                     if (_waitlistEnabled) ...<Widget>[
                       const SizedBox(height: CyTokens.space2),
                       CyField(
-                        label: '候补认领窗口（分钟，默认 1440 = 一天）',
+                        label: stringsOf(context).clubEventClaimWindow,
                         child: _numberField(
                           key: const Key('event-ops-offer'),
                           controller: _offerCtrl,
@@ -1227,8 +1229,7 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
                         ),
                       ),
                       Text(
-                        '名额空出来后为队首保留这么久，逾期顺延给下一位。'
-                        '窗口再长也不会超过这张票的报名截止时间。',
+                        stringsOf(context).clubEventClaimWindowPolicy,
                         style: TextStyle(
                           fontSize: CyTokens.typeCaption,
                           height: 1.5,
@@ -1246,7 +1247,7 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
   }
 
   Widget _topicPicker(CyPalette palette) {
-    String label = '暂无可开场的主题';
+    String label = stringsOf(context).clubEventNoTopics;
     for (final EventOpsTopic topic in _topics) {
       if (topic.id == _topicId) {
         label = topic.name;
@@ -1275,7 +1276,7 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
           ),
           children: <Widget>[
             Text(
-              '选择主题',
+              stringsOf(context).clubEventSelectTopic,
               style: TextStyle(
                 fontSize: CyTokens.typeSectionTitle,
                 fontWeight: FontWeight.w700,
@@ -1288,7 +1289,7 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
                 key: Key('event-ops-topic-${topic.id}'),
                 title: topic.name,
                 trailing: Text(
-                  _topicId == topic.id ? '已选' : '选择',
+                  _topicId == topic.id ? stringsOf(context).clubEventSelected : stringsOf(context).clubEventSelect,
                   style: TextStyle(
                     fontSize: CyTokens.typeLabel,
                     color: _topicId == topic.id
@@ -1308,11 +1309,11 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
   }
 
   Widget _leadPicker(CyPalette palette) {
-    String label = '主理人（默认）';
+    String label = stringsOf(context).clubEventOwnerDefault;
     if (_leadMemberId != null) {
       for (final ClubMember member in _leadOptions) {
         if (member.memberId == _leadMemberId) {
-          label = member.displayName;
+          label = clubMemberDisplayName(context, member);
           break;
         }
       }
@@ -1339,7 +1340,7 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
           ),
           children: <Widget>[
             Text(
-              '默认负责人',
+              stringsOf(context).clubEventDefaultLead,
               style: TextStyle(
                 fontSize: CyTokens.typeSectionTitle,
                 fontWeight: FontWeight.w700,
@@ -1349,9 +1350,9 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
             const SizedBox(height: CyTokens.space3),
             ClubOpsRow(
               key: const Key('event-ops-lead-default'),
-              title: '主理人（默认）',
+              title: stringsOf(context).clubEventOwnerDefault,
               trailing: Text(
-                _leadMemberId == null ? '已选' : '选择',
+                _leadMemberId == null ? stringsOf(context).clubEventSelected : stringsOf(context).clubEventSelect,
                 style: TextStyle(
                   fontSize: CyTokens.typeLabel,
                   color: _leadMemberId == null
@@ -1364,9 +1365,9 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
             ..._leadOptions.map(
               (ClubMember member) => ClubOpsRow(
                 key: Key('event-ops-lead-${member.memberId}'),
-                title: member.displayName,
+                title: clubMemberDisplayName(context, member),
                 trailing: Text(
-                  _leadMemberId == member.memberId ? '已选' : '选择',
+                  _leadMemberId == member.memberId ? stringsOf(context).clubEventSelected : stringsOf(context).clubEventSelect,
                   style: TextStyle(
                     fontSize: CyTokens.typeLabel,
                     color: _leadMemberId == member.memberId
@@ -1391,47 +1392,47 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
         _cancellationState == _CancellationState.loading ||
         _cancellationState == _CancellationState.submitting;
     return ClubOpsSection(
-      title: '本场管理',
+      title: stringsOf(context).clubEventSessionManagement,
       children: <Widget>[
         ClubOpsCard(
           children: <Widget>[
             ClubOpsRow(
-              title: '本场名册',
+              title: stringsOf(context).clubEventSessionRoster,
               value: (_canCheckin && _rosterState == _RosterState.ready)
-                  ? '${_roster?.registered.length ?? 0} 人'
-                  : '仅核销权限可见',
+                  ? stringsOf(context).clubEventPeople(_roster?.registered.length ?? 0)
+                  : stringsOf(context).clubEventRosterPermission,
             ),
             if (_cancellationState == _CancellationState.cancelled)
               ClubOpsRow(
                 key: const Key('event-ops-cancelled'),
-                title: '本场已取消',
+                title: stringsOf(context).clubEventSessionCancelled,
                 meta: <String>[
-                  if (_cancellationReason.isNotEmpty) '原因：$_cancellationReason',
+                  if (_cancellationReason.isNotEmpty) stringsOf(context).clubEventReason(_cancellationReason),
                   if (_cancellationSummary.isNotEmpty) _cancellationSummary,
                 ].join('\n'),
                 metaLines: 2,
-                value: '本场已取消',
+                value: stringsOf(context).clubEventSessionCancelled,
                 valueColor: CyTokens.statusDanger,
               )
             else if (busy)
               ClubOpsRow(
-                title: '取消本场',
+                title: stringsOf(context).clubEventCancelSession,
                 meta: _cancellationState == _CancellationState.submitting
-                    ? '正在提交取消…'
-                    : '正在回读本场状态…',
+                    ? stringsOf(context).clubEventCancelling
+                    : stringsOf(context).clubEventCheckingCancellation,
               )
             else if (_cancellationState == _CancellationState.error ||
                 _cancellationState == _CancellationState.readbackError)
               ClubOpsRow(
                 key: const Key('event-ops-cancel-error'),
-                title: '取消本场',
+                title: stringsOf(context).clubEventCancelSession,
                 meta: _cancellationError,
                 metaLines: 3,
                 enabled: false,
                 trailing: _cancellationState == _CancellationState.readbackError
                     ? ClubOpsRowLink(
                         key: const Key('event-ops-cancel-readback'),
-                        label: '重新回读',
+                        label: stringsOf(context).clubEventReadAgain,
                         enabled: !_cancellationSubmitting,
                         onTap: () => _readCancellationState(
                           cancelResult: _pendingCancellationResult,
@@ -1439,7 +1440,7 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
                       )
                     : ClubOpsRowLink(
                         key: const Key('event-ops-cancel-retry'),
-                        label: '重试取消本场',
+                        label: stringsOf(context).clubEventRetryCancellation,
                         danger: true,
                         enabled: !_cancellationSubmitting,
                         onTap: _cancelCurrentOccurrence,
@@ -1448,8 +1449,8 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
             else
               ClubOpsRow(
                 key: const Key('event-ops-cancel'),
-                title: '取消本场',
-                meta: '会下架本场、处理退款并终止候补',
+                title: stringsOf(context).clubEventCancelSession,
+                meta: stringsOf(context).clubEventCancellationEffects,
                 valueColor: palette.textTertiary,
                 onTap: _cancelCurrentOccurrence,
               ),
@@ -1463,8 +1464,8 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
     final CyPalette palette = CyPalette.of(context);
     final ClubRoster? roster = _roster;
     return ClubOpsSection(
-      title: '本场名册',
-      note: '不展示手机号或财务信息',
+      title: stringsOf(context).clubEventSessionRoster,
+      note: stringsOf(context).clubEventRosterPrivacy,
       children: <Widget>[
         Padding(
           padding: const EdgeInsets.only(top: CyTokens.space3),
@@ -1494,8 +1495,7 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
           Padding(
             padding: const EdgeInsets.only(top: CyTokens.space2),
             child: Text(
-              '已报名 ${roster.registered.length} · 候补 ${roster.waitlist.length}'
-              ' · 已到场 ${roster.arrived.length} · 未到场 ${roster.noShow.length}',
+              stringsOf(context).clubEventRosterSummary(roster.registered.length, roster.waitlist.length, roster.arrived.length, roster.noShow.length),
               style: TextStyle(
                 fontSize: CyTokens.typeCaption,
                 color: palette.textTertiary,
@@ -1506,13 +1506,13 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
         if (_rosterState == _RosterState.loading)
           const CySkeleton(type: CySkeletonType.card, count: 3)
         else if (_rosterState == _RosterState.error)
-          StatusView(message: '名册加载失败', sub: _rosterError, onRetry: _loadRoster)
+          StatusView(message: stringsOf(context).clubEventRosterFailed, sub: _rosterError, onRetry: _loadRoster)
         else if (_rosterState == _RosterState.ready) ...<Widget>[
           if (_activeRoster.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: CyTokens.space4),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: CyTokens.space4),
               child: StatusView(
-                message: '这一段暂时没有成员',
+                message: stringsOf(context).clubEventRosterEmpty,
                 icon: CupertinoIcons.person_2,
               ),
             )
@@ -1551,13 +1551,13 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
       ),
       title: member.nickname,
       meta:
-          '成员 #${member.memberId}'
+          '${stringsOf(context).clubEventMember(member.memberId)}'
           '${_rosterTab == 'waitlist' && member.state.isNotEmpty ? ' · ${member.state}' : ''}',
       trailing: _rosterTab == 'waitlist'
           ? null
           : ClubOpsRowLink(
               key: Key('event-ops-correct-${member.memberId}'),
-              label: _rosterTab == 'arrived' ? '更正未到' : '标记到场',
+              label: _rosterTab == 'arrived' ? stringsOf(context).clubEventMarkNoShow : stringsOf(context).clubEventMarkArrived,
               enabled: _actingMemberId == null,
               onTap: () => _correctAttendance(member),
             ),
@@ -1700,7 +1700,7 @@ class _AddDateRow extends StatelessWidget {
             ),
             const SizedBox(width: CyTokens.space1),
             Text(
-              '添加日期',
+              stringsOf(context).clubEventAddDate,
               style: TextStyle(
                 fontSize: CyTokens.typeLabel,
                 color: enabled ? palette.brand : palette.textDisabled,
@@ -1712,3 +1712,10 @@ class _AddDateRow extends StatelessWidget {
     );
   }
 }
+
+String _recurrenceLabel(BuildContext context, String value) => switch (value) {
+  'ONCE' => stringsOf(context).clubEventOnce,
+  'WEEKLY' => stringsOf(context).clubEventWeekly,
+  'CUSTOM_DATES' => stringsOf(context).clubEventCustomDates,
+  _ => value,
+};

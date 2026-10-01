@@ -1,3 +1,4 @@
+import '../../l10n/strings.dart';
 import '../../core/theme/cy_palette.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -31,9 +32,9 @@ class _WithdrawFacts {
   bool get canWithdraw => state == _WithdrawState.positive;
 
   /// 按钮下面那行原因(真源 wxml:15-16 的 withdraw-reason)。
-  String? get reason => switch (state) {
-    _WithdrawState.unknown => '已入账金额待确认',
-    _WithdrawState.zero => '暂无已入账分润',
+  String? reason(BuildContext context) => switch (state) {
+    _WithdrawState.unknown => stringsOf(context).coopFinanceUiUnknownCredited,
+    _WithdrawState.zero => stringsOf(context).coopFinanceUiNoCreditedShare,
     _WithdrawState.positive => null,
   };
 }
@@ -63,8 +64,8 @@ class CoopFinancePage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    const String title = '合作结算';
-    const String needLogin = '登录后查看合作结算';
+    final String title = stringsOf(context).coopFinanceUiTitle;
+    final String needLogin = stringsOf(context).coopFinanceUiLogin;
     final Widget? gate = coopLoginGate(
       context,
       ref,
@@ -75,7 +76,7 @@ class CoopFinancePage extends ConsumerWidget {
     final async = ref.watch(coopFinanceProvider);
     return CupertinoPageScaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      navigationBar: const CupertinoNavigationBar(middle: Text(title)),
+      navigationBar: CupertinoNavigationBar(middle: Text(title)),
       child: Material(
         color: Colors.transparent,
         child: SafeArea(
@@ -96,8 +97,8 @@ class CoopFinancePage extends ConsumerWidget {
                     // 原来这里写的是「合作财务没能加载出来」——
                     // 小程序里**根本没有「合作财务」这个词**(只在开发截图脚本里),
                     // 同一页导航叫「合作结算」、空态叫「还没有合作结算」。
-                    message: '分润数据没加载出来',
-                    sub: coopErrorSub(e),
+                    message: stringsOf(context).coopFinanceUiFailed,
+                    sub: coopErrorSub(e, context: context),
                     large: true,
                     onRetry: () => ref.invalidate(coopFinanceProvider),
                   ),
@@ -111,9 +112,9 @@ class CoopFinancePage extends ConsumerWidget {
                   _WithdrawEntry(facts: facts),
                   Expanded(
                     child: rows.isEmpty
-                        ? const StatusView(
-                            message: '还没有合作结算',
-                            sub: '你发布的主题产生交易后,结算明细会显示在这里',
+                        ? StatusView(
+                            message: stringsOf(context).coopFinanceUiEmpty,
+                            sub: stringsOf(context).coopFinanceUiEmptyHint,
                             large: true,
                           )
                         : RefreshIndicator.adaptive(
@@ -150,8 +151,14 @@ class _FinanceTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final hint = row.myIncomeHint;
-    final payout = row.merchantPayoutHint;
+    final strings = stringsOf(context);
+    final income = cny(row.myIncome);
+    final hint = income == null ? null : row.myIncomeArrived
+        ? strings.coopSettlementArrived : strings.coopFinanceUiWaitingPayment;
+    final payout = (row.merchantPayoutTime ?? '').isNotEmpty
+        ? strings.coopFinanceUiPartnerPaid(row.merchantPayoutTime!)
+        : (row.merchantPayableTime ?? '').isNotEmpty
+            ? strings.coopFinanceUiPartnerExpected(row.merchantPayableTime!) : null;
 
     return CupertinoButton(
       padding: EdgeInsets.zero,
@@ -170,9 +177,9 @@ class _FinanceTile extends StatelessWidget {
             Row(
               children: <Widget>[
                 Expanded(
-                  child: Text(row.topicName, style: textTheme.titleMedium),
+                  child: Text(row.hasCustomTopicName ? row.topicName : strings.coopSettlementUnnamed, style: textTheme.titleMedium),
                 ),
-                CyTag(label: row.settled ? '已结算' : '未结算'),
+                Flexible(child: CyTag(label: row.settled ? stringsOf(context).coopFinanceUiSettled : stringsOf(context).coopFinanceUiUnsettled)),
               ],
             ),
             const SizedBox(height: CyTokens.space3),
@@ -183,7 +190,7 @@ class _FinanceTile extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
                       Text(
-                        '我的分润',
+                        strings.coopSettlementMyShare,
                         style: textTheme.bodySmall?.copyWith(
                           color: CyPalette.of(context).textSecondary,
                         ),
@@ -191,7 +198,7 @@ class _FinanceTile extends StatelessWidget {
                       const SizedBox(height: 2),
                       // ★ 未结算显示「待结算」而不是 ¥0.00 ——
                       //   后者会让发起人以为这单一分没赚。
-                      Text(row.myIncomeDisplay, style: textTheme.titleLarge),
+                      Text(income == null ? strings.coopSettlementPending : '¥$income', style: textTheme.titleLarge),
                       // 没金额时不谈到账。
                       if (hint != null)
                         Text(
@@ -208,7 +215,7 @@ class _FinanceTile extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
                       Text(
-                        '承接方应收',
+                        stringsOf(context).coopFinanceUiPartnerDue,
                         style: textTheme.bodySmall?.copyWith(
                           color: CyPalette.of(context).textSecondary,
                         ),
@@ -219,7 +226,7 @@ class _FinanceTile extends StatelessWidget {
                         style: textTheme.titleMedium,
                       ),
                       Text(
-                        '已付 ${summaryMoney(row.merchantPaid)}',
+                        strings.coopFinanceUiPaid(summaryMoney(row.merchantPaid)),
                         style: textTheme.bodySmall?.copyWith(
                           color: CyPalette.of(context).textTertiary,
                         ),
@@ -240,7 +247,7 @@ class _FinanceTile extends StatelessWidget {
             ],
             const SizedBox(height: CyTokens.space2),
             Text(
-              '销售额 ${summaryMoney(row.totalSales)} · 已核销 ${summaryMoney(row.verifiedSales)}',
+              strings.coopFinanceUiSales(summaryMoney(row.totalSales), summaryMoney(row.verifiedSales)),
               style: textTheme.bodySmall?.copyWith(
                 color: CyPalette.of(context).textTertiary,
               ),
@@ -276,7 +283,7 @@ class _WithdrawEntry extends StatelessWidget {
         children: <Widget>[
           CyNativeButton(
             key: const Key('coop-finance-withdraw'),
-            label: '联系平台客服提现',
+            label: stringsOf(context).clubSettlementContactWithdrawal,
             role: facts.canWithdraw
                 ? CyNativeButtonRole.primary
                 : CyNativeButtonRole.secondary,
@@ -284,10 +291,10 @@ class _WithdrawEntry extends StatelessWidget {
                 ? () => showWithdrawalContactDialog(context)
                 : null,
           ),
-          if (facts.reason != null) ...<Widget>[
+          if (facts.reason(context) != null) ...<Widget>[
             const SizedBox(height: CyTokens.space1),
             Text(
-              facts.reason!,
+              facts.reason(context)!,
               style: textTheme.bodySmall?.copyWith(
                 color: CyPalette.of(context).textTertiary,
               ),

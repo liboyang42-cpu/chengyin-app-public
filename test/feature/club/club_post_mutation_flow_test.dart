@@ -5,6 +5,7 @@ import 'package:chengyin_app/data/models/user.dart';
 import 'package:chengyin_app/feature/auth/auth_controller.dart';
 import 'package:chengyin_app/feature/club/club_feed_page.dart';
 import 'package:flutter/material.dart';
+import 'package:chengyin_app/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -51,6 +52,7 @@ Future<void> _pump(
   required ClubPost post,
   required _FakeClubApi api,
   bool admin = false,
+  Locale locale = const Locale('zh'),
 }) async {
   await tester.binding.setSurfaceSize(const Size(390, 900));
   await tester.pumpWidget(
@@ -60,6 +62,9 @@ Future<void> _pump(
         clubApiProvider.overrideWithValue(api),
       ].cast(),
       child: MaterialApp(
+        locale: locale,
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
         home: Scaffold(
           body: ClubPostTile(post: post, viewerIsClubAdmin: admin),
         ),
@@ -70,6 +75,24 @@ Future<void> _pump(
 }
 
 void main() {
+  testWidgets('English post editor keeps backend rejection verbatim', (tester) async {
+    final api = _FakeClubApi(error: Exception('版本冲突，请刷新'));
+    await _pump(tester, api: api,
+      post: const ClubPost(id: 7, authorMemberId: 1, content: '原始正文', version: 3),
+      locale: const Locale('en'));
+    await tester.tap(find.byKey(const Key('club-post-more')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('club-post-edit')));
+    await tester.pumpAndSettle();
+    expect(find.text('Edit post'), findsOneWidget);
+    await tester.enterText(find.byKey(const Key('club-post-edit-input')), '新的原文');
+    await tester.tap(find.byKey(const Key('club-post-edit-submit')));
+    await tester.pumpAndSettle();
+    expect(find.text('版本冲突，请刷新'), findsOneWidget);
+    expect(api.updateCalls, 1);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('作者能编辑但不能置顶普通帖，所有人都有公开历史入口', (tester) async {
     await _pump(
       tester,

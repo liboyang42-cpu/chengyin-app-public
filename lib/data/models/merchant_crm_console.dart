@@ -429,10 +429,11 @@ class CrmAvailableTag {
 
 /// 已保存分群。GET `/api/merchant/crm/segments` 的一行。
 class CrmSavedSegment {
-  const CrmSavedSegment({required this.id, required this.name, this.filter});
+  const CrmSavedSegment({required this.id, required this.name, this.hasNameFallback = false, this.filter});
 
   final int id;
   final String name;
+  final bool hasNameFallback;
   final CrmSegmentFilter? filter;
 
   static List<CrmSavedSegment> parseList(Object? raw) {
@@ -447,6 +448,7 @@ class CrmSavedSegment {
       out.add(
         CrmSavedSegment(
           id: id,
+          hasNameFallback: name is! String || name.trim().isEmpty,
           name: name is String && name.trim().isNotEmpty
               ? name.trim()
               : '已保存分群',
@@ -462,10 +464,11 @@ class CrmSavedSegment {
 
 /// 商家有效券。GET `/api/merchant/crm/campaigns/coupons` 的一行。
 class CrmCoupon {
-  const CrmCoupon({required this.id, required this.name});
+  const CrmCoupon({required this.id, required this.name, this.hasNameFallback = false});
 
   final int id;
   final String name;
+  final bool hasNameFallback;
 
   static List<CrmCoupon> parseList(Object? raw) {
     if (raw is! List) return const <CrmCoupon>[];
@@ -478,6 +481,7 @@ class CrmCoupon {
       out.add(
         CrmCoupon(
           id: id,
+          hasNameFallback: name is! String || name.trim().isEmpty,
           name: name is String && name.trim().isNotEmpty
               ? name.trim()
               : '优惠券',
@@ -523,6 +527,7 @@ class CrmCampaignRecipient {
   const CrmCampaignRecipient({
     this.recipientId,
     required this.customerName,
+    this.hasNameFallback = false,
     required this.status,
     this.failureCode = '',
     this.failureMessage = '',
@@ -533,6 +538,7 @@ class CrmCampaignRecipient {
 
   final int? recipientId;
   final String customerName;
+  final bool hasNameFallback;
 
   /// DELIVERED / PENDING / 其余失败码。
   final String status;
@@ -551,6 +557,7 @@ class CrmCampaignRecipient {
     final Object? name = json['customerName'];
     return CrmCampaignRecipient(
       recipientId: _positiveId(json['recipientId']),
+      hasNameFallback: name is! String || name.trim().isEmpty,
       customerName: name is String && name.trim().isNotEmpty
           ? name.trim()
           : '未留姓名',

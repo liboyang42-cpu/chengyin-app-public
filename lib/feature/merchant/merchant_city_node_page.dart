@@ -1,3 +1,5 @@
+import '../../l10n/strings.dart';
+import 'merchant_node_strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -31,7 +33,7 @@ class MerchantCityNodePage extends ConsumerWidget {
     return CupertinoPageScaffold(
       backgroundColor: palette.bgPage,
       navigationBar: CupertinoNavigationBar(
-        middle: const Text('成为节点'),
+        middle: Text(stringsOf(context).merchantNodeBecomeNode),
         trailing: CupertinoButton(
           key: const Key('citynode-redeem-entry'),
           onPressed: () =>
@@ -40,7 +42,7 @@ class MerchantCityNodePage extends ConsumerWidget {
           padding: EdgeInsets.zero,
           child: Semantics(
             button: true,
-            label: '扫码核销玩家到店券',
+            label: stringsOf(context).merchantNodeScanVisitCoupon,
             child: const Icon(CupertinoIcons.qrcode_viewfinder, size: 22),
           ),
         ),
@@ -54,7 +56,7 @@ class MerchantCityNodePage extends ConsumerWidget {
             error: (Object e, _) => merchantErrorView(
               context,
               e,
-              what: '据点',
+              what: stringsOf(context).merchantNodeNodes,
               onRetry: () => ref.invalidate(cityNodesProvider),
             ),
             data: (CityNodeHome home) => RefreshIndicator.adaptive(
@@ -66,7 +68,7 @@ class MerchantCityNodePage extends ConsumerWidget {
                     children: <Widget>[
                       Expanded(
                         child: Text(
-                          '把门店变成漫游地图上的互动据点',
+                          stringsOf(context).merchantNodeNodeIntro,
                           style: textTheme.titleMedium,
                         ),
                       ),
@@ -77,10 +79,10 @@ class MerchantCityNodePage extends ConsumerWidget {
                         foregroundColor: palette.textSecondary,
                         onPressed: () => cyConfirm(
                           context,
-                          title: '据点是什么',
+                          title: stringsOf(context).merchantNodeWhatIsNode,
                           content:
-                              '据点就是门店在漫游地图上的互动打卡点。投放或认领申请经平台审核通过后，玩家才会在地图看到；到店可按模板完成暗号、问答、拍照、扫码或 GPS 验证。',
-                          confirmText: '知道了',
+                              stringsOf(context).merchantNodeNodeExplanation,
+                          confirmText: stringsOf(context).merchantNodeGotIt,
                           showCancel: false,
                         ),
                         child: const Icon(CupertinoIcons.info_circle),
@@ -89,7 +91,7 @@ class MerchantCityNodePage extends ConsumerWidget {
                   ),
                   if (home.quotaText != null)
                     Text(
-                      '在架据点 ${home.used}/${home.max}',
+                      stringsOf(context).merchantNodeQuotaCount(home.used, home.max),
                       style: textTheme.bodySmall?.copyWith(
                         color: palette.textSecondary,
                       ),
@@ -98,14 +100,14 @@ class MerchantCityNodePage extends ConsumerWidget {
                   Row(
                     children: <Widget>[
                       Expanded(
-                        child: Text('我的据点', style: textTheme.titleMedium),
+                        child: Text(stringsOf(context).merchantNodeMyNodes, style: textTheme.titleMedium),
                       ),
                       CupertinoButton(
                         key: const Key('city-node-claim-entry'),
                         minimumSize: const Size(44, 44),
                         padding: const EdgeInsets.symmetric(horizontal: 8),
                         onPressed: () => _openClaim(context, ref),
-                        child: const Text('认领节点'),
+                        child: Text(stringsOf(context).merchantNodeClaim),
                       ),
                       CupertinoButton(
                         key: const Key('city-node-create-entry'),
@@ -113,7 +115,7 @@ class MerchantCityNodePage extends ConsumerWidget {
                         padding: const EdgeInsets.symmetric(horizontal: 8),
                         onPressed: () async {
                           if (home.quotaExhausted) {
-                            CyNativeNotice.show(context, '在架据点已达上限,请先下线其他据点');
+                            CyNativeNotice.show(context, stringsOf(context).merchantNodeQuota);
                             return;
                           }
                           final Object? ok = await GoRouter.of(
@@ -121,7 +123,7 @@ class MerchantCityNodePage extends ConsumerWidget {
                           ).push('/merchant/city-nodes/create');
                           if (ok == true) ref.invalidate(cityNodesProvider);
                         },
-                        child: const Text('+ 投放据点'),
+                        child: Text(stringsOf(context).merchantNodePlace),
                       ),
                     ],
                   ),
@@ -131,7 +133,7 @@ class MerchantCityNodePage extends ConsumerWidget {
                         _ApplicationTile(application: application),
                   ),
                   if (home.nodes.isEmpty && home.applications.isEmpty)
-                    const StatusView(message: '还没有据点', sub: '提交投放申请，把门店放上漫游地图'),
+                    StatusView(message: stringsOf(context).merchantNodeNoNodes, sub: stringsOf(context).merchantNodeNoNodesHint),
                   ...home.nodes.map((CityNode node) => _NodeTile(node: node)),
                 ],
               ),
@@ -179,7 +181,7 @@ class _ApplicationTileState extends ConsumerState<_ApplicationTile> {
       await ref.read(merchantApiProvider).cancelClaim(widget.application.id);
       ref.invalidate(cityNodesProvider);
       if (!mounted) return;
-      CyNativeNotice.show(context, '已撤回认领申请');
+      CyNativeNotice.show(context, stringsOf(context).merchantNodeClaimWithdrawn);
     } catch (e) {
       if (!mounted) return;
       CyNativeNotice.show(
@@ -196,8 +198,8 @@ class _ApplicationTileState extends ConsumerState<_ApplicationTile> {
   Widget build(BuildContext context) {
     final CityNodeApplication application = widget.application;
     return CyCell(
-      title: application.displayTitle,
-      subtitle: application.statusText,
+      title: stringsOf(context).merchantNodeApplicationTitle(application.applicationType == 2 ? stringsOf(context).merchantNodeClaimType : stringsOf(context).merchantNodePlacementType, merchantNodeApplicationName(context, application)),
+      subtitle: merchantNodeApplicationStatus(context, application),
       showChevron: false,
       trailing: _canCancel
           ? CupertinoButton(
@@ -205,7 +207,7 @@ class _ApplicationTileState extends ConsumerState<_ApplicationTile> {
               minimumSize: const Size(44, 44),
               padding: const EdgeInsets.symmetric(horizontal: 8),
               onPressed: _cancelling ? null : _cancel,
-              child: Text(_cancelling ? '撤回中' : '撤回申请'),
+              child: Text(_cancelling ? stringsOf(context).merchantNodeWithdrawing : stringsOf(context).merchantNodeWithdraw),
             )
           : null,
     );
@@ -240,8 +242,8 @@ class _NodeTileState extends ConsumerState<_NodeTile> {
               final CyPalette palette = CyPalette.of(sheetContext);
               return CupertinoPageScaffold(
                 backgroundColor: palette.bgPage,
-                navigationBar: const CupertinoNavigationBar(
-                  middle: Text('到店打卡码'),
+                navigationBar: CupertinoNavigationBar(
+                  middle: Text(stringsOf(context).merchantNodeCheckinCode),
                 ),
                 child: SafeArea(
                   top: false,
@@ -252,7 +254,7 @@ class _NodeTileState extends ConsumerState<_NodeTile> {
                       if (url != null && url.isNotEmpty)
                         Center(child: CyNetImage(url, width: 200, height: 200))
                       else
-                        const Text('打卡码暂时没能生成，请稍后重试'),
+                        Text(stringsOf(context).merchantNodeCodeFailed),
                       const SizedBox(height: CyTokens.space3),
                       Text(
                         (data['nodeName'] as String?) ?? widget.node.name,
@@ -261,7 +263,7 @@ class _NodeTileState extends ConsumerState<_NodeTile> {
                       ),
                       const SizedBox(height: CyTokens.space2),
                       Text(
-                        '长按保存并打印张贴。玩家到店扫码完成互动。',
+                        stringsOf(context).merchantNodeCodeInstructions,
                         textAlign: TextAlign.center,
                         style: Theme.of(sheetContext).textTheme.bodySmall
                             ?.copyWith(color: palette.textSecondary),
@@ -278,7 +280,7 @@ class _NodeTileState extends ConsumerState<_NodeTile> {
                         color: palette.actionPrimaryBg,
                         foregroundColor: palette.actionPrimaryFg,
                         onPressed: () => Navigator.of(sheetContext).pop(),
-                        child: const Text('关闭'),
+                        child: Text(stringsOf(context).merchantNodeClose),
                       ),
                     ],
                   ),
@@ -334,7 +336,7 @@ class _NodeTileState extends ConsumerState<_NodeTile> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text(widget.node.name, style: textTheme.titleSmall),
+          Text(merchantNodeName(context, widget.node), style: textTheme.titleSmall),
           if ((widget.node.templateTitle ?? '').isNotEmpty ||
               (widget.node.tagsText ?? '').isNotEmpty)
             Padding(
@@ -360,13 +362,13 @@ class _NodeTileState extends ConsumerState<_NodeTile> {
                   minimumSize: const Size(44, 44),
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                   onPressed: _busy ? null : _showPoster,
-                  child: const Text('取到店打卡码 ›'),
+                  child: Text(stringsOf(context).merchantNodeGetCode),
                 ),
               CupertinoButton(
                 minimumSize: const Size(44, 44),
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 onPressed: _busy ? null : _toggleStatus,
-                child: Text(widget.node.status == 1 ? '下线' : '上架'),
+                child: Text(widget.node.status == 1 ? stringsOf(context).merchantNodeOffline : stringsOf(context).merchantNodeOnline),
               ),
             ],
           ),
@@ -421,7 +423,7 @@ class _ClaimSheetState extends ConsumerState<_ClaimSheet> {
       if (!mounted) return;
       final BuildContext noticeContext = Navigator.of(context).context;
       Navigator.of(context).pop(true);
-      CyNativeNotice.show(noticeContext, '认领申请已提交');
+      CyNativeNotice.show(noticeContext, stringsOf(context).merchantNodeClaimSubmitted);
     } catch (e) {
       if (!mounted) return;
       CyNativeNotice.show(
@@ -440,7 +442,7 @@ class _ClaimSheetState extends ConsumerState<_ClaimSheet> {
     return CupertinoPageScaffold(
       backgroundColor: palette.bgPage,
       resizeToAvoidBottomInset: true,
-      navigationBar: const CupertinoNavigationBar(middle: Text('认领平台节点')),
+      navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).merchantNodeClaimPlatform)),
       child: SafeArea(
         top: false,
         child: ListView(
@@ -466,17 +468,17 @@ class _ClaimSheetState extends ConsumerState<_ClaimSheet> {
       );
     }
     if (_error != null) {
-      return StatusView(message: '没能加载地点', sub: _error, onRetry: _search);
+      return StatusView(message: stringsOf(context).merchantNodePlacesFailed, sub: _error, onRetry: _search);
     }
     final rows = _rows ?? const <CityNode>[];
     if (rows.isEmpty) {
-      return const StatusView(message: '暂无可认领节点', sub: '已被认领或有申请审核中的节点不会重复展示');
+      return StatusView(message: stringsOf(context).merchantNodeNoClaimable, sub: stringsOf(context).merchantNodeNoClaimableHint);
     }
     return Column(
       children: <Widget>[
         for (final CityNode n in rows)
           CyCell(
-            title: n.name,
+            title: merchantNodeName(context, n),
             subtitle: n.address,
             // 正在提交的那一条禁用,防连点建出两条申请。
             onTap: _claiming == null ? () => _claim(n) : null,

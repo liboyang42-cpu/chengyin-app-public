@@ -1,3 +1,4 @@
+import '../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -50,7 +51,7 @@ class MerchantRegistrationEditPage extends ConsumerWidget {
     );
     return CupertinoPageScaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      navigationBar: const CupertinoNavigationBar(middle: Text('修改报名')),
+      navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).merchantCatalogEditTitle)),
       child: Material(
         color: Colors.transparent,
         child: SafeArea(
@@ -151,10 +152,10 @@ class _EditorState extends ConsumerState<_Editor> {
       return StatusView(
         key: const Key('reg-edit-locked'),
         icon: CupertinoIcons.lock,
-        message: d.isWon ? '已中标的报名不能再改' : '当前状态下这条报名不能修改',
+        message: d.isWon ? stringsOf(context).merchantCatalogEditWonLocked : stringsOf(context).merchantCatalogEditLocked,
         sub: d.isWon
-            ? '主办方是看着你提交的内容选的你,改动要联系平台'
-            : '只有审核中和已驳回的报名可以改,而且主题开始后就冻结了',
+            ? stringsOf(context).merchantCatalogEditWonHint
+            : stringsOf(context).merchantCatalogEditLockedHint,
         large: true,
       );
     }
@@ -167,13 +168,13 @@ class _EditorState extends ConsumerState<_Editor> {
             children: <Widget>[
               Text(
                 (d.topicName ?? '').trim().isEmpty
-                    ? '这条报名'
+                    ? stringsOf(context).merchantCatalogThisApplication
                     : d.topicName!.trim(),
                 style: t.titleMedium,
               ),
               if ((d.nodeName ?? '').trim().isNotEmpty)
                 Text(
-                  '承接站点:${d.nodeName!.trim()}',
+                  stringsOf(context).merchantCatalogAssignedStop(d.nodeName!.trim()),
                   style: t.bodySmall?.copyWith(color: p.textSecondary),
                 ),
               // 被驳回时把原因摆在表单最上面 —— 商家是照着它改的。
@@ -189,14 +190,14 @@ class _EditorState extends ConsumerState<_Editor> {
                   ),
                   child: Text(
                     (d.reason ?? '').trim().isEmpty
-                        ? '被驳回了,但平台没填原因 —— 可以联系平台问一下'
-                        : '驳回原因:${d.reason!.trim()}',
+                        ? stringsOf(context).merchantCatalogMissingEditReason
+                        : stringsOf(context).merchantCatalogReason(d.reason!.trim()),
                     style: t.bodySmall,
                   ),
                 ),
                 const SizedBox(height: CyTokens.space2),
                 Text(
-                  '改完提交会重新进入审核,上一次的驳回原因会被清掉。',
+                  stringsOf(context).merchantCatalogResubmitHint,
                   style: t.bodySmall?.copyWith(color: p.textTertiary),
                 ),
               ],
@@ -235,12 +236,12 @@ class _EditorState extends ConsumerState<_Editor> {
           primary: CyNativeButton(
             key: const Key('reg-edit-save'),
             onPressed: _busy || !_form.isComplete ? null : _save,
-            label: '保存修改',
+            label: stringsOf(context).merchantCatalogSave,
             loading: _busy,
           ),
           secondary: CyNativeButton(
             onPressed: _busy ? null : () => Navigator.of(context).maybePop(),
-            label: '返回',
+            label: stringsOf(context).merchantCatalogBack,
             role: CyNativeButtonRole.secondary,
           ),
         ),

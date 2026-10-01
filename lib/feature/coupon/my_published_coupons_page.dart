@@ -1,3 +1,6 @@
+import '../../data/api/coupon_api.dart';
+import 'merchant_coupon_strings.dart';
+import '../../l10n/strings.dart';
 import '../../core/theme/cy_palette.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -54,18 +57,18 @@ class MyPublishedCouponsPage extends ConsumerWidget {
     //   (b1-sim-coupon P1-1,同 roam #208 范式);路由侧已放行这一条。
     if (!ref.watch(authControllerProvider).isLoggedIn) {
       return CupertinoPageScaffold(
-        navigationBar: const CupertinoNavigationBar(middle: Text('我发布的券')),
+        navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).merchantCouponMyCoupons)),
         child: Material(
           color: Colors.transparent,
           child: SafeArea(
             bottom: false,
             child: StatusView(
               key: const Key('coupon-published-login-gate'),
-              message: '登录后查看我发布的券',
-              sub: '券存在商家账号里,登录完就能看到。',
+              message: stringsOf(context).merchantCouponLoginTitle,
+              sub: stringsOf(context).merchantCouponLoginBody,
               icon: CupertinoIcons.lock,
               large: true,
-              retryLabel: '去登录',
+              retryLabel: stringsOf(context).merchantCouponLogin,
               onRetry: () => requireLogin(context, ref),
             ),
           ),
@@ -75,10 +78,10 @@ class MyPublishedCouponsPage extends ConsumerWidget {
     final async = ref.watch(myPublishedCouponsProvider);
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
-        middle: const Text('我发布的券'),
+        middle: Text(stringsOf(context).merchantCouponMyCoupons),
         trailing: CyNativeIconButton(
           key: const Key('coupon-publish-entry'),
-          label: '发布优惠券',
+          label: stringsOf(context).merchantCouponPublish,
           icon: const CyNativeButtonIcon(
             sfSymbol: 'plus',
             fallback: CupertinoIcons.add,
@@ -97,7 +100,10 @@ class MyPublishedCouponsPage extends ConsumerWidget {
           child: async.when(
             loading: () =>
                 const CySkeleton(type: CySkeletonType.card, count: 3),
-            error: (Object e, _) => merchantErrorView(
+            error: (Object e, _) => e is CouponLocalFailure
+                ? StatusView(message: couponLocalFailureText(context, e),
+                    onRetry: () => ref.invalidate(myPublishedCouponsProvider))
+                : merchantErrorView(
               context,
               e,
               onRetry: () => ref.invalidate(myPublishedCouponsProvider),
@@ -105,7 +111,7 @@ class MyPublishedCouponsPage extends ConsumerWidget {
             data: (List<Map<String, dynamic>> rows) {
               if (rows.isEmpty) {
                 return StatusView(
-                  message: '还没有发布过优惠券',
+                  message: stringsOf(context).merchantCouponEmpty,
                   sub: '',
                   large: true,
                   scrollable: true,
@@ -163,13 +169,13 @@ class _PublishedCardState extends ConsumerState<_PublishedCard> {
   /// 连失败也回读 —— 不让人对着一个可能已经变了的状态再点一次。
   Future<void> _stop() async {
     final int? id = (coupon['id'] as num?)?.toInt();
-    final String name = (coupon['name'] as String?) ?? '这张券';
+    final String name = (coupon['name'] as String?) ?? stringsOf(context).merchantCouponThisCoupon;
     if (id == null || _stopping) return;
     final bool ok = await cyConfirm(
       context,
-      title: '停发「$name」?',
-      content: '停发后这张券不能再被领取、发放,已领到的券不受影响。',
-      confirmText: '停发该券',
+      title: stringsOf(context).merchantCouponStopTitle(name),
+      content: stringsOf(context).couponStopDistributionPolicy,
+      confirmText: stringsOf(context).merchantCouponStop,
       danger: true,
     );
     if (!ok || !mounted) return;
@@ -177,7 +183,7 @@ class _PublishedCardState extends ConsumerState<_PublishedCard> {
     try {
       await ref.read(couponApiProvider).stop(id);
       if (!mounted) return;
-      CyNativeNotice.show(context, '已停发「$name」');
+      CyNativeNotice.show(context, stringsOf(context).merchantCouponStoppedNotice(name));
     } on Object catch (e) {
       if (!mounted) return;
       // 失败原因点名:后端给的 msg 优先(配额/权限各自的话术),否则说停发失败。
@@ -188,10 +194,11 @@ class _PublishedCardState extends ConsumerState<_PublishedCard> {
     }
   }
 
-  static String _stopErrorText(Object error) {
+  String _stopErrorText(Object error) {
+    if (error is CouponLocalFailure) return couponLocalFailureText(context, error);
     final String raw = error.toString().replaceFirst('Exception: ', '').trim();
     if (raw.isEmpty || raw.contains('DioException')) {
-      return '停发结果待确认，已刷新列表';
+      return stringsOf(context).merchantCouponStopUnconfirmed;
     }
     return raw;
   }
@@ -209,12 +216,12 @@ class _PublishedCardState extends ConsumerState<_PublishedCard> {
     final String description = ((coupon['description'] as String?) ?? '')
         .trim();
     // 真源兜底:缺说明显「未填写说明」,不能空着一行让人猜是不是渲染坏了。
-    final descText = description.isEmpty ? '未填写说明' : description;
+    final descText = description.isEmpty ? stringsOf(context).merchantCouponNoDescription : description;
     // 真源 normalizeCoupon:库存 = 发行 - 已领(钳到 0);任一缺席显「—」不冒充 0。
     final String remainText = publishCount == null || receiveCount == null
         ? '—'
         : '${(publishCount - receiveCount).clamp(0, 1 << 31)}';
-    final String typeText = couponTypeLabel(_int('couponType', coupon));
+    final String typeText = merchantCouponLocalText(context, couponTypeLabel(_int('couponType', coupon)));
     // 真源徽标规则:「进行中」是常态不摆 badge;已失效(3)/已停发(4)danger 色。
     final statusLabel = couponPublishStatusText(status);
     final showBadge = statusLabel.isNotEmpty && statusLabel != '进行中';
@@ -235,7 +242,7 @@ class _PublishedCardState extends ConsumerState<_PublishedCard> {
           // gap space-1):券名 → 日期 → 状态胶囊各占一行。原来把胶囊塞进券名
           // 那行右侧,长券名折到第二行时胶囊就骑在字上、还挤掉一行字宽。
           Text(
-            name.isEmpty ? '优惠券' : name,
+            name.isEmpty ? stringsOf(context).merchantCouponCoupons : name,
             // 真源 `.david_tkb_li_con_top_tit` 是加粗标题 + 两行截断;
             // titleSmall(14/500) 比正文还轻,一行 ellipsis 又把长券名吞了。
             // iOS 梯上对应档 = Headline 17 Semibold(列表行标题)。
@@ -252,7 +259,9 @@ class _PublishedCardState extends ConsumerState<_PublishedCard> {
           ),
           if (showBadge) ...<Widget>[
             SizedBox(height: CyTokens.space1),
-            _StatusTag(label: statusLabel, danger: dangerBadge),
+            _StatusTag(label: status != null && (status < 0 || status > 4)
+                ? stringsOf(context).merchantCouponUnknownStatus(status)
+                : merchantCouponLocalText(context, statusLabel), danger: dangerBadge),
           ],
           const SizedBox(height: CyTokens.space1_5),
           Text(
@@ -276,15 +285,15 @@ class _PublishedCardState extends ConsumerState<_PublishedCard> {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              Text('$remainText 库存数', style: textTheme.bodySmall),
+              Text(stringsOf(context).merchantCouponInventory(remainText), style: textTheme.bodySmall),
             ],
           ),
           const SizedBox(height: CyTokens.space2),
           Row(
             children: <Widget>[
-              _stat(context, '发行', publishCount),
-              _stat(context, '已领', receiveCount),
-              _stat(context, '已核销', useCount),
+              _stat(context, stringsOf(context).merchantCouponIssued, publishCount),
+              _stat(context, stringsOf(context).merchantCouponClaimed, receiveCount),
+              _stat(context, stringsOf(context).merchantCouponRedeemed, useCount),
             ],
           ),
           // 真源 `coupon.wxml` 的 `tkbox_stop`:只有进行中/未开始的券能停发,
@@ -298,7 +307,7 @@ class _PublishedCardState extends ConsumerState<_PublishedCard> {
             const SizedBox(height: CyTokens.space2),
             CyNativeButton(
               key: Key('coupon-stop-$name'),
-              label: '停发该券',
+              label: stringsOf(context).merchantCouponStop,
               role: CyNativeButtonRole.destructive,
               height: 44,
               loading: _stopping,

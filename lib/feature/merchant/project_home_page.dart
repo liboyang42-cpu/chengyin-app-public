@@ -1,3 +1,5 @@
+import '../../l10n/my_project_error_display.dart';
+import '../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -40,7 +42,7 @@ class ProjectHomePage extends ConsumerWidget {
     final async = ref.watch(projectHomeProvider(topicId));
     return CupertinoPageScaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      navigationBar: const CupertinoNavigationBar(middle: Text('项目主页')),
+      navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).merchantCatalogProject)),
       child: Material(
         color: Colors.transparent,
         child: SafeArea(
@@ -49,8 +51,8 @@ class ProjectHomePage extends ConsumerWidget {
             loading: () => const CySkeleton(),
             error: (Object e, StackTrace st) => StatusView(
               icon: CupertinoIcons.exclamationmark_triangle,
-              message: '项目主页没读出来',
-              sub: e.toString().replaceFirst('Exception: ', ''),
+              message: stringsOf(context).merchantCatalogProjectError,
+              sub: (myProjectErrorCopy(stringsOf(context), e) ?? e.toString().replaceFirst('Exception: ', '')),
               large: true,
               onRetry: () => ref.invalidate(projectHomeProvider(topicId)),
             ),
@@ -67,10 +69,10 @@ class ProjectHomePage extends ConsumerWidget {
     final Map<String, dynamic>? join = d['join'] as Map<String, dynamic>?;
 
     if (topic == null && host == null && join == null) {
-      return const StatusView(
+      return StatusView(
         icon: CupertinoIcons.tray,
-        message: '还没有进行中的项目',
-        sub: '发布主题或报名承接后,这里会显示招商进度与玩家名单',
+        message: stringsOf(context).merchantCatalogProjectEmpty,
+        sub: stringsOf(context).merchantCatalogProjectEmptyHint,
         large: true,
       );
     }
@@ -96,7 +98,7 @@ class ProjectHomePage extends ConsumerWidget {
     final TextTheme t = Theme.of(context).textTheme;
     return _shell(
       context,
-      title: (topic['name'] ?? topic['title'] ?? '未命名主题').toString(),
+      title: (topic['name'] ?? topic['title'] ?? stringsOf(context).merchantCatalogUnnamedTheme).toString(),
       children: <Widget>[
         if ((topic['city'] ?? '').toString().isNotEmpty)
           Text(
@@ -129,14 +131,13 @@ class ProjectHomePage extends ConsumerWidget {
 
     return _shell(
       context,
-      title: '我主办的',
+      title: stringsOf(context).merchantCatalogHosting,
       children: <Widget>[
         if (recruit != null) ...<Widget>[
           // 招商进度用后端给的三个数,不自己算 —— 「已接/在等」的口径
           // 在 service 里(pendingCount 同时含待审报名与待确认邀约)。
           Text(
-            '站点 ${n(recruit['nodeFilled'])} / ${n(recruit['nodeTotal'])} 已有人接'
-            '${n(recruit['pendingCount']) > 0 ? ',还有 ${n(recruit['pendingCount'])} 家在等确认' : ''}',
+            stringsOf(context).merchantCatalogRecruitProgress(n(recruit['nodeFilled']), n(recruit['nodeTotal']), n(recruit['pendingCount']) > 0 ? stringsOf(context).merchantCatalogRecruitPending(n(recruit['pendingCount'])) : ''),
             style: t.bodyMedium,
           ),
           const SizedBox(height: CyTokens.space2),
@@ -147,7 +148,7 @@ class ProjectHomePage extends ConsumerWidget {
           onPressed: () => GoRouter.of(context).push(
             topicId == null ? '/project/players' : '/project/players/$topicId',
           ),
-          label: paidCount > 0 ? '看玩家名单($paidCount 人)' : '看玩家名单',
+          label: paidCount > 0 ? stringsOf(context).merchantCatalogPlayersCount(paidCount) : stringsOf(context).merchantCatalogPlayers,
           role: CyNativeButtonRole.secondary,
         ),
         // 章节承接的审核与邀请是**按主题**的,没有 topicId 就没有可审的对象 ——
@@ -159,7 +160,7 @@ class ProjectHomePage extends ConsumerWidget {
             onPressed: () => GoRouter.of(
               context,
             ).push('/merchant/topic/$topicId/applications'),
-            label: '审商家承接申请 / 邀商家',
+            label: stringsOf(context).merchantCatalogReviewApplications,
             role: CyNativeButtonRole.secondary,
           ),
         ],
@@ -186,16 +187,16 @@ class ProjectHomePage extends ConsumerWidget {
     final TextTheme t = Theme.of(context).textTheme;
     return _shell(
       context,
-      title: '我承接的',
+      title: stringsOf(context).merchantCatalogJoining,
       children: <Widget>[
         Text(
-          reg == null ? '你报名过这个主题' : (reg['addressName'] ?? '我的门店').toString(),
+          reg == null ? stringsOf(context).merchantCatalogAppliedTheme : (reg['addressName'] ?? stringsOf(context).merchantCatalogMyStore).toString(),
           style: t.bodyMedium,
         ),
         const SizedBox(height: CyTokens.space2),
         CyNativeButton(
           onPressed: () => GoRouter.of(context).push('/merchant/registrations'),
-          label: '查看我的报名',
+          label: stringsOf(context).merchantCatalogViewApplications,
           role: CyNativeButtonRole.secondary,
         ),
       ],
@@ -269,7 +270,7 @@ class _CircleReviewSectionState extends ConsumerState<_CircleReviewSection> {
             scope: widget.scope,
           );
       if (!mounted) return;
-      CyNativeNotice.show(context, '供给复核已更新');
+      CyNativeNotice.show(context, stringsOf(context).merchantCatalogReviewUpdated);
       ref.invalidate(projectHomeProvider(widget.topicId));
     } on Exception catch (error) {
       if (!mounted) return;
@@ -277,7 +278,7 @@ class _CircleReviewSectionState extends ConsumerState<_CircleReviewSection> {
       debugPrint('[project-home] 供给复核失败: $error');
       CyNativeNotice.show(
         context,
-        friendlyOrBackendMessage(error, fallback: '供给复核没有提交成功，请稍后重试'),
+        friendlyOrBackendMessage(error, fallback: stringsOf(context).merchantCatalogReviewFailed),
         isError: true,
       );
     } finally {
@@ -292,14 +293,14 @@ class _CircleReviewSectionState extends ConsumerState<_CircleReviewSection> {
         .toString()
         .trim();
     final String status = reviewedAt.isEmpty
-        ? '尚未完成城市供给复核'
-        : '${reviewedAt.length > 10 ? reviewedAt.substring(0, 10) : reviewedAt} 已复核';
+        ? stringsOf(context).merchantCatalogReviewPending
+        : stringsOf(context).merchantCatalogReviewedAt(reviewedAt.length > 10 ? reviewedAt.substring(0, 10) : reviewedAt);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Row(
           children: <Widget>[
-            Expanded(child: Text('30天供给复核', style: t.titleSmall)),
+            Expanded(child: Text(stringsOf(context).merchantCatalogReviewTitle, style: t.titleSmall)),
             Text(
               status,
               style: t.labelSmall?.copyWith(
@@ -310,7 +311,7 @@ class _CircleReviewSectionState extends ConsumerState<_CircleReviewSection> {
         ),
         const SizedBox(height: CyTokens.space1),
         Text(
-          '系统会重新校验3—4家当前供给；少于3家、资料过期或商家重复时不会刷新。',
+          stringsOf(context).merchantCatalogReviewRules,
           style: t.bodySmall?.copyWith(
             color: CyPalette.of(context).textSecondary,
           ),
@@ -319,7 +320,7 @@ class _CircleReviewSectionState extends ConsumerState<_CircleReviewSection> {
         CyNativeButton(
           key: const Key('project-host-circle-review'),
           onPressed: _reviewing ? null : _review,
-          label: '确认本实例供给已复核',
+          label: stringsOf(context).merchantCatalogReviewConfirm,
           role: CyNativeButtonRole.secondary,
         ),
       ],

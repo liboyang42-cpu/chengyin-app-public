@@ -1,3 +1,5 @@
+import 'club_api_messages.dart';
+import '../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -68,7 +70,7 @@ class ClubPostsSection extends ConsumerWidget {
       children: <Widget>[
         Row(
           children: <Widget>[
-            Text('圈子', style: textTheme.titleMedium),
+            Text(stringsOf(context).clubAuxPostsCircle, style: textTheme.titleMedium),
             const Spacer(),
             if (canPost)
               CupertinoButton(
@@ -82,12 +84,12 @@ class ClubPostsSection extends ConsumerWidget {
                   );
                   if (posted == true) refresh();
                 },
-                child: const Row(
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: <Widget>[
-                    Icon(CupertinoIcons.pencil, size: 16),
-                    SizedBox(width: CyTokens.space1),
-                    Text('发动态'),
+                    const Icon(CupertinoIcons.pencil, size: 16),
+                    const SizedBox(width: CyTokens.space1),
+                    Text(stringsOf(context).clubAuxCompose),
                   ],
                 ),
               ),
@@ -97,21 +99,21 @@ class ClubPostsSection extends ConsumerWidget {
         async.when(
           loading: () => const Padding(
             padding: EdgeInsets.all(CyTokens.space4),
-            child: Center(child: CupertinoActivityIndicator()),
+            child: Center(child: const CupertinoActivityIndicator()),
           ),
           error: (Object e, _) => StatusView(
             icon: CupertinoIcons.exclamationmark_circle,
-            message: '圈子动态加载不出来',
-            sub: e.toString().replaceFirst('Exception: ', ''),
+            message: stringsOf(context).clubAuxPostsError,
+            sub: clubApiErrorMessage(context, e),
             onRetry: refresh,
           ),
           data: (List<ClubPost> list) => list.isEmpty
               ? StatusView(
                   icon: CupertinoIcons.chat_bubble_2,
-                  message: '这个俱乐部还没有动态',
+                  message: stringsOf(context).clubAuxPostsEmpty,
                   // ★ 空态说清「为什么空」而不是只说「没有」:
                   //   非成员看到的空态和成员看到的不是一回事。
-                  sub: canPost ? '发第一条,让成员知道最近在跑什么' : '加入后可以发动态',
+                  sub: canPost ? stringsOf(context).clubAuxFirstPost : stringsOf(context).clubAuxJoinToPost,
                 )
               : Column(
                   children: list
@@ -197,7 +199,7 @@ class _ComposeSheetState extends ConsumerState<_ComposeSheet> {
       if (!mounted) return;
       setState(() {
         _sending = false;
-        _notice = e.toString().replaceFirst('Exception: ', '');
+        _notice = clubApiErrorMessage(context, e);
       });
     }
   }
@@ -243,7 +245,7 @@ class _ComposeSheetState extends ConsumerState<_ComposeSheet> {
               children: <Widget>[
                 Expanded(
                   child: Text(
-                    '发条动态',
+                    stringsOf(context).clubAuxComposeTitle,
                     style: textTheme.titleLarge?.copyWith(
                       color: palette.textPrimary,
                       fontWeight: FontWeight.w700,
@@ -251,7 +253,7 @@ class _ComposeSheetState extends ConsumerState<_ComposeSheet> {
                   ),
                 ),
                 Semantics(
-                  label: '关闭发动态',
+                  label: stringsOf(context).clubAuxCloseCompose,
                   button: true,
                   child: CupertinoButton(
                     key: const Key('club-compose-close'),
@@ -271,7 +273,7 @@ class _ComposeSheetState extends ConsumerState<_ComposeSheet> {
             const SizedBox(height: CyTokens.space3),
             Semantics(
               textField: true,
-              label: '动态内容',
+              label: stringsOf(context).clubAuxPostContent,
               child: CupertinoTextField(
                 controller: _input,
                 autofocus: true,
@@ -280,7 +282,7 @@ class _ComposeSheetState extends ConsumerState<_ComposeSheet> {
                 maxLines: 8,
                 maxLength: 300,
                 clearButtonMode: OverlayVisibilityMode.editing,
-                placeholder: '分享俱乐部路线、战报或公告…',
+                placeholder: stringsOf(context).clubAuxPostPlaceholder,
                 padding: const EdgeInsets.all(CyTokens.space3),
                 decoration: BoxDecoration(
                   color: palette.bgSurface,
@@ -310,7 +312,7 @@ class _ComposeSheetState extends ConsumerState<_ComposeSheet> {
                         Align(
                           alignment: Alignment.topRight,
                           child: Semantics(
-                            label: '移除第 ${entry.key + 1} 张图片',
+                            label: stringsOf(context).clubAuxRemoveImage(entry.key + 1),
                             button: true,
                             child: CupertinoButton(
                               key: Key('club-compose-remove-${entry.key}'),
@@ -347,12 +349,12 @@ class _ComposeSheetState extends ConsumerState<_ComposeSheet> {
                       onPressed: (_picking || _sending) ? null : _pickImages,
                       child: _picking
                           ? const CupertinoActivityIndicator()
-                          : const Column(
+                          : Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: <Widget>[
-                                Icon(CupertinoIcons.photo_on_rectangle),
-                                SizedBox(height: CyTokens.space1),
-                                Text('添加图片'),
+                                const Icon(CupertinoIcons.photo_on_rectangle),
+                                const SizedBox(height: CyTokens.space1),
+                                Text(stringsOf(context).clubAuxAddImage),
                               ],
                             ),
                     ),
@@ -383,15 +385,15 @@ class _ComposeSheetState extends ConsumerState<_ComposeSheet> {
               borderRadius: BorderRadius.circular(CyTokens.radiusPill),
               onPressed: canSubmit ? _submit : null,
               child: _sending
-                  ? const Row(
+                  ? Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: <Widget>[
-                        CupertinoActivityIndicator(),
-                        SizedBox(width: CyTokens.space2),
-                        Text('发布中…'),
+                        const CupertinoActivityIndicator(),
+                        const SizedBox(width: CyTokens.space2),
+                        Text(stringsOf(context).clubAuxPublishing),
                       ],
                     )
-                  : const Text('发布'),
+                  : Text(stringsOf(context).clubAuxPublish),
             ),
           ],
         ),

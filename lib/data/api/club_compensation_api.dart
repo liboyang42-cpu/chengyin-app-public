@@ -1,3 +1,4 @@
+import 'club_api.dart' show clubApiResponseFailure;
 import 'package:dio/dio.dart';
 import '../../core/network/dio_client.dart';
 import '../models/club_manage.dart';
@@ -27,7 +28,7 @@ class ClubCompensationApi {
   void _ensureOk(Map<String, dynamic> body) {
     final code = (body['code'] as num?)?.toInt();
     if (code != 200) {
-      throw Exception((body['msg'] as String?) ?? '请求失败');
+      throw clubApiResponseFailure(body['msg'] as String?, 'request', '请求失败');
     }
   }
 

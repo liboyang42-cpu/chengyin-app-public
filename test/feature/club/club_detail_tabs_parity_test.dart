@@ -6,6 +6,8 @@ import 'package:chengyin_app/data/models/coop_invite_row.dart';
 import 'package:chengyin_app/data/models/my_project.dart';
 import 'package:chengyin_app/feature/coop/coop_list_page.dart' show coopInviteListProvider;
 import 'package:chengyin_app/data/models/club.dart';
+import 'package:chengyin_app/data/models/club_access.dart';
+import 'package:chengyin_app/l10n/app_localizations.dart';
 import 'package:chengyin_app/data/models/club_manage.dart';
 import 'package:chengyin_app/data/models/club_post.dart';
 import 'package:chengyin_app/data/models/club_settlement.dart';
@@ -18,12 +20,17 @@ Future<void> _pump(
   WidgetTester tester, {
   required Club club,
   List<ClubTopic> topics = const <ClubTopic>[],
+  Locale locale = const Locale('zh'),
+  ClubAccess? access,
 }) async {
   await tester.binding.setSurfaceSize(const Size(390, 1100));
   await tester.pumpWidget(
     ProviderScope(
       overrides: <dynamic>[
         clubDetailProvider(club.id).overrideWith((ref) async => club),
+        clubAccessProvider(club.id).overrideWith((ref) async => access ?? ClubAccess(
+          active: true, clubId: club.id, permissions: const {}, roleCodes: const [],
+        )),
         clubPostsProvider(club.id).overrideWith((ref) async => <ClubPost>[]),
         clubMembersProvider(
           club.id,
@@ -64,13 +71,55 @@ Future<void> _pump(
           ),
         ),
       ].cast(),
-      child: MaterialApp(home: ClubDetailPage(clubId: club.id)),
+      child: MaterialApp(
+        locale: locale,
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        home: ClubDetailPage(clubId: club.id),
+      ),
     ),
   );
   await tester.pumpAndSettle();
 }
 
 void main() {
+  testWidgets('English visitor UI keeps club content and hides management', (tester) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await _pump(
+      tester,
+      locale: const Locale('en'),
+      club: Club(id: 7, name: '夜行社', description: '原始俱乐部介绍', memberCount: 1),
+    );
+    expect(find.text('Club details'), findsWidgets);
+    expect(find.text('夜行社'), findsOneWidget);
+    expect(find.text('原始俱乐部介绍'), findsOneWidget);
+    expect(find.text('1 member'), findsOneWidget);
+    expect(find.text('Join the club to view its members'), findsOneWidget);
+    expect(find.text('Manage'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('English delegated notification role does not gain owner actions', (tester) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await _pump(
+      tester,
+      locale: const Locale('en'),
+      club: Club(id: 7, name: '夜行社', isJoined: true),
+      access: const ClubAccess(
+        active: true, clubId: 7,
+        permissions: {'club:notify:send'}, roleCodes: ['NOTICE_EDITOR'],
+      ),
+    );
+    await tester.tap(find.text('Manage'));
+    await tester.pumpAndSettle();
+    expect(find.text('Notify members'), findsOneWidget);
+    expect(find.text('Roles and permissions'), findsNothing);
+    expect(find.text('Publish a theme'), findsNothing);
+    expect(find.text('Club revenue share'), findsNothing);
+    expect(find.text('Settings and dissolution'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   test('审批中是独立状态，不能退化成可重复提交的加入按钮', () {
     final club = Club.fromJson(<String, dynamic>{
       'id': 7,

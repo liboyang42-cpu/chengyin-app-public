@@ -14,6 +14,7 @@
 //    评分照样成功。三条里这条最坏 —— 它连失败都不报。
 
 import 'package:dio/dio.dart';
+import 'package:chengyin_app/data/models/coop_failure.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -29,7 +30,7 @@ class _Recorder extends Interceptor {
   final List<(String, Object?)> calls = <(String, Object?)>[];
   Map<String, dynamic> reply = <String, dynamic>{};
   Object code = 200;
-  String msg = 'ok';
+  String? msg = 'ok';
   bool networkError = false;
 
   @override
@@ -256,4 +257,31 @@ void main() {
       throwsA(predicate((Object e) => '$e'.contains('退款结果暂无法确认，请先核对，勿重复提交'))),
     );
   });
+  test('missing messages are local while identical server wording remains external', () async {
+    final (api, rec) = _api();
+    rec
+      ..code = 500
+      ..msg = null;
+    await expectLater(api.pool(), throwsA(isA<CoopFailure>()
+        .having((e) => e.isLocalFallback, 'local origin', isTrue)
+        .having((e) => e.kind, 'kind', CoopFailureKind.operation)));
+    for (final message in ['操作失败', '  English business rejection  ', '']) {
+      rec.msg = message;
+      await expectLater(api.pool(), throwsA(isA<CoopFailure>()
+          .having((e) => e.isLocalFallback, 'server origin', isFalse)
+          .having((e) => e.message, 'verbatim', message)));
+    }
+  });
+
+  test('refund receipt preserves original whitespace and unknown failure provenance', () async {
+    final (api, rec) = _api();
+    rec..msg = '  Pending manual verification  '
+       ..reply = {'refundState': 'processing'};
+    expect(await api.retryDepositRefund(42), '  Pending manual verification  ');
+    rec.reply = {'refundState': 4};
+    await expectLater(api.retryDepositRefund(42), throwsA(isA<CoopFailure>()
+        .having((e) => e.kind, 'unknown refund', CoopFailureKind.refundUnknown)
+        .having((e) => e.isLocalFallback, 'local origin', isTrue)));
+  });
+
 }

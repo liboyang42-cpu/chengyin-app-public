@@ -1,3 +1,4 @@
+import '../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -8,6 +9,8 @@ import '../../core/widgets/cy_native_notice.dart';
 import '../../core/widgets/cy_system_text_input_alert.dart';
 import '../../data/models/club_director.dart';
 import 'club_director_controller.dart';
+import 'club_director_messages.dart';
+import 'club_director_labels.dart';
 import 'club_ops_sections.dart';
 
 /// 导演台 D1–D8 的半屏与行列表(活动详情页宿主的那套)。
@@ -63,13 +66,14 @@ class ClubDirectorRow {
 
 /// D1 站点行(标题=站名,副标题=异常,值=状态)。
 List<ClubDirectorRow> clubDirectorStationRows(
-  List<ClubDirectorStation> stations,
+  List<ClubDirectorStation> stations, {BuildContext? context}
 ) {
+  final labels = context == null ? null : ClubDirectorLabels(context);
   return <ClubDirectorRow>[
     for (final ClubDirectorStation s in stations)
       ClubDirectorRow(
         id: s.nodeId?.toString() ?? s.nameText,
-        title: s.nameText,
+        title: labels?.stationName(s) ?? s.nameText,
         subtitle: s.issueText,
         value: s.statusText,
         valueTone: s.priority == 3 ? 'default' : 'warning',
@@ -79,29 +83,30 @@ List<ClubDirectorRow> clubDirectorStationRows(
 
 /// 小程序 `refreshTeamRows`:异常队伍的「卡点节点 / 提示层级 / 最近有效事件」
 /// 摊成 details 三行;缺值写「待确认」,不写 0 也不留空。
-List<ClubDirectorRow> clubDirectorTeamRows(List<ClubDirectorTeam> teams) {
-  const String pending = '待确认';
+List<ClubDirectorRow> clubDirectorTeamRows(List<ClubDirectorTeam> teams, {BuildContext? context}) {
+  final String pending = context == null ? '待确认' : stringsOf(context).clubDirectorPending;
+  final labels = context == null ? null : ClubDirectorLabels(context);
   return <ClubDirectorRow>[
     for (final ClubDirectorTeam t in teams)
       ClubDirectorRow(
         id: t.teamId?.toString() ?? t.nameText,
-        title: t.nameText,
-        subtitle: t.issueText.isEmpty ? t.progressText : t.issueText,
+        title: labels?.teamName(t) ?? t.nameText,
+        subtitle: t.issueText.isEmpty ? (labels?.teamProgress(t) ?? t.progressText) : t.issueText,
         value: t.statusText,
         valueTone: t.isAbnormal ? 'warning' : 'default',
         details: t.isAbnormal
             ? <ClubDirectorRowDetail>[
                 (
-                  label: '卡点节点',
-                  text: t.stuckNodeText.isEmpty ? pending : t.stuckNodeText,
+                  label: context == null ? '卡点节点' : stringsOf(context).clubDirectorStuckNode,
+                  text: labels?.teamStuck(t) ?? (t.stuckNodeText.isEmpty ? pending : t.stuckNodeText),
                 ),
                 (
-                  label: '提示层级',
-                  text: t.hintLevelText.isEmpty ? pending : t.hintLevelText,
+                  label: context == null ? '提示层级' : stringsOf(context).clubDirectorHintLevel,
+                  text: labels?.teamHint(t) ?? (t.hintLevelText.isEmpty ? pending : t.hintLevelText),
                 ),
                 (
-                  label: '最近有效事件',
-                  text: t.recentEventText.isEmpty ? pending : t.recentEventText,
+                  label: context == null ? '最近有效事件' : stringsOf(context).clubDirectorRecentEvent,
+                  text: labels?.teamEvent(t) ?? (t.recentEventText.isEmpty ? pending : t.recentEventText),
                 ),
               ]
             : const <ClubDirectorRowDetail>[],
@@ -110,66 +115,80 @@ List<ClubDirectorRow> clubDirectorTeamRows(List<ClubDirectorTeam> teams) {
 }
 
 List<ClubDirectorRow> clubDirectorBroadcastRows(
-  List<ClubDirectorBroadcast> broadcasts,
+  List<ClubDirectorBroadcast> broadcasts, {BuildContext? context}
 ) {
+  final labels = context == null ? null : ClubDirectorLabels(context);
   return <ClubDirectorRow>[
     for (int i = 0; i < broadcasts.length; i++)
       ClubDirectorRow(
         id: 'broadcast-$i',
-        title: broadcasts[i].contentText,
-        subtitle: broadcasts[i].targetText,
-        value: broadcasts[i].receiptText,
+        title: labels?.broadcastContent(broadcasts[i]) ?? broadcasts[i].contentText,
+        subtitle: labels?.broadcastTarget(broadcasts[i]) ?? broadcasts[i].targetText,
+        value: labels?.broadcastReceipt(broadcasts[i]) ?? broadcasts[i].receiptText,
       ),
   ];
 }
 
 List<ClubDirectorRow> clubDirectorMemberRows(
-  List<ClubDirectorMemberRow> members,
+  List<ClubDirectorMemberRow> members, {BuildContext? context, ClubDirectorProjection? projection}
 ) {
-  return <ClubDirectorRow>[
-    for (final ClubDirectorMemberRow m in members)
-      ClubDirectorRow(
-        id: m.id,
-        title: m.title,
-        subtitle: m.subtitle,
-        value: m.value,
-        valueTone: m.muted ? 'muted' : 'default',
-      ),
-  ];
+  return [for (final member in members) _directorMemberRow(member, context, projection)];
+}
+
+ClubDirectorRow _directorMemberRow(ClubDirectorMemberRow member,
+    BuildContext? context, ClubDirectorProjection? projection) {
+  final role = projection?.roles.where((role) => '${role.teamId}:${role.memberId}' == member.id).firstOrNull;
+  final labels = context == null ? null : ClubDirectorLabels(context);
+  final team = projection?.teams.where((team) => team.teamId == role?.teamId).firstOrNull;
+  return ClubDirectorRow(
+    id: member.id,
+    title: labels != null && role != null ? labels.memberName(role) : member.title,
+    subtitle: labels != null && role != null
+        ? (team == null ? labels.strings.clubDirectorTeamFallback(role.teamId!) : labels.teamName(team))
+        : member.subtitle,
+    value: labels != null && role != null ? labels.roleName(role) : member.value,
+    valueTone: member.muted ? 'muted' : 'default',
+  );
 }
 
 List<ClubDirectorRow> clubDirectorTakeoverRows(
-  List<ClubDirectorRole> candidates,
+  List<ClubDirectorRole> candidates, {BuildContext? context}
 ) {
+  final labels = context == null ? null : ClubDirectorLabels(context);
   return <ClubDirectorRow>[
     for (final ClubDirectorRole r in candidates)
       ClubDirectorRow(
         id: '${r.teamId}:${r.memberId}',
-        title: r.memberNameText,
-        subtitle: r.roleNameText,
-        value: r.confirmationText,
+        title: labels?.memberName(r) ?? r.memberNameText,
+        subtitle: labels?.roleName(r) ?? r.roleNameText,
+        value: labels?.roleConfirmation(r) ?? r.confirmationText,
       ),
   ];
 }
 
 List<ClubDirectorRow> clubDirectorChapterRows(
-  List<ClubDirectorChapterOption> chapters,
+  List<ClubDirectorChapterOption> chapters, {BuildContext? context, ClubDirectorProjection? projection}
 ) {
   return <ClubDirectorRow>[
     for (final ClubDirectorChapterOption c in chapters)
-      ClubDirectorRow(id: '${c.chapterId}', title: c.title),
+      ClubDirectorRow(id: '${c.chapterId}', title: context != null &&
+          projection?.chapterOptions.where((raw) => raw.chapterId == c.chapterId).firstOrNull?.title.isEmpty == true
+              ? stringsOf(context).clubDirectorChapterFallback(c.chapterId) : c.title),
   ];
 }
 
 List<ClubDirectorRow> clubDirectorIncidentRows(
-  List<ClubDirectorIncident> incidents,
+  List<ClubDirectorIncident> incidents, {BuildContext? context, ClubDirectorProjection? projection}
 ) {
+  final labels = context == null ? null : ClubDirectorLabels(context);
   return <ClubDirectorRow>[
     for (final ClubDirectorIncident r in incidents)
       ClubDirectorRow(
         id: r.key,
-        title: r.label,
-        subtitle: r.sub.isEmpty ? r.text : '${r.text}\n${r.sub}',
+        title: labels?.incidentLabel(r) ?? r.label,
+        subtitle: labels != null && projection != null
+            ? _incidentSubtitle(labels.incidentDetails(projection, r))
+            : (r.sub.isEmpty ? r.text : '${r.text}\n${r.sub}'),
       ),
   ];
 }
@@ -182,12 +201,12 @@ void clubDirectorNotifyWriteResult(
 ) {
   switch (result) {
     case ClubDirectorWriteResult.rejected:
-      CyNativeNotice.show(context, '操作未生效，请刷新后重试');
+      CyNativeNotice.show(context, stringsOf(context).clubDirectorWriteRejected);
     case ClubDirectorWriteResult.unknown:
-      CyNativeNotice.show(context, '结果待核对，请勿重复操作');
+      CyNativeNotice.show(context, stringsOf(context).clubDirectorWriteUnknown);
     case ClubDirectorWriteResult.blocked:
       if (after.writeState == ClubDirectorWriteState.storageError) {
-        CyNativeNotice.show(context, '无法安全保存，请稍后重试');
+        CyNativeNotice.show(context, stringsOf(context).clubDirectorStorageFailed);
       }
     case ClubDirectorWriteResult.confirmed:
       break;
@@ -541,14 +560,14 @@ class ClubDirectorUnknownBar extends StatelessWidget {
       state.writeLocked ||
       state.writeState == ClubDirectorWriteState.storageError;
 
-  String get _title {
+  String _title(BuildContext context) {
     switch (state.writeState) {
       case ClubDirectorWriteState.storageError:
-        return '无法安全提交';
+        return stringsOf(context).clubDirectorCannotSubmit;
       case ClubDirectorWriteState.unknownWrite:
-        return '结果待核对';
+        return stringsOf(context).clubDirectorResultPending;
       default:
-        return '操作处理中';
+        return stringsOf(context).clubDirectorProcessing;
     }
   }
 
@@ -571,7 +590,7 @@ class ClubDirectorUnknownBar extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Text(
-                  _title,
+                  _title(context),
                   key: const Key('director-unknown-title'),
                   style: TextStyle(
                     fontSize: CyTokens.typeBody,
@@ -581,7 +600,7 @@ class ClubDirectorUnknownBar extends StatelessWidget {
                 ),
                 const SizedBox(height: CyTokens.space1),
                 Text(
-                  state.writeMessage,
+                  clubDirectorWriteMessage(context, state),
                   style: TextStyle(
                     fontSize: CyTokens.typeCaption,
                     color: palette.textSecondary,
@@ -590,7 +609,7 @@ class ClubDirectorUnknownBar extends StatelessWidget {
                 if (state.writeState == ClubDirectorWriteState.unknownWrite)
                   Padding(
                     padding: const EdgeInsets.only(top: CyTokens.space2),
-                    child: Row(
+                    child: Wrap(
                       children: <Widget>[
                         CupertinoButton(
                           key: const Key('director-unknown-reconcile'),
@@ -600,7 +619,7 @@ class ClubDirectorUnknownBar extends StatelessWidget {
                           minimumSize: const Size(44, 44),
                           onPressed: onReconcile,
                           child: Text(
-                            '核对结果',
+                            stringsOf(context).clubDirectorReconcile,
                             style: TextStyle(
                               fontSize: CyTokens.typeBody,
                               color: palette.brand,
@@ -616,7 +635,7 @@ class ClubDirectorUnknownBar extends StatelessWidget {
                             minimumSize: const Size(44, 44),
                             onPressed: onRetry,
                             child: Text(
-                              '重试原操作',
+                              stringsOf(context).clubDirectorRetryOriginal,
                               style: TextStyle(
                                 fontSize: CyTokens.typeBody,
                                 color: palette.brand,
@@ -665,12 +684,12 @@ class ClubDirectorChapterSheet extends ConsumerStatefulWidget {
     final ClubDirectorState s = ref.read(clubDirectorProvider(activityId));
     if (s.writeLocked) return;
     if (s.projection?.canUnlockChapter != true) {
-      CyNativeNotice.show(context, '当前没有可解锁的章节');
+      CyNativeNotice.show(context, stringsOf(context).clubDirectorNoUnlockableChapter);
       return;
     }
     await showClubDirectorSheet(
       context,
-      title: '手动解锁章节',
+      title: stringsOf(context).clubDirectorUnlockTitle,
       sheetKey: const Key('director-chapter-sheet'),
       child: ClubDirectorChapterSheet(activityId: activityId),
     );
@@ -714,7 +733,7 @@ class _ClubDirectorChapterSheetState
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           ClubDirectorRowList(
-            rows: clubDirectorChapterRows(options),
+            rows: clubDirectorChapterRows(options, context: context, projection: s.projection),
             selectable: true,
             selectedId: selected,
             onRowTap: (String id) => setState(() => _selectedId = id),
@@ -722,14 +741,14 @@ class _ClubDirectorChapterSheetState
           ClubDirectorTextField(
             key: const Key('director-unlock-reason'),
             controller: _reason,
-            label: '现场原因(必填)',
-            placeholder: '写明为什么要手动解锁,会进审计记录',
+            label: stringsOf(context).clubDirectorReasonLabel,
+            placeholder: stringsOf(context).clubDirectorUnlockReasonHint,
             onChanged: (_) => setState(() {}),
           ),
           const SizedBox(height: CyTokens.space4),
           CyNativeButton(
             key: const Key('director-unlock-confirm'),
-            label: '解锁',
+            label: stringsOf(context).clubDirectorUnlock,
             width: double.infinity,
             onPressed: disabled
                 ? null
@@ -737,7 +756,7 @@ class _ClubDirectorChapterSheetState
                     final int? chapterId = int.tryParse(selected);
                     final String reason = _reason.text.trim();
                     if (chapterId == null || reason.isEmpty) {
-                      CyNativeNotice.show(context, '请填写手动解锁原因');
+                      CyNativeNotice.show(context, stringsOf(context).clubDirectorUnlockReasonRequired);
                       return;
                     }
                     await clubDirectorSettleWrite(
@@ -756,7 +775,7 @@ class _ClubDirectorChapterSheetState
             Padding(
               padding: const EdgeInsets.only(top: CyTokens.space2),
               child: Text(
-                s.writeMessage,
+                clubDirectorWriteMessage(context, s),
                 style: TextStyle(
                   fontSize: CyTokens.typeCaption,
                   color: CyPalette.of(context).textTertiary,
@@ -783,7 +802,7 @@ class ClubDirectorTeamSheet extends ConsumerWidget {
   ) {
     return showClubDirectorSheet(
       context,
-      title: '队伍进度',
+      title: stringsOf(context).clubDirectorTeamProgress,
       sheetKey: const Key('director-team-sheet'),
       child: ClubDirectorTeamSheet(activityId: activityId),
     );
@@ -796,9 +815,11 @@ class ClubDirectorTeamSheet extends ConsumerWidget {
         .projection;
     final List<ClubDirectorRow> teams = clubDirectorTeamRows(
       p?.teams ?? const <ClubDirectorTeam>[],
+      context: context,
     );
     final List<ClubDirectorRow> collab = clubDirectorBroadcastRows(
       p?.broadcasts ?? const <ClubDirectorBroadcast>[],
+      context: context,
     );
     // 纯只读展示,没有主键 —— 稿子里唯二的操作是关闭。
     return Padding(
@@ -813,7 +834,7 @@ class ClubDirectorTeamSheet extends ConsumerWidget {
         children: <Widget>[
           ClubDirectorRowList(rows: teams),
           if (collab.isNotEmpty) ...<Widget>[
-            const ClubDirectorSectionTitle('队伍协作'),
+            ClubDirectorSectionTitle(stringsOf(context).clubDirectorTeamCollaboration),
             ClubDirectorRowList(rows: collab),
           ],
         ],
@@ -838,16 +859,16 @@ class ClubDirectorRoleSheet extends ConsumerStatefulWidget {
     final ClubDirectorState s = ref.read(clubDirectorProvider(activityId));
     if (s.writeLocked) return;
     if (s.projection?.canAssignRoles != true) {
-      CyNativeNotice.show(context, '当前不能调整角色');
+      CyNativeNotice.show(context, stringsOf(context).clubDirectorRolesUnavailable);
       return;
     }
     if (s.projection?.roleMemberRows.isNotEmpty != true) {
-      CyNativeNotice.show(context, '还没有可分角色的成员');
+      CyNativeNotice.show(context, stringsOf(context).clubDirectorNoAssignableMembers);
       return;
     }
     await showClubDirectorSheet(
       context,
-      title: '角色分配',
+      title: stringsOf(context).clubDirectorAssignRoles,
       sheetKey: const Key('director-role-sheet'),
       child: ClubDirectorRoleSheet(activityId: activityId),
     );
@@ -881,7 +902,7 @@ class _ClubDirectorRoleSheetState extends ConsumerState<ClubDirectorRoleSheet> {
         .where((ClubDirectorRole r) => '${r.teamId}:${r.memberId}' == id)
         .firstOrNull;
     if (row == null || row.teamId == null || row.memberId == null) {
-      CyNativeNotice.show(context, '成员信息待同步');
+      CyNativeNotice.show(context, stringsOf(context).clubDirectorMemberSyncPending);
       return;
     }
     setState(() {
@@ -897,7 +918,7 @@ class _ClubDirectorRoleSheetState extends ConsumerState<ClubDirectorRoleSheet> {
         .read(clubDirectorProvider(widget.activityId))
         .projection!;
     if (!p.canTakeoverRoles) {
-      CyNativeNotice.show(context, '当前不能接管角色');
+      CyNativeNotice.show(context, stringsOf(context).clubDirectorTakeoverUnavailable);
       return;
     }
     final ClubDirectorRole? source = p.roles
@@ -907,7 +928,7 @@ class _ClubDirectorRoleSheetState extends ConsumerState<ClubDirectorRoleSheet> {
         !source.isConfirmedRoleSource ||
         source.teamId == null ||
         source.memberId == null) {
-      CyNativeNotice.show(context, '来源角色待确认');
+      CyNativeNotice.show(context, stringsOf(context).clubDirectorSourceRolePending);
       return;
     }
     final List<ClubDirectorRole> targets = p.roles
@@ -920,7 +941,7 @@ class _ClubDirectorRoleSheetState extends ConsumerState<ClubDirectorRoleSheet> {
         )
         .toList(growable: false);
     if (targets.isEmpty) {
-      CyNativeNotice.show(context, '同队没有待分配成员');
+      CyNativeNotice.show(context, stringsOf(context).clubDirectorNoTakeoverTargets);
       return;
     }
     setState(() {
@@ -941,13 +962,13 @@ class _ClubDirectorRoleSheetState extends ConsumerState<ClubDirectorRoleSheet> {
     final String? picked = await showCupertinoModalPopup<String>(
       context: context,
       builder: (BuildContext sheetContext) => CupertinoActionSheet(
-        title: const Text('接管给'),
+        title: Text(stringsOf(context).clubDirectorTakeoverTarget),
         actions: draft.targets
             .map(
               (ClubDirectorRole t) => CupertinoActionSheetAction(
                 key: Key('director-takeover-target-${t.memberId}'),
                 child: Text(
-                  t.memberNameText,
+                  ClubDirectorLabels(context).memberName(t),
                   style: TextStyle(color: palette.textPrimary),
                 ),
                 onPressed: () =>
@@ -956,7 +977,7 @@ class _ClubDirectorRoleSheetState extends ConsumerState<ClubDirectorRoleSheet> {
             )
             .toList(growable: false),
         cancelButton: CupertinoActionSheetAction(
-          child: Text('取消', style: TextStyle(color: palette.textPrimary)),
+          child: Text(stringsOf(context).clubDirectorCancel, style: TextStyle(color: palette.textPrimary)),
           onPressed: () => Navigator.of(sheetContext).pop(),
         ),
       ),
@@ -973,7 +994,7 @@ class _ClubDirectorRoleSheetState extends ConsumerState<ClubDirectorRoleSheet> {
     final String reason = _takeoverReason.text.trim();
     if (draft == null || targetId == null) return;
     if (!p.canTakeoverRoles) {
-      CyNativeNotice.show(context, '当前不能接管角色');
+      CyNativeNotice.show(context, stringsOf(context).clubDirectorTakeoverUnavailable);
       return;
     }
     final int? targetMemberId = int.tryParse(targetId.split(':').last);
@@ -985,7 +1006,7 @@ class _ClubDirectorRoleSheetState extends ConsumerState<ClubDirectorRoleSheet> {
           reason: reason,
         ) ==
         null) {
-      CyNativeNotice.show(context, '请选同队待分配成员并填写原因');
+      CyNativeNotice.show(context, stringsOf(context).clubDirectorTakeoverRequired);
       return;
     }
     await clubDirectorSettleWrite(
@@ -1013,14 +1034,14 @@ class _ClubDirectorRoleSheetState extends ConsumerState<ClubDirectorRoleSheet> {
         memberId == null ||
         roleCode == null ||
         roleCode.isEmpty) {
-      CyNativeNotice.show(context, '请先选择有效角色');
+      CyNativeNotice.show(context, stringsOf(context).clubDirectorValidRoleRequired);
       return;
     }
     final List<String> parts = memberId.split(':');
     final int? teamId = int.tryParse(parts.first);
     final int? member = parts.length > 1 ? int.tryParse(parts.last) : null;
     if (teamId == null || member == null) {
-      CyNativeNotice.show(context, '请先选择有效角色');
+      CyNativeNotice.show(context, stringsOf(context).clubDirectorValidRoleRequired);
       return;
     }
     await clubDirectorSettleWrite(
@@ -1055,15 +1076,15 @@ class _ClubDirectorRoleSheetState extends ConsumerState<ClubDirectorRoleSheet> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          const ClubDirectorSectionTitle('选择成员'),
+          ClubDirectorSectionTitle(stringsOf(context).clubDirectorSelectMember),
           ClubDirectorRowList(
-            rows: clubDirectorMemberRows(p.roleMemberRows),
+            rows: clubDirectorMemberRows(p.roleMemberRows, context: context, projection: p),
             selectable: true,
             selectedId: _memberId,
             onRowTap: _pickMember,
           ),
           if (p.roleOptions.isNotEmpty) ...<Widget>[
-            const ClubDirectorSectionTitle('分配固定角色'),
+            ClubDirectorSectionTitle(stringsOf(context).clubDirectorAssignFixedRole),
             ClubDirectorChips(
               options: p.roleOptions
                   .map((o) => (id: o.roleCode, label: o.label))
@@ -1073,9 +1094,9 @@ class _ClubDirectorRoleSheetState extends ConsumerState<ClubDirectorRoleSheet> {
             ),
           ],
           if (p.takeoverCandidates.isNotEmpty) ...<Widget>[
-            const ClubDirectorSectionTitle('角色接管'),
+            ClubDirectorSectionTitle(stringsOf(context).clubDirectorRoleTakeover),
             ClubDirectorRowList(
-              rows: clubDirectorTakeoverRows(p.takeoverCandidates),
+              rows: clubDirectorTakeoverRows(p.takeoverCandidates, context: context),
               selectable: true,
               selectedId: draft == null
                   ? null
@@ -1090,13 +1111,13 @@ class _ClubDirectorRoleSheetState extends ConsumerState<ClubDirectorRoleSheet> {
                 children: <Widget>[
                   ClubOpsRow(
                     key: const Key('director-takeover-target'),
-                    title: '接管给',
-                    value: target?.memberNameText ?? '选择同队待分配成员',
+                    title: stringsOf(context).clubDirectorTakeoverTarget,
+                    value: target == null ? stringsOf(context).clubDirectorSelectTakeoverTarget : ClubDirectorLabels(context).memberName(target),
                     valueColor: palette.textSecondary,
                     onTap: _pickTarget,
                   ),
                   ClubOpsRow(
-                    title: '接管原因(必填)',
+                    title: stringsOf(context).clubDirectorTakeoverReason,
                     minHeight: 0,
                     trailing: const SizedBox.shrink(),
                   ),
@@ -1110,7 +1131,7 @@ class _ClubDirectorRoleSheetState extends ConsumerState<ClubDirectorRoleSheet> {
                     child: ClubDirectorTextField(
                       key: const Key('director-takeover-reason'),
                       controller: _takeoverReason,
-                      placeholder: '写明为什么要接管,会进审计记录',
+                      placeholder: stringsOf(context).clubDirectorTakeoverReasonHint,
                       label: null,
                       onChanged: (_) => setState(() {}),
                     ),
@@ -1125,7 +1146,7 @@ class _ClubDirectorRoleSheetState extends ConsumerState<ClubDirectorRoleSheet> {
                   Expanded(
                     child: CyNativeButton(
                       key: const Key('director-takeover-cancel'),
-                      label: '取消接管',
+                      label: stringsOf(context).clubDirectorCancelTakeover,
                       role: CyNativeButtonRole.secondary,
                       width: double.infinity,
                       onPressed: s.writeLocked
@@ -1137,7 +1158,7 @@ class _ClubDirectorRoleSheetState extends ConsumerState<ClubDirectorRoleSheet> {
                   Expanded(
                     child: CyNativeButton(
                       key: const Key('director-takeover-confirm'),
-                      label: '确认接管',
+                      label: stringsOf(context).clubDirectorConfirmTakeover,
                       width: double.infinity,
                       onPressed:
                           s.writeLocked || _takeoverReason.text.trim().isEmpty
@@ -1152,7 +1173,7 @@ class _ClubDirectorRoleSheetState extends ConsumerState<ClubDirectorRoleSheet> {
           const SizedBox(height: CyTokens.space4),
           CyNativeButton(
             key: const Key('director-role-confirm'),
-            label: '确认分配',
+            label: stringsOf(context).clubDirectorConfirmAssignment,
             width: double.infinity,
             onPressed: s.writeLocked ? null : _confirmAssignment,
           ),
@@ -1197,12 +1218,12 @@ class ClubDirectorBroadcastSheet extends ConsumerStatefulWidget {
     final ClubDirectorState s = ref.read(clubDirectorProvider(activityId));
     if (s.writeLocked) return;
     if (s.projection?.canBroadcast != true) {
-      CyNativeNotice.show(context, '当前不能发送广播');
+      CyNativeNotice.show(context, stringsOf(context).clubDirectorBroadcastUnavailable);
       return;
     }
     await showClubDirectorSheet(
       context,
-      title: '定向广播',
+      title: stringsOf(context).clubDirectorBroadcast,
       sheetKey: const Key('director-broadcast-sheet'),
       child: ClubDirectorBroadcastSheet(activityId: activityId),
     );
@@ -1236,11 +1257,11 @@ class _ClubDirectorBroadcastSheetState
     final bool ready = count != null && count > 0 && selected != null;
     final String content = _content.text.trim();
     if (!p.canBroadcast || !ready) {
-      CyNativeNotice.show(context, '接收范围待确认，暂不能发送');
+      CyNativeNotice.show(context, stringsOf(context).clubDirectorRecipientsPending);
       return;
     }
     if (content.isEmpty) {
-      CyNativeNotice.show(context, '请输入广播内容');
+      CyNativeNotice.show(context, stringsOf(context).clubDirectorContentRequired);
       return;
     }
     await clubDirectorSettleWrite(
@@ -1275,8 +1296,8 @@ class _ClubDirectorBroadcastSheetState
     final int? count = p.broadcastRecipientCount(selected);
     final bool ready = count != null && count > 0 && selected != null;
     final String previewText = selected == null
-        ? '定向范围待选择 · 人数待确认'
-        : '${selected.label} · ${count == null ? '人数待确认' : '$count 人'}';
+        ? stringsOf(context).clubDirectorScopePending
+        : '${ClubDirectorLabels(context).targetLabel(p, _scope, selected)} · ${count == null ? stringsOf(context).clubDirectorCountPending : stringsOf(context).clubDirectorRecipientCount(count)}';
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         CyTokens.pageX,
@@ -1287,9 +1308,10 @@ class _ClubDirectorBroadcastSheetState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          const ClubDirectorSectionTitle('范围'),
+          ClubDirectorSectionTitle(stringsOf(context).clubDirectorScope),
           ClubDirectorChips(
-            options: kClubDirectorBroadcastScopes,
+            options: [for (final scope in kClubDirectorBroadcastScopes)
+              (id: scope.id, label: _broadcastScopeLabel(context, scope.id))],
             value: _scope,
             onChanged: (String id) => setState(() {
               _scope = id;
@@ -1302,10 +1324,10 @@ class _ClubDirectorBroadcastSheetState
                 for (int i = 0; i < targets.length; i++)
                   ClubDirectorRow(
                     id: '${targets[i].id}',
-                    title: targets[i].label,
+                    title: ClubDirectorLabels(context).targetLabel(p, _scope, targets[i]),
                     value: targets[i].memberCount == null
-                        ? '人数待确认'
-                        : '${targets[i].memberCount} 人',
+                        ? stringsOf(context).clubDirectorCountPending
+                        : stringsOf(context).clubDirectorRecipientCount(targets[i].memberCount!),
                   ),
               ],
               selectable: true,
@@ -1316,18 +1338,18 @@ class _ClubDirectorBroadcastSheetState
                 }
               }),
             ),
-          const ClubDirectorSectionTitle('内容'),
+          ClubDirectorSectionTitle(stringsOf(context).clubDirectorContent),
           ClubDirectorTextField(
             key: const Key('director-broadcast-content'),
             controller: _content,
-            placeholder: '输入广播内容',
+            placeholder: stringsOf(context).clubDirectorContentHint,
             onChanged: (_) => setState(() {}),
           ),
-          ClubDirectorRowList(rows: clubDirectorBroadcastRows(p.broadcasts)),
+          ClubDirectorRowList(rows: clubDirectorBroadcastRows(p.broadcasts, context: context)),
           const SizedBox(height: CyTokens.space4),
           CyNativeButton(
             key: const Key('director-broadcast-send'),
-            label: '发送',
+            label: stringsOf(context).clubDirectorSend,
             width: double.infinity,
             onPressed: s.writeLocked || !ready ? null : () => _confirm(p),
           ),
@@ -1361,7 +1383,7 @@ class ClubDirectorIncidentSheet extends ConsumerStatefulWidget {
   ) {
     return showClubDirectorSheet(
       context,
-      title: '现场事件',
+      title: stringsOf(context).clubDirectorIncidents,
       sheetKey: const Key('director-incident-sheet'),
       child: ClubDirectorIncidentSheet(activityId: activityId),
     );
@@ -1396,11 +1418,11 @@ class _ClubDirectorIncidentSheetState
         .where((ClubDirectorIncident i) => i.key == _selectedKey)
         .firstOrNull;
     if (row == null) {
-      CyNativeNotice.show(context, '先选一条要处理的事件');
+      CyNativeNotice.show(context, stringsOf(context).clubDirectorSelectIncident);
       return;
     }
     if (_mode.isEmpty) {
-      CyNativeNotice.show(context, '先选处理方式');
+      CyNativeNotice.show(context, stringsOf(context).clubDirectorSelectResolution);
       return;
     }
     final ClubDirectorController c = ref.read(
@@ -1420,16 +1442,16 @@ class _ClubDirectorIncidentSheetState
     if (_mode == 'reject' && row.submissionId != null) {
       final String? reason = await showCySystemTextInputAlert(
         context: context,
-        title: '驳回重交',
-        placeholder: '驳回原因（至少 2 个字，玩家会看到）',
-        confirmText: '确认驳回',
-        cancelText: '再想想',
+        title: stringsOf(context).clubDirectorRejectTitle,
+        placeholder: stringsOf(context).clubDirectorRejectReasonHint,
+        confirmText: stringsOf(context).clubDirectorConfirmReject,
+        cancelText: stringsOf(context).clubDirectorReconsider,
       );
       if (reason == null) return;
       final String trimmed = reason.trim();
       if (trimmed.length < 2) {
         if (!mounted) return;
-        CyNativeNotice.show(context, '请填写驳回原因');
+        CyNativeNotice.show(context, stringsOf(context).clubDirectorRejectReasonRequired);
         return;
       }
       if (!mounted) return;
@@ -1445,22 +1467,22 @@ class _ClubDirectorIncidentSheetState
     if (_mode == 'pause' && row.nodeId != null) {
       final List<ClubDirectorFallbackPlan> plans = row.planOptions;
       if (plans.length > 1) {
-        CyNativeNotice.show(context, '有多个备用方案，请到后台指定');
+        CyNativeNotice.show(context, stringsOf(context).clubDirectorMultipleFallbacks);
         return;
       }
       final ClubDirectorFallbackPlan? plan = plans.isEmpty ? null : plans.first;
       final String? reason = await showCySystemTextInputAlert(
         context: context,
-        title: '暂停本站',
-        placeholder: '暂停原因（至少 2 个字，会同步给商家与玩家）',
-        confirmText: '确认暂停',
-        cancelText: '再想想',
+        title: stringsOf(context).clubDirectorPauseTitle,
+        placeholder: stringsOf(context).clubDirectorPauseReasonHint,
+        confirmText: stringsOf(context).clubDirectorConfirmPause,
+        cancelText: stringsOf(context).clubDirectorReconsider,
       );
       if (reason == null) return;
       final String trimmed = reason.trim();
       if (trimmed.length < 2) {
         if (!mounted) return;
-        CyNativeNotice.show(context, '请填写暂停原因');
+        CyNativeNotice.show(context, stringsOf(context).clubDirectorPauseReasonRequired);
         return;
       }
       if (!mounted) return;
@@ -1498,21 +1520,22 @@ class _ClubDirectorIncidentSheetState
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           ClubDirectorRowList(
-            rows: clubDirectorIncidentRows(incidents),
+            rows: clubDirectorIncidentRows(incidents, context: context, projection: p),
             selectable: true,
             selectedId: _selectedKey,
             onRowTap: _select,
           ),
-          const ClubDirectorSectionTitle('处理方式'),
+          ClubDirectorSectionTitle(stringsOf(context).clubDirectorResolution),
           ClubDirectorChips(
-            options: modes,
+            options: [for (final mode in modes)
+              (id: mode.id, label: ClubDirectorLabels(context).incidentMode(mode.id))],
             value: _mode,
             onChanged: (String id) => setState(() => _mode = id),
           ),
           const SizedBox(height: CyTokens.space4),
           CyNativeButton(
             key: const Key('director-incident-confirm'),
-            label: '确认处理',
+            label: stringsOf(context).clubDirectorConfirmResolution,
             width: double.infinity,
             onPressed: _mode.isEmpty || s.writeLocked
                 ? null
@@ -1522,7 +1545,7 @@ class _ClubDirectorIncidentSheetState
           Padding(
             padding: const EdgeInsets.only(top: CyTokens.space2),
             child: Text(
-              '暂停只影响本站，不改变已发放的权益与已完成的提交。',
+              stringsOf(context).clubDirectorPauseScope,
               style: TextStyle(
                 fontSize: CyTokens.typeCaption,
                 color: palette.textTertiary,
@@ -1534,3 +1557,13 @@ class _ClubDirectorIncidentSheetState
     );
   }
 }
+
+String _broadcastScopeLabel(BuildContext context, String id) => switch (id) {
+  'ALL' => stringsOf(context).clubDirectorScopeAll,
+  'TEAM' => stringsOf(context).clubDirectorScopeTeam,
+  'ROLE' => stringsOf(context).clubDirectorScopeRole,
+  _ => id,
+};
+
+String _incidentSubtitle(({String text, String sub}) value) =>
+    value.sub.isEmpty ? value.text : '${value.text}\n${value.sub}';

@@ -18,6 +18,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:gal/gal.dart';
+import 'package:chengyin_app/l10n/app_localizations.dart';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -43,10 +44,13 @@ import 'package:chengyin_app/feature/club/club_join_requests_page.dart';
 
 import '../../support/fake_publisher_identity.dart';
 
-Widget _app(List<dynamic> overrides, Widget home) {
+Widget _app(List<dynamic> overrides, Widget home, {Locale locale = const Locale('zh')}) {
   return ProviderScope(
     overrides: overrides.cast(),
     child: MaterialApp(
+      locale: locale,
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
       theme: ThemeData(useMaterial3: true),
       debugShowCheckedModeBanner: false,
       home: home,
@@ -222,6 +226,17 @@ void main() {
   });
 
   group('enroll:退款权限门', () {
+    testWidgets('English roster preserves denied permission and no refund action', (tester) async {
+      await tester.pumpWidget(_app([
+        clubDetailProvider(1).overrideWith((ref) async => _club()),
+        clubMembersProvider(1).overrideWith((ref) async => <ClubMember>[]),
+      ], const ClubEnrollPage(clubId: 1), locale: const Locale('en')));
+      await tester.pumpAndSettle();
+      expect(find.text('You cannot view the registration roster'), findsOneWidget);
+      expect(find.text('Refund'), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('非 owner 非管理员 → 无权限', (WidgetTester tester) async {
       await tester.pumpWidget(
         _app(<dynamic>[

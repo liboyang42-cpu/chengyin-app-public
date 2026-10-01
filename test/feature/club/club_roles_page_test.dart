@@ -10,6 +10,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:chengyin_app/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -26,10 +27,13 @@ import 'package:chengyin_app/data/models/club.dart';
 import 'package:chengyin_app/data/models/club_ops.dart';
 import 'package:chengyin_app/feature/club/club_roles_page.dart';
 
-Widget _app(Widget home, List<dynamic> overrides) {
+Widget _app(Widget home, List<dynamic> overrides, {Locale locale = const Locale('zh')}) {
   return ProviderScope(
     overrides: overrides.cast(),
     child: MaterialApp(
+      locale: locale,
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
       theme: ThemeData(useMaterial3: true),
       debugShowCheckedModeBanner: false,
       home: home,
@@ -195,6 +199,33 @@ Future<void> _pickRole(WidgetTester tester, String roleCode) async {
 }
 
 void main() {
+  testWidgets('English role denial still prevents assignments', (tester) async {
+    final fake = _FakeClubOpsApi()..accessValue = _access(canManageRoles: false);
+    await tester.pumpWidget(_app(const ClubRolesPage(clubId: 1), [
+      clubOpsApiProvider.overrideWithValue(fake),
+      clubApiProvider.overrideWithValue(_FakeClubApi()),
+    ], locale: const Locale('en')));
+    await tester.pumpAndSettle();
+    expect(find.text('You cannot manage roles'), findsOneWidget);
+    expect(find.text('Assign'), findsNothing);
+    expect(fake.assigns, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('English role chrome preserves server role and member names', (tester) async {
+    final fake = _FakeClubOpsApi();
+    await tester.pumpWidget(_app(const ClubRolesPage(clubId: 1), [
+      clubOpsApiProvider.overrideWithValue(fake),
+      clubApiProvider.overrideWithValue(_FakeClubApi()),
+    ], locale: const Locale('en')));
+    await tester.pumpAndSettle();
+    expect(find.text('Current assignments'), findsOneWidget);
+    expect(find.text('阿明'), findsOneWidget);
+    expect(find.textContaining('副主理人'), findsWidgets);
+    expect(fake.revokes, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
   group('roles:权限裁决', () {
     testWidgets('canManageRoles 不是 true → 无权限屏(重试也没用)', (WidgetTester tester) async {
       final fake = _FakeClubOpsApi()

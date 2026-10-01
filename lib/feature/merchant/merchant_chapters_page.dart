@@ -1,3 +1,5 @@
+import '../../l10n/strings.dart';
+import 'merchant_directory_strings.dart';
 import '../../core/theme/cy_palette.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -29,7 +31,7 @@ class MerchantChaptersPage extends ConsumerWidget {
     final async = ref.watch(myChapterApplicationsProvider);
     return CupertinoPageScaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      navigationBar: const CupertinoNavigationBar(middle: Text('我的承接')),
+      navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).merchantDirectoryMyHosting)),
       child: Material(
         color: Colors.transparent,
         child: SafeArea(
@@ -43,9 +45,9 @@ class MerchantChaptersPage extends ConsumerWidget {
             ),
             data: (List<ChapterApplication> rows) {
               if (rows.isEmpty) {
-                return const StatusView(
-                  message: '还没有承接申请',
-                  sub: '在「合作中心」里可以申请承接开放的路线',
+                return StatusView(
+                  message: stringsOf(context).merchantDirectoryNoApplications,
+                  sub: stringsOf(context).merchantDirectoryNoApplicationsHint,
                   large: true,
                 );
               }
@@ -81,9 +83,9 @@ class _ApplicationTileState extends ConsumerState<_ApplicationTile> {
     final a = widget.app;
     final bool ok = await cyConfirm(
       context,
-      title: '撤回「${a.displayTitle}」的申请?',
-      content: '撤回后可以重新申请。',
-      confirmText: '撤回',
+      title: stringsOf(context).merchantDirectoryWithdrawTitle(merchantDirectoryChapterTitle(context, a)),
+      content: stringsOf(context).merchantDirectoryWithdrawHint,
+      confirmText: stringsOf(context).merchantDirectoryWithdraw,
     );
     if (!ok || !mounted) return;
     setState(() => _busy = true);
@@ -91,7 +93,7 @@ class _ApplicationTileState extends ConsumerState<_ApplicationTile> {
       await ref.read(merchantApiProvider).withdrawChapterApplication(a.id);
       ref.invalidate(myChapterApplicationsProvider);
       if (!mounted) return;
-      CyNativeNotice.show(context, '已撤回');
+      CyNativeNotice.show(context, stringsOf(context).merchantDirectoryWithdrawn);
     } catch (e) {
       if (!mounted) return;
       CyNativeNotice.show(
@@ -126,7 +128,7 @@ class _ApplicationTileState extends ConsumerState<_ApplicationTile> {
             Semantics(
               key: Key('chapter-app-open-${a.id}'),
               button: true,
-              label: a.displayTitle,
+              label: merchantDirectoryChapterTitle(context, a),
               onTap: () => context.push('/merchant/recruit/${a.topicId}'),
               excludeSemantics: true,
               child: CupertinoButton(
@@ -139,7 +141,7 @@ class _ApplicationTileState extends ConsumerState<_ApplicationTile> {
                     children: <Widget>[
                       Expanded(
                         child: Text(
-                          a.displayTitle,
+                          merchantDirectoryChapterTitle(context, a),
                           style: textTheme.titleMedium,
                         ),
                       ),
@@ -154,11 +156,11 @@ class _ApplicationTileState extends ConsumerState<_ApplicationTile> {
               ),
             )
           else
-            Text(a.displayTitle, style: textTheme.titleMedium),
+            Text(merchantDirectoryChapterTitle(context, a), style: textTheme.titleMedium),
           const SizedBox(height: CyTokens.space1),
           // ★ 被拒时 statusText 自带原因;主办方邀请与自己申请通过分开说。
           Text(
-            a.statusText,
+            merchantDirectoryChapterStatus(context, a),
             style: textTheme.bodySmall?.copyWith(
               color: a.isRejected
                   ? CyPalette.of(context).statusWarning
@@ -170,7 +172,7 @@ class _ApplicationTileState extends ConsumerState<_ApplicationTile> {
             Padding(
               padding: const EdgeInsets.only(top: 2),
               child: Text(
-                '你提交的点位无需再审核',
+                stringsOf(context).merchantDirectoryNoFurtherReview,
                 style: textTheme.bodySmall?.copyWith(
                   color: CyPalette.of(context).textTertiary,
                 ),
@@ -183,7 +185,7 @@ class _ApplicationTileState extends ConsumerState<_ApplicationTile> {
               width: double.infinity,
               child: CyNativeButton(
                 onPressed: _busy ? null : _withdraw,
-                label: '撤回申请',
+                label: stringsOf(context).merchantDirectoryWithdrawApplication,
                 role: CyNativeButtonRole.secondary,
               ),
             ),

@@ -1,10 +1,12 @@
+import 'club_api_messages.dart';
+import '../../l10n/strings.dart';
+import 'club_form_labels.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/providers.dart';
-import '../../core/network/dio_client.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/cy_tokens.dart';
 import '../../core/widgets/cy_image_source_sheet.dart';
@@ -16,7 +18,6 @@ import '../publish/publish_image_cropper.dart';
 import 'club_controller.dart';
 import 'club_form_scaffold.dart';
 import 'club_image_picker.dart';
-import '../../core/widgets/upload_hints.dart';
 
 /// 创建俱乐部(D18 表单B,轻量·填完即有)。参考 Strava 创建俱乐部向导:
 /// 类型→方向→资料→城市。对齐小程序 `pages/club/create`:
@@ -143,7 +144,7 @@ class _ClubCreatePageState extends ConsumerState<ClubCreatePage> {
         'style': _style.text.trim(),
       });
       if (!mounted) return;
-      CyNativeNotice.show(context, '俱乐部已创建');
+      CyNativeNotice.show(context, stringsOf(context).clubFormCreated);
       // 创建成功的下一步是管理自己的俱乐部,不再把主理人送回泛发现页。
       ref.invalidate(clubMyProvider);
       if (clubId > 0) {
@@ -158,7 +159,7 @@ class _ClubCreatePageState extends ConsumerState<ClubCreatePage> {
       debugPrint('[club-create] 创建俱乐部失败: $e');
       CyNativeNotice.show(
         context,
-        friendlyOrBackendMessage(e, fallback: '俱乐部没能创建成功，请稍后重试'),
+        clubApiErrorMessage(context, e, fallback: stringsOf(context).clubFormCreateError),
         isError: true,
       );
     }
@@ -169,12 +170,12 @@ class _ClubCreatePageState extends ConsumerState<ClubCreatePage> {
     final user = ref.watch(authControllerProvider).user;
     final role = user?.effectiveRole;
     return ClubStepScaffold(
-      title: _stepTitles[_step - 1],
+      title: clubFormValueLabel(context, _stepTitles[_step - 1]),
       step: _step,
       stepCount: 4,
-      backLabel: _step == 1 ? '返回' : _stepTitles[_step - 2],
+      backLabel: _step == 1 ? stringsOf(context).clubFormBack : clubFormValueLabel(context, _stepTitles[_step - 2]),
       onBack: _onBack,
-      nextLabel: _step < 4 ? '下一步' : '创建俱乐部',
+      nextLabel: _step < 4 ? stringsOf(context).clubFormNext : stringsOf(context).clubFormCreate,
       canNext: _canNext(),
       busy: _submitting,
       onNext: _onNext,
@@ -231,11 +232,11 @@ class _ClubCreatePageState extends ConsumerState<ClubCreatePage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
-                          Text(opt.val, style: textTheme.bodyMedium),
+                          Text(clubFormValueLabel(context, opt.val), style: textTheme.bodyMedium),
                           if (opt.sub.isNotEmpty) ...<Widget>[
                             const SizedBox(height: CyTokens.space1),
                             Text(
-                              opt.sub,
+                              clubFormValueLabel(context, opt.sub),
                               style: textTheme.labelSmall?.copyWith(
                                 color: AppColors.textSecondary,
                               ),
@@ -269,7 +270,7 @@ class _ClubCreatePageState extends ConsumerState<ClubCreatePage> {
           children: <Widget>[
             for (final String dir in _dirOptions)
               CyChip(
-                label: dir,
+                label: clubFormValueLabel(context, dir),
                 selected: _activityPrefs.contains(dir),
                 onTap: () => setState(() {
                   if (_activityPrefs.contains(dir)) {
@@ -279,7 +280,7 @@ class _ClubCreatePageState extends ConsumerState<ClubCreatePage> {
                   } else if (_activityPrefs.length < 3) {
                     _activityPrefs = <String>[..._activityPrefs, dir];
                   } else {
-                    CyNativeNotice.show(context, '最多选 3 个');
+                    CyNativeNotice.show(context, stringsOf(context).clubFormMaxThree);
                   }
                 }),
               ),
@@ -287,7 +288,7 @@ class _ClubCreatePageState extends ConsumerState<ClubCreatePage> {
         ),
         const SizedBox(height: CyTokens.space4),
         Text(
-          '路线方向选填,最多选 3 个。',
+          stringsOf(context).clubFormDirectionHint,
           style: Theme.of(
             context,
           ).textTheme.labelSmall?.copyWith(color: CyTokens.textTertiary),
@@ -305,7 +306,7 @@ class _ClubCreatePageState extends ConsumerState<ClubCreatePage> {
           children: <Widget>[
             Expanded(
               child: _ImagePickerTile(
-                label: uploadHint('封面', kHint16x9),
+                label: stringsOf(context).clubFormCoverHint,
                 url: _cover,
                 onTap: _pickCover,
                 aspect: 16 / 9,
@@ -314,7 +315,7 @@ class _ClubCreatePageState extends ConsumerState<ClubCreatePage> {
             const SizedBox(width: CyTokens.space3),
             Expanded(
               child: _ImagePickerTile(
-                label: uploadHint('Logo', kHint1x1),
+                label: stringsOf(context).clubFormLogoHint,
                 url: _logo,
                 onTap: _pickLogo,
               ),
@@ -323,15 +324,15 @@ class _ClubCreatePageState extends ConsumerState<ClubCreatePage> {
         ),
         const SizedBox(height: CyTokens.space3),
         CyField(
-          label: '俱乐部名称',
-          child: _input(_name, '给你的俱乐部起个名字', maxLength: 30),
+          label: stringsOf(context).clubFormClubName,
+          child: _input(_name, stringsOf(context).clubFormNameHint, maxLength: 30),
         ),
         CyField(
-          label: '简介',
-          child: _textarea(_description, '用一句话说清你的俱乐部是做什么的', maxLength: 200),
+          label: stringsOf(context).clubFormShortIntroduction,
+          child: _textarea(_description, stringsOf(context).clubFormShortIntroductionHint, maxLength: 200),
         ),
         Text(
-          '名称必填;Logo 与封面建议正方形/16:9。',
+          stringsOf(context).clubFormRequiredNameHint,
           style: textTheme.labelSmall?.copyWith(color: CyTokens.textTertiary),
         ),
       ],
@@ -343,10 +344,10 @@ class _ClubCreatePageState extends ConsumerState<ClubCreatePage> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
         CyField(
-          label: '城市',
+          label: stringsOf(context).clubFormCityField,
           child: CupertinoTextField(
             onChanged: (String v) => setState(() => _city = v),
-            placeholder: '如 上海',
+            placeholder: stringsOf(context).clubFormCityHint,
             maxLength: 20,
             textInputAction: TextInputAction.next,
             textCapitalization: TextCapitalization.words,
@@ -357,15 +358,15 @@ class _ClubCreatePageState extends ConsumerState<ClubCreatePage> {
           ),
         ),
         CyField(
-          label: '核心关键词(选填)',
-          child: _input(_keywords, '逗号分隔,如 徒步,摄影', maxLength: 60),
+          label: stringsOf(context).clubFormOptionalKeywords,
+          child: _input(_keywords, stringsOf(context).clubFormCommaKeywordsHint, maxLength: 60),
         ),
         CyField(
-          label: '风格/调性(选填)',
-          child: _input(_style, '如 沉浸剧情', maxLength: 30),
+          label: stringsOf(context).clubFormOptionalStyle,
+          child: _input(_style, stringsOf(context).clubFormExampleStyle, maxLength: 30),
         ),
         Text(
-          '俱乐部是地理强相关的,城市必填。',
+          stringsOf(context).clubFormRequiredCityHint,
           style: Theme.of(
             context,
           ).textTheme.labelSmall?.copyWith(color: CyTokens.textTertiary),
@@ -448,11 +449,11 @@ class _StepGate extends StatelessWidget {
             color: CyTokens.actionPrimaryBg,
             foregroundColor: CyTokens.actionPrimaryFg,
             onPressed: onBecoming,
-            child: const Text('登录并申请主理人'),
+            child: Text(stringsOf(context).clubFormLoginApply),
           ),
           const SizedBox(height: CyTokens.space2),
           Text(
-            '创建俱乐部前,请先注册成为主理人。',
+            stringsOf(context).clubFormRegisterFirst,
             textAlign: TextAlign.center,
             style: Theme.of(
               context,
@@ -470,11 +471,11 @@ class _StepGate extends StatelessWidget {
           color: CyTokens.actionPrimaryBg,
           foregroundColor: CyTokens.actionPrimaryFg,
           onPressed: onBecoming,
-          child: const Text('去申请主理人'),
+          child: Text(stringsOf(context).clubFormApplyOrganizer),
         ),
         const SizedBox(height: CyTokens.space2),
         Text(
-          role == 'merchant' ? '商户账户与俱乐部主理人互斥,本入口不可用。' : '还不是主理人?先去申请,填完即有。',
+          role == 'merchant' ? stringsOf(context).clubFormMerchantCreateBlocked : stringsOf(context).clubFormApplyFirst,
           textAlign: TextAlign.center,
           style: Theme.of(
             context,
@@ -540,7 +541,7 @@ class _ImagePickerTile extends StatelessWidget {
           ),
           const SizedBox(height: CyTokens.space1),
           Text(
-            has ? '更换$label' : '添加$label',
+            has ? stringsOf(context).clubFormReplaceImage(label) : stringsOf(context).clubFormAddImage(label),
             style: textTheme.labelSmall?.copyWith(
               color: AppColors.textSecondary,
             ),

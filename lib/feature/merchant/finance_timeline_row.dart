@@ -1,3 +1,4 @@
+import 'merchant_finance_detail_strings.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/theme/cy_palette.dart';
@@ -8,9 +9,10 @@ import 'finance_state_text.dart';
 ///
 /// ★ 抽出来是因为两页各画一遍必然画歪一处:真源也是同一套 `.fin-tl` 样式类。
 class FinanceTimelineRow extends StatelessWidget {
-  const FinanceTimelineRow({super.key, required this.node});
+  const FinanceTimelineRow({super.key, required this.node, this.displayAt});
 
   final BatchTimelineNode node;
+  final String? displayAt;
 
   @override
   Widget build(BuildContext context) {
@@ -38,7 +40,7 @@ class FinanceTimelineRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Text(
-                  node.label,
+                  merchantFinanceLocalText(context, node.label),
                   style: textTheme.bodyMedium?.copyWith(
                     color: done || now ? p.textPrimary : p.textTertiary,
                   ),
@@ -46,7 +48,7 @@ class FinanceTimelineRow extends StatelessWidget {
                 // ★ 只有服务端真给了时间的节点才有小字 —— 未来节点不写「预计」。
                 if (node.at != null)
                   Text(
-                    node.at!,
+                    displayAt ?? node.at!,
                     style: textTheme.labelSmall?.copyWith(
                       color: p.textTertiary,
                     ),

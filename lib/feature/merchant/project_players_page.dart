@@ -1,3 +1,6 @@
+import '../../l10n/my_project_error_display.dart';
+import '../../l10n/strings.dart';
+import '../../core/network/dio_client.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -33,7 +36,7 @@ class ProjectPlayersPage extends ConsumerWidget {
     final async = ref.watch(projectPlayersProvider(topicId));
     return CupertinoPageScaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      navigationBar: const CupertinoNavigationBar(middle: Text('玩家名单')),
+      navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).merchantPairPlayersTitle)),
       child: Material(
         color: Colors.transparent,
         child: SafeArea(
@@ -42,8 +45,8 @@ class ProjectPlayersPage extends ConsumerWidget {
             loading: () => const CySkeleton(),
             error: (Object e, StackTrace st) => StatusView(
               icon: CupertinoIcons.exclamationmark_triangle,
-              message: '名单没读出来',
-              sub: e.toString().replaceFirst('Exception: ', ''),
+              message: stringsOf(context).merchantPairPlayersError,
+              sub: myProjectErrorCopy(stringsOf(context), e) ?? friendlyOrBackendMessage(e, fallback: stringsOf(context).merchantPairPlayersError),
               large: true,
               onRetry: () => ref.invalidate(projectPlayersProvider(topicId)),
             ),
@@ -68,10 +71,10 @@ class ProjectPlayersPage extends ConsumerWidget {
     int n(Object? v) => v is num ? v.toInt() : 0;
 
     if (rows.isEmpty) {
-      return const StatusView(
+      return StatusView(
         icon: CupertinoIcons.person,
-        message: '还没有人报名',
-        sub: '有人买票后,这里会显示谁要来、谁已经到店',
+        message: stringsOf(context).merchantPairPlayersEmpty,
+        sub: stringsOf(context).merchantPairPlayersEmptyHint,
         large: true,
       );
     }
@@ -81,10 +84,8 @@ class ProjectPlayersPage extends ConsumerWidget {
       children: <Widget>[
         // summary 只做一行小字 —— 这页的主体是名单不是统计。
         Text(
-          '已付 ${n(summary['paidCount'])} 人 · '
-          '已到 ${n(summary['arrivedCount'])} · '
-          '未到 ${n(summary['pendingCount'])}'
-          '${n(summary['refundedCount']) > 0 ? ' · 已退 ${n(summary['refundedCount'])}' : ''}',
+          stringsOf(context).merchantPairSummary(n(summary['paidCount']), n(summary['arrivedCount']), n(summary['pendingCount'])) +
+          (n(summary['refundedCount']) > 0 ? stringsOf(context).merchantPairRefundCount(n(summary['refundedCount'])) : ''),
           style: t.bodySmall?.copyWith(color: p.textSecondary),
         ),
         if (hint != null && hint.isNotEmpty) ...<Widget>[
@@ -127,7 +128,7 @@ class ProjectPlayersPage extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text((r['name'] ?? '玩家').toString(), style: t.titleSmall),
+                Text((r['name'] ?? stringsOf(context).merchantPairPlayer).toString(), style: t.titleSmall),
                 if ((r['ticketName'] ?? '').toString().isNotEmpty) ...<Widget>[
                   const SizedBox(height: CyTokens.space1),
                   Text(
@@ -143,7 +144,7 @@ class ProjectPlayersPage extends ConsumerWidget {
             ),
           ),
           Text(
-            _stateText(state),
+            _stateText(context, state),
             style: t.labelSmall?.copyWith(color: _stateColor(state, p)),
           ),
         ],
@@ -153,14 +154,14 @@ class ProjectPlayersPage extends ConsumerWidget {
 
   /// 三态照后端的 state 走。**「已退款」必须单独一态** ——
   /// 混进「未到」的话,商家会一直等一个不会来的人。
-  static String _stateText(String s) {
+  static String _stateText(BuildContext context, String s) {
     switch (s) {
       case 'arrived':
-        return '已到店';
+        return stringsOf(context).merchantPairArrived;
       case 'refunded':
-        return '已退款';
+        return stringsOf(context).merchantPairRefunded;
       default:
-        return '未到店';
+        return stringsOf(context).merchantPairPending;
     }
   }
 

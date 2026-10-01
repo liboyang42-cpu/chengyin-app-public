@@ -1,3 +1,5 @@
+import '../../l10n/strings.dart';
+import 'merchant_crm_strings.dart';
 import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
@@ -219,7 +221,7 @@ class _MerchantCustomerPageState extends ConsumerState<MerchantCustomerPage> {
       if (!mounted) return;
       setState(() {
         _accessLoading = false;
-        _accessError = '经营身份加载失败，请稍后重试';
+        _accessError = stringsOf(context).merchantCrmAccessError;
       });
     }
   }
@@ -276,7 +278,7 @@ class _MerchantCustomerPageState extends ConsumerState<MerchantCustomerPage> {
       if (!mounted || token != _loadToken) return;
       setState(() {
         _loading = false;
-        _listError = e.message;
+        _listError = merchantCrmErrorText(context, e);
         _rows = <CrmCustomerRow>[];
       });
     }
@@ -366,7 +368,7 @@ class _MerchantCustomerPageState extends ConsumerState<MerchantCustomerPage> {
       initialDateTime: DateTime.tryParse(current ?? '') ?? now,
       minimumDate: DateTime(now.year - 5),
       maximumDate: DateTime(now.year + 1, 12, 31),
-      title: isStart ? '选择开始日期' : '选择结束日期',
+      title: isStart ? stringsOf(context).merchantCrmStartDate : stringsOf(context).merchantCrmEndDate,
     );
     if (picked == null || !mounted) return;
     final String value =
@@ -397,7 +399,7 @@ class _MerchantCustomerPageState extends ConsumerState<MerchantCustomerPage> {
       return;
     }
     if (_selectedIds.length >= kCrmBatchTagLimit) {
-      CyNativeNotice.show(context, '一次最多选 $kCrmBatchTagLimit 位客户');
+      CyNativeNotice.show(context, stringsOf(context).merchantCrmSelectionLimit(kCrmBatchTagLimit));
       return;
     }
     setState(() => _selectedIds.add(memberId));
@@ -407,11 +409,11 @@ class _MerchantCustomerPageState extends ConsumerState<MerchantCustomerPage> {
     if (!_canSegment || _batchSubmitting) return;
     final String tagName = _batchTagName.text.trim();
     if (_selectedIds.isEmpty) {
-      setState(() => _batchError = '请先选择客户');
+      setState(() => _batchError = stringsOf(context).merchantCrmSelectCustomer);
       return;
     }
     if (tagName.isEmpty || tagName.length > 16) {
-      setState(() => _batchError = '请输入1至16字标签名称');
+      setState(() => _batchError = stringsOf(context).merchantCrmTagLength);
       return;
     }
     setState(() {
@@ -433,13 +435,13 @@ class _MerchantCustomerPageState extends ConsumerState<MerchantCustomerPage> {
         _selecting = false;
         _selectedIds.clear();
       });
-      CyNativeNotice.show(context, '标签已添加');
+      CyNativeNotice.show(context, stringsOf(context).merchantCrmTagAdded);
       unawaited(_load());
     } on MerchantCrmApiException catch (e) {
       if (!mounted) return;
       setState(() {
         _batchSubmitting = false;
-        _batchError = e.message;
+        _batchError = merchantCrmErrorText(context, e);
       });
     }
   }
@@ -461,11 +463,11 @@ class _MerchantCustomerPageState extends ConsumerState<MerchantCustomerPage> {
             .firstOrNull;
         final CrmSavedSegment? first = selected ?? segments.firstOrNull;
         _segmentId = first?.id;
-        _segmentLabel = first?.name ?? '';
+        _segmentLabel = first == null ? '' : merchantCrmSegmentName(context, first);
       });
     } on MerchantCrmApiException catch (e) {
       if (!mounted) return;
-      setState(() => _savedSegmentsError = e.message);
+      setState(() => _savedSegmentsError = merchantCrmErrorText(context, e));
     }
   }
 
@@ -473,7 +475,7 @@ class _MerchantCustomerPageState extends ConsumerState<MerchantCustomerPage> {
     if (!_canSegment || _segmentSaving) return;
     final String name = _segmentName.text.trim();
     if (name.isEmpty || name.length > 30) {
-      CyNativeNotice.show(context, '请输入1至30字分群名称');
+      CyNativeNotice.show(context, stringsOf(context).merchantCrmSegmentLength);
       return;
     }
     setState(() => _segmentSaving = true);
@@ -490,12 +492,12 @@ class _MerchantCustomerPageState extends ConsumerState<MerchantCustomerPage> {
         _segmentSaving = false;
         _segmentName.clear();
       });
-      CyNativeNotice.show(context, '分群已保存');
+      CyNativeNotice.show(context, stringsOf(context).merchantCrmSegmentSaved);
       unawaited(_loadSavedSegments());
     } on MerchantCrmApiException catch (e) {
       if (!mounted) return;
       setState(() => _segmentSaving = false);
-      CyNativeNotice.show(context, e.message, isError: true);
+      CyNativeNotice.show(context, merchantCrmErrorText(context, e), isError: true);
     }
   }
 
@@ -537,11 +539,11 @@ class _MerchantCustomerPageState extends ConsumerState<MerchantCustomerPage> {
   Future<void> _pickCampaignSegment() async {
     final int? picked = await showCrmPickerSheet(
       context,
-      title: '选择保存分群',
+      title: stringsOf(context).merchantCrmChooseSegment,
       selectedId: _segmentId,
       options: <CrmPickerOption>[
         for (final CrmSavedSegment s in _savedSegments)
-          CrmPickerOption(id: s.id, label: s.name),
+          CrmPickerOption(id: s.id, label: merchantCrmSegmentName(context, s)),
       ],
     );
     if (picked == null || !mounted) return;
@@ -551,7 +553,7 @@ class _MerchantCustomerPageState extends ConsumerState<MerchantCustomerPage> {
     if (hit == null) return;
     setState(() {
       _segmentId = hit.id;
-      _segmentLabel = hit.name;
+      _segmentLabel = merchantCrmSegmentName(context, hit);
       _preview = null;
       _campaignError = '';
     });
@@ -560,11 +562,11 @@ class _MerchantCustomerPageState extends ConsumerState<MerchantCustomerPage> {
   Future<void> _pickCampaignCoupon() async {
     final int? picked = await showCrmPickerSheet(
       context,
-      title: '选择优惠券',
+      title: stringsOf(context).merchantCrmChooseCoupon,
       selectedId: _couponId,
       options: <CrmPickerOption>[
         for (final CrmCoupon c in _coupons)
-          CrmPickerOption(id: c.id, label: c.name),
+          CrmPickerOption(id: c.id, label: merchantCrmCouponName(context, c)),
       ],
     );
     if (picked == null || !mounted) return;
@@ -574,7 +576,7 @@ class _MerchantCustomerPageState extends ConsumerState<MerchantCustomerPage> {
     if (hit == null) return;
     setState(() {
       _couponId = hit.id;
-      _couponLabel = hit.name;
+      _couponLabel = merchantCrmCouponName(context, hit);
       _preview = null;
       _campaignError = '';
     });
@@ -594,11 +596,11 @@ class _MerchantCustomerPageState extends ConsumerState<MerchantCustomerPage> {
             .firstOrNull;
         final CrmCoupon? first = selected ?? coupons.firstOrNull;
         _couponId = first?.id;
-        _couponLabel = first?.name ?? '';
+        _couponLabel = first == null ? '' : merchantCrmCouponName(context, first);
       });
     } on MerchantCrmApiException catch (e) {
       if (!mounted) return;
-      setState(() => _couponCatalogError = e.message);
+      setState(() => _couponCatalogError = merchantCrmErrorText(context, e));
     }
   }
 
@@ -618,11 +620,11 @@ class _MerchantCustomerPageState extends ConsumerState<MerchantCustomerPage> {
     if (!_canMarket || _previewing || _sending) return;
     final int? segmentId = _segmentId;
     if (segmentId == null) {
-      setState(() => _campaignError = '请先保存并选择客户分群');
+      setState(() => _campaignError = stringsOf(context).merchantCrmSegmentRequired);
       return;
     }
     if (_channel == 'COUPON' && (!_canCoupon || _couponId == null)) {
-      setState(() => _campaignError = '请选择当前商家的有效优惠券');
+      setState(() => _campaignError = stringsOf(context).merchantCrmCouponRequired);
       return;
     }
     setState(() {
@@ -643,7 +645,7 @@ class _MerchantCustomerPageState extends ConsumerState<MerchantCustomerPage> {
       if (!mounted) return;
       setState(() {
         _previewing = false;
-        _campaignError = e.message;
+        _campaignError = merchantCrmErrorText(context, e);
       });
     }
   }
@@ -658,30 +660,29 @@ class _MerchantCustomerPageState extends ConsumerState<MerchantCustomerPage> {
     final String title = _campaignTitle.text.trim();
     final String content = _campaignContent.text.trim();
     if (segmentId == null) {
-      setState(() => _campaignError = '请先保存并选择客户分群');
+      setState(() => _campaignError = stringsOf(context).merchantCrmSegmentRequired);
       return;
     }
     if (title.isEmpty || title.length > 60) {
-      setState(() => _campaignError = '请输入1至60字触达标题');
+      setState(() => _campaignError = stringsOf(context).merchantCrmCampaignTitleLength);
       return;
     }
     if (content.isEmpty || content.length > 500) {
-      setState(() => _campaignError = '请输入1至500字触达内容');
+      setState(() => _campaignError = stringsOf(context).merchantCrmCampaignContentLength);
       return;
     }
     final int? couponId = _channel == 'COUPON' ? _couponId : null;
     if (_channel == 'COUPON' && (!_canCoupon || couponId == null)) {
-      setState(() => _campaignError = '请选择当前商家的有效优惠券');
+      setState(() => _campaignError = stringsOf(context).merchantCrmCouponRequired);
       return;
     }
 
     final bool confirmed = await cyConfirm(
       context,
-      title: '确认发送?',
+      title: stringsOf(context).merchantCrmConfirmSend,
       content:
-          '将按「${_segmentLabel.isEmpty ? '所选分群' : _segmentLabel}」'
-          '创建并发送触达。发送后不可撤回。',
-      confirmText: '发送',
+          stringsOf(context).merchantCrmPolicySegmentSend(_segmentLabel.isEmpty ? stringsOf(context).merchantCrmPolicySelectedSegment : _segmentLabel),
+      confirmText: stringsOf(context).merchantCrmSend,
       danger: true,
     );
     if (!confirmed || !mounted) return;
@@ -715,7 +716,7 @@ class _MerchantCustomerPageState extends ConsumerState<MerchantCustomerPage> {
       if (!mounted) return;
       setState(() {
         _sending = false;
-        _campaignError = e.message;
+        _campaignError = merchantCrmErrorText(context, e);
       });
     }
   }
@@ -743,7 +744,7 @@ class _MerchantCustomerPageState extends ConsumerState<MerchantCustomerPage> {
       if (!mounted) return;
       setState(() {
         _sending = false;
-        _campaignError = e.message;
+        _campaignError = merchantCrmErrorText(context, e);
       });
     }
   }
@@ -763,7 +764,7 @@ class _MerchantCustomerPageState extends ConsumerState<MerchantCustomerPage> {
       });
     } on MerchantCrmApiException catch (e) {
       if (!mounted) return;
-      setState(() => _campaignError = e.message);
+      setState(() => _campaignError = merchantCrmErrorText(context, e));
     }
   }
 
@@ -783,7 +784,7 @@ class _MerchantCustomerPageState extends ConsumerState<MerchantCustomerPage> {
       if (mounted) {
         CyNativeNotice.show(
           context,
-          '号码没能取到：${e.message}。为保护客户隐私，每次联系都要经服务端核验。',
+          stringsOf(context).merchantCrmPolicyContactPrivacy(merchantCrmErrorText(context, e)),
           isError: true,
         );
       }
@@ -798,9 +799,9 @@ class _MerchantCustomerPageState extends ConsumerState<MerchantCustomerPage> {
     if (phone == null || !mounted) return;
     try {
       final bool ok = await launchUrl(Uri(scheme: 'tel', path: phone));
-      if (!ok && mounted) CyNativeNotice.show(context, '没能打开拨号');
+      if (!ok && mounted) CyNativeNotice.show(context, stringsOf(context).merchantCrmDialError);
     } catch (_) {
-      if (mounted) CyNativeNotice.show(context, '没能打开拨号', isError: true);
+      if (mounted) CyNativeNotice.show(context, stringsOf(context).merchantCrmDialError, isError: true);
     }
   }
 
@@ -810,9 +811,9 @@ class _MerchantCustomerPageState extends ConsumerState<MerchantCustomerPage> {
     try {
       await Clipboard.setData(ClipboardData(text: phone));
       if (!mounted) return;
-      CyNativeNotice.show(context, '已复制');
+      CyNativeNotice.show(context, stringsOf(context).merchantCrmCopied);
     } catch (_) {
-      if (mounted) CyNativeNotice.show(context, '没能复制', isError: true);
+      if (mounted) CyNativeNotice.show(context, stringsOf(context).merchantCrmCopyError, isError: true);
     }
   }
 
@@ -846,7 +847,7 @@ class _MerchantCustomerPageState extends ConsumerState<MerchantCustomerPage> {
       final MerchantCrmExportTask? task = MerchantCrmExportTask.tryParse(data);
       if (task == null) {
         setState(() {
-          _exportError = '导出任务创建失败';
+          _exportError = stringsOf(context).merchantCrmExportCreateError;
         });
         return;
       }
@@ -884,7 +885,7 @@ class _MerchantCustomerPageState extends ConsumerState<MerchantCustomerPage> {
       final MerchantCrmExportTask? next = MerchantCrmExportTask.tryParse(data);
       if (next == null) {
         // ★ 这一帧读不懂就**保留上一帧**并继续问,不是把界面落到一个编造的态上。
-        setState(() => _exportError = '导出状态没读到,请重新查询');
+        setState(() => _exportError = stringsOf(context).merchantCrmExportStatusError);
         _scheduleExportPoll();
         return;
       }
@@ -913,7 +914,7 @@ class _MerchantCustomerPageState extends ConsumerState<MerchantCustomerPage> {
     final String? token = _exportToken;
     if (task == null || !task.isSuccess) return;
     if (token == null || token.isEmpty) {
-      CyNativeNotice.show(context, '下载凭证不可用,请重新创建导出', isError: true);
+      CyNativeNotice.show(context, stringsOf(context).merchantCrmExportTokenError, isError: true);
       return;
     }
     setState(() {
@@ -921,8 +922,9 @@ class _MerchantCustomerPageState extends ConsumerState<MerchantCustomerPage> {
       _exportError = null;
     });
     try {
+      final fileName = stringsOf(context).merchantCrmExportFile(task.id);
       final Directory dir = await getTemporaryDirectory();
-      final String path = '${dir.path}/客户资料-${task.id}.xlsx';
+      final String path = '${dir.path}/$fileName';
       await ref
           .read(pageParityApiProvider)
           .downloadCrmExport(
@@ -934,13 +936,13 @@ class _MerchantCustomerPageState extends ConsumerState<MerchantCustomerPage> {
       await SharePlus.instance.share(
         ShareParams(
           files: <XFile>[XFile(path, mimeType: _xlsxMime)],
-          subject: '客户资料导出',
+          subject: stringsOf(context).merchantCrmExportSubject,
         ),
       );
     } catch (e) {
       if (!mounted) return;
       final String msg = e is DioException
-          ? '下载失败,请稍后重试'
+          ? stringsOf(context).merchantCrmDownloadError
           : e.toString().replaceFirst('Exception: ', '');
       setState(() => _exportError = msg);
     } finally {
@@ -975,7 +977,7 @@ class _MerchantCustomerPageState extends ConsumerState<MerchantCustomerPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Text(
-            task?.statusLabel ?? '导出任务创建失败',
+            task == null ? stringsOf(context).merchantCrmExportCreateError : merchantCrmExportStatus(context, task),
             key: const Key('merchant-crm-export-status'),
             style: t.bodySmall?.copyWith(color: p.textSecondary),
           ),
@@ -992,8 +994,8 @@ class _MerchantCustomerPageState extends ConsumerState<MerchantCustomerPage> {
             CyNativeButton(
               key: const Key('merchant-crm-export-download'),
               label: task.isSuccess
-                  ? (_downloading ? '下载中…' : '下载并打开')
-                  : '重新创建导出',
+                  ? (_downloading ? stringsOf(context).merchantCrmDownloading : stringsOf(context).merchantCrmDownload)
+                  : stringsOf(context).merchantCrmRecreateExport,
               role: CyNativeButtonRole.secondary,
               loading: _downloading,
               onPressed: _downloading
@@ -1017,11 +1019,11 @@ class _MerchantCustomerPageState extends ConsumerState<MerchantCustomerPage> {
     return CupertinoPageScaffold(
       backgroundColor: p.bgPage,
       navigationBar: CupertinoNavigationBar(
-        middle: const Text('客户'),
+        middle: Text(stringsOf(context).merchantCrmTitle),
         trailing: canExport
             ? Semantics(
                 button: true,
-                label: '导出脱敏客户资料',
+                label: stringsOf(context).merchantCrmExportSemantics,
                 child: CupertinoButton(
                   key: const Key('merchant-crm-export'),
                   padding: EdgeInsets.zero,
@@ -1030,7 +1032,7 @@ class _MerchantCustomerPageState extends ConsumerState<MerchantCustomerPage> {
                       ? null
                       : _createExport,
                   child: Text(
-                    (_export?.isRunning ?? false) || _exporting ? '导出中…' : '导出',
+                    (_export?.isRunning ?? false) || _exporting ? stringsOf(context).merchantCrmExporting : stringsOf(context).merchantCrmExport,
                   ),
                 ),
               )
@@ -1049,16 +1051,16 @@ class _MerchantCustomerPageState extends ConsumerState<MerchantCustomerPage> {
     }
     if (_accessError.isNotEmpty) {
       return StatusView(
-        message: '经营身份加载失败',
+        message: stringsOf(context).merchantCrmAccessFailed,
         sub: _accessError,
         large: true,
         onRetry: _retryAccess,
       );
     }
     if (!_canRead) {
-      return const StatusView(
-        message: '当前岗位没有客户查看权限',
-        sub: '请联系店主调整经营团队权限',
+      return StatusView(
+        message: stringsOf(context).merchantCrmDenied,
+        sub: stringsOf(context).merchantCrmDeniedHint,
         large: true,
       );
     }
@@ -1087,7 +1089,7 @@ class _MerchantCustomerPageState extends ConsumerState<MerchantCustomerPage> {
             ),
             child: CySearchField(
               value: _query,
-              placeholder: '搜索姓名或手机号',
+              placeholder: stringsOf(context).merchantCrmSearch,
               onChanged: _onKeywordInput,
               onSubmitted: _onKeywordConfirm,
             ),
@@ -1123,7 +1125,7 @@ class _MerchantCustomerPageState extends ConsumerState<MerchantCustomerPage> {
                 child: Semantics(
                   liveRegion: true,
                   child: Text(
-                    '正在更新客户名单…',
+                    stringsOf(context).merchantCrmRefreshing,
                     style: CyType.caption1.copyWith(color: p.textSecondary),
                   ),
                 ),
@@ -1160,11 +1162,11 @@ class _MerchantCustomerPageState extends ConsumerState<MerchantCustomerPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   Text(
-                    '当前筛选 · $count 人',
+                    stringsOf(context).merchantCrmAudience(count),
                     style: CyType.footnote.copyWith(color: p.textPrimary),
                   ),
                   Text(
-                    '只发这批人,不是全场广播',
+                    stringsOf(context).merchantCrmResidualAudienceHint,
                     style: CyType.caption1.copyWith(color: p.textSecondary),
                   ),
                 ],
@@ -1173,7 +1175,7 @@ class _MerchantCustomerPageState extends ConsumerState<MerchantCustomerPage> {
             const SizedBox(width: CyTokens.space2),
             CrmPillButton(
               key: const Key('merchant-crm-cast'),
-              label: '定向广播',
+              label: stringsOf(context).merchantCrmBroadcast,
               primary: true,
               onTap: count > 0 ? _openCast : null,
             ),
@@ -1282,7 +1284,7 @@ class _MerchantCustomerPageState extends ConsumerState<MerchantCustomerPage> {
 
   /// 计数摘要(`cu-hero-sub`)。计数是**全量统计**,取 segmentCounts.all。
   Widget _summaryLine(CyPalette p) {
-    final String text = _data?.summaryText() ?? '客户数量加载中';
+    final String text = merchantCrmSummary(context, _data);
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         CyTokens.pageX,
@@ -1303,7 +1305,7 @@ class _MerchantCustomerPageState extends ConsumerState<MerchantCustomerPage> {
   Widget _listArea(CyPalette p) {
     if (_listError.isNotEmpty && _rows.isEmpty) {
       return StatusView(
-        message: '客户名单加载失败',
+        message: stringsOf(context).merchantCrmListError,
         sub: _listError,
         large: true,
         onRetry: _load,
@@ -1330,7 +1332,7 @@ class _MerchantCustomerPageState extends ConsumerState<MerchantCustomerPage> {
               child: Center(
                 child: _loadingMore
                     ? Text(
-                        '正在加载更多',
+                        stringsOf(context).merchantCrmMore,
                         style: CyType.caption1.copyWith(color: p.textSecondary),
                       )
                     : const SizedBox.shrink(),
@@ -1363,10 +1365,10 @@ class _MerchantCustomerPageState extends ConsumerState<MerchantCustomerPage> {
   Widget _emptyView() {
     if (_filters.keyword.isNotEmpty) {
       return StatusView(
-        message: '没搜到这个客户',
-        sub: '换个姓名再试试',
+        message: stringsOf(context).merchantCrmSearchEmpty,
+        sub: stringsOf(context).merchantCrmSearchEmptyHint,
         large: true,
-        retryLabel: '清除搜索',
+        retryLabel: stringsOf(context).merchantCrmClearSearch,
         onRetry: () => _applyFilters(_filters.copyWith(keyword: '')),
       );
     }
@@ -1378,37 +1380,37 @@ class _MerchantCustomerPageState extends ConsumerState<MerchantCustomerPage> {
           )
           .label;
       return StatusView(
-        message: '暂时没有$label客户',
-        sub: '换个分段看看',
+        message: stringsOf(context).merchantCrmSegmentEmpty(merchantCrmLocalText(context, label)),
+        sub: stringsOf(context).merchantCrmSegmentEmptyHint,
         large: true,
-        retryLabel: '查看全部客户',
+        retryLabel: stringsOf(context).merchantCrmAllCustomers,
         onRetry: () => _applyFilters(_filters.copyWith(segment: 'all')),
       );
     }
     final int? countedAll = _data?.segmentCounts['all'];
     if (countedAll == null) {
       return StatusView(
-        message: '客户统计暂未取到',
-        sub: '不会用 0 代替缺失的客户计数，请重新加载。',
+        message: stringsOf(context).merchantCrmCountsUnavailable,
+        sub: stringsOf(context).merchantCrmCountsUnavailableHint,
         large: true,
-        retryLabel: '重新加载',
+        retryLabel: stringsOf(context).merchantCrmReload,
         onRetry: _load,
       );
     }
     if (countedAll > 0) {
       return StatusView(
-        message: '客户名单这次没取回来',
-        sub: '统计里有 $countedAll 位客户,但名单没加载出来。下拉刷新或稍后再看。',
+        message: stringsOf(context).merchantCrmRowsMissing,
+        sub: stringsOf(context).merchantCrmRowsMissingHint(countedAll),
         large: true,
-        retryLabel: '重新加载',
+        retryLabel: stringsOf(context).merchantCrmReload,
         onRetry: _load,
       );
     }
     return StatusView(
-      message: '还没有客户',
-      sub: '先去合作中心承接项目，有人购票后会出现在这里',
+      message: stringsOf(context).merchantCrmEmpty,
+      sub: stringsOf(context).merchantCrmEmptyHint,
       large: true,
-      retryLabel: '去合作中心',
+      retryLabel: stringsOf(context).merchantCrmCoop,
       onRetry: () => context.push('/merchant/coop'),
     );
   }
@@ -1443,7 +1445,7 @@ class _CrmCustomerTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final CyPalette p = CyPalette.of(context);
-    final String action = row.actionText(now);
+    final String action = merchantCrmAction(context, row, now);
     final Widget content = Padding(
       padding: const EdgeInsets.symmetric(vertical: CyTokens.space2),
       child: Row(
@@ -1473,7 +1475,7 @@ class _CrmCustomerTile extends StatelessWidget {
                   children: <Widget>[
                     Flexible(
                       child: Text(
-                        row.displayName,
+                        merchantCrmCustomerName(context, row),
                         style: CyType.body.copyWith(
                           color: p.textPrimary,
                           fontWeight: FontWeight.w600,
@@ -1485,13 +1487,13 @@ class _CrmCustomerTile extends StatelessWidget {
                     if (row.tierText.isNotEmpty) ...<Widget>[
                       const SizedBox(width: CyTokens.space1_5),
                       _TierPill(
-                        label: row.tierText,
+                        label: merchantCrmLocalText(context, row.tierText),
                         warning: row.tierIsWarning,
                       ),
                     ],
                     if (row.noteText.isNotEmpty) ...<Widget>[
                       const SizedBox(width: CyTokens.space1_5),
-                      CyTag(label: '备注'),
+                      CyTag(label: stringsOf(context).merchantCrmNote),
                     ],
                   ],
                 ),
@@ -1571,8 +1573,8 @@ class _CrmCustomerTile extends StatelessWidget {
     return Semantics(
       button: true,
       label: selecting
-          ? '${selected ? '取消选择' : '选择'}客户 ${row.displayName}'
-          : '查看客户 ${row.displayName} 详情',
+          ? selected ? stringsOf(context).merchantCrmDeselectName(merchantCrmCustomerName(context, row)) : stringsOf(context).merchantCrmSelectName(merchantCrmCustomerName(context, row))
+          : stringsOf(context).merchantCrmViewName(merchantCrmCustomerName(context, row)),
       excludeSemantics: true,
       child: CupertinoButton(
         minimumSize: Size.zero,

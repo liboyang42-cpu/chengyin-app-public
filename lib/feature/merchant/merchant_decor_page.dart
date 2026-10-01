@@ -1,3 +1,5 @@
+import 'merchant_store_strings.dart';
+import '../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -72,7 +74,7 @@ class _MerchantDecorPageState extends ConsumerState<MerchantDecorPage> {
     });
     try {
       await ref.read(merchantApiProvider).saveDecor(next);
-      if (mounted) CyNativeNotice.show(context, '已保存');
+      if (mounted) CyNativeNotice.show(context, stringsOf(context).merchantStoreSaved);
     } catch (error) {
       if (!mounted) return;
       setState(() => _decor = before);
@@ -94,7 +96,7 @@ class _MerchantDecorPageState extends ConsumerState<MerchantDecorPage> {
     });
     try {
       await _saveBrandProfile();
-      if (mounted) CyNativeNotice.show(context, '已保存');
+      if (mounted) CyNativeNotice.show(context, stringsOf(context).merchantStoreSaved);
     } catch (error) {
       if (!mounted) return;
       setState(() => _profile = before);
@@ -163,7 +165,7 @@ class _MerchantDecorPageState extends ConsumerState<MerchantDecorPage> {
                       minimumSize: const Size(44, 44),
                       onPressed: () =>
                           Navigator.of(sheetContext).pop(controller.text),
-                      child: const Text('完成'),
+                      child: Text(stringsOf(context).merchantStoreDone),
                     ),
                   ],
                 ),
@@ -232,7 +234,7 @@ class _MerchantDecorPageState extends ConsumerState<MerchantDecorPage> {
       final Category? selected = await showCupertinoModalPopup<Category>(
         context: context,
         builder: (BuildContext sheetContext) => CupertinoActionSheet(
-          title: const Text('选择行业'),
+          title: Text(stringsOf(context).merchantStoreSelectIndustry),
           actions: categories
               .map(
                 (Category category) => CupertinoActionSheetAction(
@@ -243,7 +245,7 @@ class _MerchantDecorPageState extends ConsumerState<MerchantDecorPage> {
               .toList(),
           cancelButton: CupertinoActionSheetAction(
             onPressed: () => Navigator.of(sheetContext).pop(),
-            child: const Text('取消'),
+            child: Text(stringsOf(context).merchantStoreCancel),
           ),
         ),
       );
@@ -302,11 +304,11 @@ class _MerchantDecorPageState extends ConsumerState<MerchantDecorPage> {
                 children: <Widget>[
                   Row(
                     children: <Widget>[
-                      const Expanded(child: Text('选择特色标签')),
+                      Expanded(child: Text(stringsOf(context).merchantStoreSelectTags)),
                       CupertinoButton(
                         minimumSize: const Size(44, 44),
                         onPressed: () => Navigator.of(context).pop(draft),
-                        child: const Text('完成'),
+                        child: Text(stringsOf(context).merchantStoreDone),
                       ),
                     ],
                   ),
@@ -321,7 +323,7 @@ class _MerchantDecorPageState extends ConsumerState<MerchantDecorPage> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: <Widget>[
-                                Text(entry.key),
+                                Text(merchantStoreTagOption(context, entry.key)),
                                 const SizedBox(height: CyTokens.space1),
                                 Wrap(
                                   spacing: CyTokens.space1,
@@ -329,7 +331,7 @@ class _MerchantDecorPageState extends ConsumerState<MerchantDecorPage> {
                                   children: entry.value
                                       .map(
                                         (String tag) => CyChip(
-                                          label: tag,
+                                          label: merchantStoreTagOption(context, tag),
                                           selected: draft.contains(tag),
                                           onTap: () => setSheetState(() {
                                             if (draft.contains(tag)) {
@@ -346,7 +348,7 @@ class _MerchantDecorPageState extends ConsumerState<MerchantDecorPage> {
                             ),
                           ),
                         ),
-                        const Text('自定义'),
+                        Text(stringsOf(context).merchantStoreCustom),
                         const SizedBox(height: CyTokens.space1),
                         Row(
                           children: <Widget>[
@@ -354,7 +356,7 @@ class _MerchantDecorPageState extends ConsumerState<MerchantDecorPage> {
                               child: CupertinoTextField(
                                 key: const Key('merchant-decor-custom-tag'),
                                 controller: customController,
-                                placeholder: '输入自定义标签',
+                                placeholder: stringsOf(context).merchantStoreCustomHint,
                               ),
                             ),
                             CupertinoButton(
@@ -371,7 +373,7 @@ class _MerchantDecorPageState extends ConsumerState<MerchantDecorPage> {
                                   customController.clear();
                                 });
                               },
-                              child: const Text('添加'),
+                              child: Text(stringsOf(context).merchantStoreAdd),
                             ),
                           ],
                         ),
@@ -417,7 +419,7 @@ class _MerchantDecorPageState extends ConsumerState<MerchantDecorPage> {
   void _openPreview() {
     final int memberId = (_profile['memberId'] as num?)?.toInt() ?? 0;
     if (memberId < 1) {
-      CyNativeNotice.show(context, '资料加载中', isError: true);
+      CyNativeNotice.show(context, stringsOf(context).merchantStoreLoading, isError: true);
       return;
     }
     context.push('/merchant/public-home/member/$memberId');
@@ -426,7 +428,7 @@ class _MerchantDecorPageState extends ConsumerState<MerchantDecorPage> {
   @override
   Widget build(BuildContext context) => CupertinoPageScaffold(
     backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-    navigationBar: const CupertinoNavigationBar(middle: Text('店铺装修')),
+    navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).merchantStoreDecor)),
     child: Material(
       color: Colors.transparent,
       child: SafeArea(top: false, child: _body()),
@@ -436,17 +438,17 @@ class _MerchantDecorPageState extends ConsumerState<MerchantDecorPage> {
   Widget _body() => switch (_loadState) {
     _DecorLoadState.loading => const CySkeleton(type: CySkeletonType.detail),
     _DecorLoadState.error => StatusView(
-      message: '店铺装修加载失败',
-      sub: '网络或登录状态暂时不可用，请重试。',
+      message: stringsOf(context).merchantStoreDecorFailed,
+      sub: stringsOf(context).merchantStoreNetworkSession,
       onRetry: _load,
-      retryLabel: '重新载入',
+      retryLabel: stringsOf(context).merchantStoreReload,
       large: true,
     ),
     _DecorLoadState.empty => StatusView(
-      message: '暂时无法装修店铺',
-      sub: '这个账号还没有店铺，先完成商家入驻拿到店铺，再回来填行业类型和品牌资料。',
+      message: stringsOf(context).merchantStoreDecorUnavailable,
+      sub: stringsOf(context).merchantStoreDecorNoStore,
       onRetry: () => context.push('/merchant/apply'),
-      retryLabel: '去商家入驻',
+      retryLabel: stringsOf(context).merchantStoreApply,
       large: true,
     ),
     _DecorLoadState.ready => _readyBody(),
@@ -460,10 +462,10 @@ class _MerchantDecorPageState extends ConsumerState<MerchantDecorPage> {
             .where((String value) => value.isNotEmpty)
             .join(' · ');
     final String coopSummary = <String>[
-      if (_profile['capacity'] != null) '${_profile['capacity']} 人',
+      if (_profile['capacity'] != null) stringsOf(context).merchantStoreCapacity(_profile['capacity'].toString()),
       if ((_profile['availableTime'] ?? '').toString().isNotEmpty)
         _profile['availableTime'].toString(),
-      (_profile['chargeType'] as num?)?.toInt() == 1 ? '收费承接' : '免费承接',
+      (_profile['chargeType'] as num?)?.toInt() == 1 ? stringsOf(context).merchantStorePaidHosting : stringsOf(context).merchantStoreFreeHosting,
     ].join(' · ');
     return Stack(
       children: <Widget>[
@@ -484,120 +486,120 @@ class _MerchantDecorPageState extends ConsumerState<MerchantDecorPage> {
             const SizedBox(height: CyTokens.space3),
             _guideCard(),
             const SizedBox(height: CyTokens.space3),
-            _section('品牌资料', <Widget>[
+            _section(stringsOf(context).merchantStoreBrandProfile, <Widget>[
               _row(
-                '封面头图 · 16:9',
-                _decor.coverImage == null ? '未上传' : '已上传',
+                stringsOf(context).merchantStoreCoverRatio,
+                _decor.coverImage == null ? stringsOf(context).merchantStoreNotUploaded : stringsOf(context).merchantStoreUploaded,
                 () => _pickImage(cover: true),
               ),
               _row(
                 'Logo · 1:1',
-                (_profile['logo'] ?? '').toString().isEmpty ? '未上传' : '已上传',
+                (_profile['logo'] ?? '').toString().isEmpty ? stringsOf(context).merchantStoreNotUploaded : stringsOf(context).merchantStoreUploaded,
                 () => _pickImage(cover: false),
               ),
               _row(
-                '店铺名称',
-                (_profile['name'] ?? '填写店铺名称').toString(),
+                stringsOf(context).merchantStoreStoreName,
+                (_profile['name'] ?? stringsOf(context).merchantStoreEnterName).toString(),
                 () => _editField(
                   key: 'name',
-                  label: '店铺名称',
-                  placeholder: '店铺名称(必填)',
+                  label: stringsOf(context).merchantStoreStoreName,
+                  placeholder: stringsOf(context).merchantStoreNameRequired,
                   brand: true,
                 ),
               ),
               _row(
-                '行业类型',
-                categoryNames.isEmpty ? '选择行业(平台固定，主页显示)' : categoryNames,
+                stringsOf(context).merchantStoreIndustry,
+                categoryNames.isEmpty ? stringsOf(context).merchantStoreIndustryHint : categoryNames,
                 _chooseCategory,
               ),
               _row(
-                '门店定位',
+                stringsOf(context).merchantStoreLocation,
                 (_profile['locationVerified'] as num?)?.toInt() == 1
-                    ? '已定位 ✓'
-                    : '点击校准店址',
+                    ? stringsOf(context).merchantStoreLocated
+                    : stringsOf(context).merchantStoreCalibrate,
                 _chooseLocation,
               ),
             ]),
-            _section('品牌内容', <Widget>[
+            _section(stringsOf(context).merchantStoreBrandContent, <Widget>[
               _row(
-                '城市角色名',
-                _decor.cityRole ?? '如:巷口的夜间补给站',
+                stringsOf(context).merchantStoreCityRole,
+                _decor.cityRole ?? stringsOf(context).merchantStoreCityRoleHint,
                 () => _editField(
                   key: 'cityRole',
-                  label: '城市角色名',
-                  placeholder: '如:巷口的夜间补给站',
+                  label: stringsOf(context).merchantStoreCityRole,
+                  placeholder: stringsOf(context).merchantStoreCityRoleHint,
                   brand: false,
                 ),
               ),
               _row(
-                '一句话 slogan',
-                _decor.slogan ?? '一句话说清你的店',
+                stringsOf(context).merchantStoreSlogan,
+                _decor.slogan ?? stringsOf(context).merchantStoreSloganHint,
                 () => _editField(
                   key: 'slogan',
-                  label: '一句话 slogan',
-                  placeholder: '一句话说清你的店',
+                  label: stringsOf(context).merchantStoreSlogan,
+                  placeholder: stringsOf(context).merchantStoreSloganHint,
                   brand: false,
                 ),
               ),
               _row(
-                '品牌故事',
+                stringsOf(context).merchantStoreStory,
                 (_profile['description'] ?? '').toString().isEmpty
-                    ? '还没写'
-                    : (_decor.storyTitle ?? '已填写'),
+                    ? stringsOf(context).merchantStoreUnwritten
+                    : (_decor.storyTitle ?? stringsOf(context).merchantStoreCompleted),
                 () => _openChild('/merchant/decor/story'),
               ),
               _row(
-                '衍生权益',
-                (_profile['derivatives'] ?? '如 限定饮品 / 核销折扣').toString(),
+                stringsOf(context).merchantStoreBenefits,
+                (_profile['derivatives'] ?? stringsOf(context).merchantStoreBenefitsHint).toString(),
                 () => _editField(
                   key: 'derivatives',
-                  label: '衍生权益',
-                  placeholder: '如 限定饮品 / 核销折扣 / 路线纪念章',
+                  label: stringsOf(context).merchantStoreBenefits,
+                  placeholder: stringsOf(context).merchantStoreBenefitsEditHint,
                   brand: true,
                 ),
               ),
               _row(
-                '特色标签',
+                stringsOf(context).merchantStoreTags,
                 _decor.tags.isEmpty
-                    ? '还没选标签'
-                    : '${_decor.tags.first}${_decor.tags.length > 1 ? ' 等 ${_decor.tags.length} 个' : ''}',
+                    ? stringsOf(context).merchantStoreNoTags
+                    : _decor.tags.length > 1 ? stringsOf(context).merchantStoreTagSummary(_decor.tags.first, _decor.tags.length) : _decor.tags.first,
                 _chooseTags,
               ),
               _row(
-                '门店相册 · 16:9',
+                stringsOf(context).merchantStoreGalleryRatio,
                 _decor.gallery.isEmpty
-                    ? '还没上传'
-                    : '${_decor.gallery.length}/9 张',
+                    ? stringsOf(context).merchantStoreNoUploads
+                    : stringsOf(context).merchantStoreImageCount(_decor.gallery.length),
                 () => _openChild('/merchant/decor/gallery'),
               ),
             ]),
-            _section('承接与经营(B2B 撮合)', <Widget>[
+            _section(stringsOf(context).merchantStoreBusiness, <Widget>[
               _row(
-                '承接设置',
+                stringsOf(context).merchantStoreHostingSettings,
                 coopSummary,
                 () => context.push('/merchant/coop-profile'),
               ),
               _row(
-                '招牌主推',
-                _decor.featuredId == null ? '选 1 个活动置顶' : '已选主推',
+                stringsOf(context).merchantStoreFeatured,
+                _decor.featuredId == null ? stringsOf(context).merchantStoreFeatureHint : stringsOf(context).merchantStoreFeatureSelected,
                 () => context.push('/my-projects'),
               ),
-              _row('常备权益', '查看与管理', () => context.push('/coop/perk-templates')),
+              _row(stringsOf(context).merchantStoreStandingBenefits, stringsOf(context).merchantStoreManage, () => context.push('/coop/perk-templates')),
             ]),
             _section(null, <Widget>[
               _row(
-                '升级权益',
-                '查看可开通的权益',
+                stringsOf(context).merchantStoreUpgrade,
+                stringsOf(context).merchantStoreAvailableBenefits,
                 () => context.push('/merchant/subscription'),
               ),
             ]),
             _section(null, <Widget>[
               _row(
-                '成为城市节点 · 挂互动玩法',
+                stringsOf(context).merchantStoreCityNode,
                 '',
                 () => context.push('/merchant/city-nodes'),
               ),
-              _row('用户照片 · 探索记录 · 评价', '即将开放', null),
+              _row(stringsOf(context).merchantStoreUserContent, stringsOf(context).merchantStoreComingSoon, null),
             ]),
           ],
         ),
@@ -615,49 +617,49 @@ class _MerchantDecorPageState extends ConsumerState<MerchantDecorPage> {
     final List<({String label, bool done, VoidCallback action})> items =
         <({String label, bool done, VoidCallback action})>[
           (
-            label: '封面头图',
+            label: stringsOf(context).merchantStoreCover,
             done: (_decor.coverImage ?? '').trim().isNotEmpty,
             action: () => _pickImage(cover: true),
           ),
           (
-            label: '店铺 Logo',
+            label: stringsOf(context).merchantStoreLogo,
             done:
                 (_profile['logo'] ?? '').toString().trim().isNotEmpty &&
                 _profile['logo'] != '/images/mer1.jpg',
             action: () => _pickImage(cover: false),
           ),
           (
-            label: '店铺名称',
+            label: stringsOf(context).merchantStoreStoreName,
             done: (_profile['name'] ?? '').toString().trim().isNotEmpty,
             action: () => _editField(
               key: 'name',
-              label: '店铺名称',
-              placeholder: '店铺名称(必填)',
+              label: stringsOf(context).merchantStoreStoreName,
+              placeholder: stringsOf(context).merchantStoreNameRequired,
               brand: true,
             ),
           ),
           (
-            label: '行业类型',
+            label: stringsOf(context).merchantStoreIndustry,
             done: _decor.categoryId != null,
             action: _chooseCategory,
           ),
           (
-            label: '门店定位',
+            label: stringsOf(context).merchantStoreLocation,
             done: (_profile['locationVerified'] as num?)?.toInt() == 1,
             action: _chooseLocation,
           ),
           (
-            label: '一句话 slogan',
+            label: stringsOf(context).merchantStoreSlogan,
             done: (_decor.slogan ?? '').trim().isNotEmpty,
             action: () => _editField(
               key: 'slogan',
-              label: '一句话 slogan',
-              placeholder: '一句话说清你的店',
+              label: stringsOf(context).merchantStoreSlogan,
+              placeholder: stringsOf(context).merchantStoreSloganHint,
               brand: false,
             ),
           ),
           (
-            label: '品牌故事',
+            label: stringsOf(context).merchantStoreStory,
             done: (_profile['description'] ?? '').toString().trim().isNotEmpty,
             action: () => _openChild('/merchant/decor/story'),
           ),
@@ -673,7 +675,7 @@ class _MerchantDecorPageState extends ConsumerState<MerchantDecorPage> {
         children: <Widget>[
           Row(
             children: <Widget>[
-              const Expanded(child: Text('资料完整度')),
+              Expanded(child: Text(stringsOf(context).merchantStoreCompleteness)),
               Text('$done/${items.length}'),
             ],
           ),
@@ -703,11 +705,11 @@ class _MerchantDecorPageState extends ConsumerState<MerchantDecorPage> {
               ),
             ),
           if (done == items.length)
-            const Align(
+            Align(
               alignment: Alignment.centerLeft,
               child: Padding(
                 padding: EdgeInsets.only(top: CyTokens.space1),
-                child: Text('必填资料都齐了'),
+                child: Text(stringsOf(context).merchantStoreComplete),
               ),
             ),
         ],
@@ -816,7 +818,7 @@ class _PreviewCard extends StatelessWidget {
               height: 140,
               child: Center(
                 child: Text(
-                  '还没有封面头图',
+                  stringsOf(context).merchantStoreNoCover,
                   style: TextStyle(color: CyPalette.of(context).textSecondary),
                 ),
               ),
@@ -841,9 +843,9 @@ class _PreviewCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
-                      Text((profile['name'] ?? '还没填店铺名称').toString()),
+                      Text((profile['name'] ?? stringsOf(context).merchantStoreNoName).toString()),
                       Text(
-                        '看公开主页 ›',
+                        stringsOf(context).merchantStorePublicPage,
                         style: TextStyle(
                           color: CyPalette.of(context).textSecondary,
                         ),
@@ -855,8 +857,8 @@ class _PreviewCard extends StatelessWidget {
                   children: <Widget>[
                     Text(
                       (profile['businessStatus'] as num?)?.toInt() == 0
-                          ? '已打烊'
-                          : '营业中',
+                          ? stringsOf(context).merchantStoreClosed
+                          : stringsOf(context).merchantStoreOpen,
                     ),
                     CupertinoSwitch(
                       value: (profile['businessStatus'] as num?)?.toInt() != 0,

@@ -1,3 +1,6 @@
+import '../../support/fixed_auth.dart';
+import 'package:chengyin_app/feature/auth/auth_controller.dart';
+import 'package:chengyin_app/data/models/user.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -12,6 +15,13 @@ import 'package:chengyin_app/data/models/merchant_coop.dart';
 import 'package:chengyin_app/feature/coop/coop_list_page.dart';
 import 'package:chengyin_app/feature/merchant/merchant_coop_page.dart';
 import 'package:chengyin_app/feature/payment/wechat_payment.dart';
+
+class _AccountAuth extends AuthController {
+  @override
+  AuthState build() => signedInAuthState();
+  void changeAccount() => state = AuthState(initialized: true,
+      user: User(id: 2, nickname: 'B', avatar: '', role: 'player'));
+}
 
 class _FakeCoopApi implements CoopApi {
   _FakeCoopApi(
@@ -87,6 +97,7 @@ Widget _app({
 }) {
   return ProviderScope(
     overrides: [
+      authControllerProvider.overrideWith(_AccountAuth.new),
       coopApiProvider.overrideWithValue(api),
       coopDepositPaymentConfiguredProvider.overrideWithValue(configured),
       coopDepositPayProvider.overrideWithValue(pay),
@@ -102,6 +113,24 @@ Widget _app({
 }
 
 void main() {
+  testWidgets('account switch during native payment prevents old deposit readback and notice', (tester) async {
+    final api = _FakeCoopApi(_validPayParams, paymentStatus: 'success');
+    final payment = Completer<WechatPayOutcome>();
+    await tester.pumpWidget(_app(api: api, configured: true, pay: (_) => payment.future));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('缴纳保证金'));
+    await tester.pump();
+    expect(api.depositCalls, 1);
+    final container = ProviderScope.containerOf(tester.element(find.byType(CoopListPage)));
+    (container.read(authControllerProvider.notifier) as _AccountAuth).changeAccount();
+    await tester.pump();
+    payment.complete(WechatPayOutcome.success);
+    await tester.pumpAndSettle();
+    expect(api.statusCalls, 0);
+    expect(find.text('保证金已到账'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   tearDown(CyNativeNotice.hide);
 
   testWidgets('SDK success 但服务端 pending 时不得说已到账', (WidgetTester tester) async {
@@ -282,6 +311,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+      authControllerProvider.overrideWith(_AccountAuth.new),
             coopApiProvider.overrideWithValue(
               _RefundFakeApi(<Map<String, dynamic>>[
                 refundRow(42),
@@ -311,6 +341,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+      authControllerProvider.overrideWith(_AccountAuth.new),
             coopApiProvider.overrideWithValue(api),
             merchantInvitesProvider.overrideWith(
               (ref) async => const <MerchantInvite>[],
@@ -336,6 +367,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+      authControllerProvider.overrideWith(_AccountAuth.new),
             coopApiProvider.overrideWithValue(api),
             merchantInvitesProvider.overrideWith(
               (ref) async => const <MerchantInvite>[],

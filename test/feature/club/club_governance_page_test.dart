@@ -8,6 +8,7 @@
 //   - report 模式缺合法目标直接进错误态,不发请求。
 
 import 'package:flutter/material.dart';
+import 'package:chengyin_app/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -27,10 +28,13 @@ import 'package:chengyin_app/feature/club/club_ops_access.dart';
 /// 原生输入弹窗在测试里退成 Cupertino Alert,输入框固定这个 key。
 const Key _reasonFieldKey = Key('cy-system-input-alert-field');
 
-Widget _app(Widget home, List<dynamic> overrides) {
+Widget _app(Widget home, List<dynamic> overrides, {Locale locale = const Locale('zh')}) {
   return ProviderScope(
     overrides: overrides.cast(),
     child: MaterialApp(
+      locale: locale,
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
       theme: ThemeData(useMaterial3: true),
       debugShowCheckedModeBanner: false,
       home: home,
@@ -217,6 +221,35 @@ Future<int> _daysUntil(String wire) async {
 }
 
 void main() {
+  testWidgets('English governance retains platform-only unban restriction', (tester) async {
+    final fake = _FakeClubOpsApi()..bansValue = [
+      _ban(id: 1, sourceType: 'PLATFORM'),
+      _ban(id: 2),
+    ];
+    await tester.pumpWidget(_app(const ClubGovernancePage(clubId: 1), [
+      clubOpsApiProvider.overrideWithValue(fake),
+      clubApiProvider.overrideWithValue(_FakeClubApi()),
+    ], locale: const Locale('en')));
+    await tester.pumpAndSettle();
+    expect(find.text('Governance records'), findsOneWidget);
+    expect(find.byKey(const Key('governance-unban-1')), findsNothing);
+    expect(find.byKey(const Key('governance-unban-2')), findsOneWidget);
+    expect(find.textContaining('Only the platform can lift this ban'), findsOneWidget);
+    expect(fake.unbans, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('English invalid report target makes no access request', (tester) async {
+    final fake = _FakeClubOpsApi();
+    await tester.pumpWidget(_app(const ClubGovernancePage(clubId: 1, mode: 'report'), [
+      clubOpsApiProvider.overrideWithValue(fake),
+    ], locale: const Locale('en')));
+    await tester.pumpAndSettle();
+    expect(find.text('A valid report target is required'), findsOneWidget);
+    expect(fake.accessCalls, 0);
+    expect(fake.cases, isEmpty);
+  });
+
   group('governance:权限与状态', () {
     testWidgets('无 member:manage → 无权限屏', (WidgetTester tester) async {
       final fake = _FakeClubOpsApi()

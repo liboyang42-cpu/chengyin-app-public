@@ -1,3 +1,4 @@
+import '../../l10n/app_localizations.dart';
 import 'dart:async';
 
 import 'package:dio/dio.dart';
@@ -120,13 +121,13 @@ class PublisherIdentityFormState {
 
 /// 返回第一条不满足的原因;全通过返回 null。
 /// 与后端 `MemberIdentityService.register` 的校验顺序一致:姓名 → 证件 → 单独同意。
-String? checkIdentityForm(PublisherIdentityFormState form) {
+String? checkIdentityForm(PublisherIdentityFormState form, {AppLocalizations? strings}) {
   final name = form.realName.trim();
-  if (name.isEmpty) return '请填写真实姓名';
-  if (name.length < 2 || name.length > 20) return '请填写真实姓名(2-20 个字)';
-  if (RegExp('[0-9]').hasMatch(name)) return '姓名里不应包含数字';
-  if (!isValidIdCard(form.idCard)) return '身份证号格式不正确，请核对后重填';
-  if (!form.consented) return '请先同意提供真实姓名与身份证号';
+  if (name.isEmpty) return strings?.merchantApplyRealNameRequired ?? '请填写真实姓名';
+  if (name.length < 2 || name.length > 20) return strings?.merchantApplyRealNameLength ?? '请填写真实姓名(2-20 个字)';
+  if (RegExp('[0-9]').hasMatch(name)) return strings?.merchantApplyRealNameDigits ?? '姓名里不应包含数字';
+  if (!isValidIdCard(form.idCard)) return strings?.merchantApplyIdInvalid ?? '身份证号格式不正确，请核对后重填';
+  if (!form.consented) return strings?.merchantApplyConsentRequired ?? '请先同意提供真实姓名与身份证号';
   return null;
 }
 
@@ -155,9 +156,10 @@ class IdentityRegisterOutcome {
 /// 提交登记:先过同一份校验(没过一个请求都不许发出去),再落 /api/publisher/identity。
 Future<IdentityRegisterOutcome> registerPublisherIdentity(
   PublisherIdentityApi api,
-  PublisherIdentityFormState form,
-) async {
-  final problem = checkIdentityForm(form);
+  PublisherIdentityFormState form, {
+  AppLocalizations? strings,
+}) async {
+  final problem = checkIdentityForm(form, strings: strings);
   if (problem != null) {
     return IdentityRegisterOutcome.fail(problem);
   }
@@ -171,11 +173,11 @@ Future<IdentityRegisterOutcome> registerPublisherIdentity(
     return const IdentityRegisterOutcome.ok();
   } on PublisherIdentityException catch (e) {
     return IdentityRegisterOutcome.fail(
-      e.message.isEmpty ? kIdentityRegisterFallbackText : e.message,
+      e.message.isEmpty ? (strings?.publisherUiRegisterIncomplete ?? kIdentityRegisterFallbackText) : e.message,
     );
   } on DioException {
-    return const IdentityRegisterOutcome.fail(
-      kIdentityNetworkErrorText,
+    return IdentityRegisterOutcome.fail(
+      strings?.merchantApplyIdentityNetworkError ?? kIdentityNetworkErrorText,
       network: true,
     );
   }

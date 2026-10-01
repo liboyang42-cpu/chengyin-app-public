@@ -49,7 +49,7 @@ class MerchantPredictApi {
     _ensureOk(body);
     final Object? data = body['data'];
     if (data is! List) {
-      throw const MerchantPredictApiException('待答列表回执不完整');
+      throw const MerchantPredictApiException('待答列表回执不完整', localCode: 'incomplete');
     }
     return data
         .whereType<Map>()
@@ -106,6 +106,7 @@ class MerchantPredictApi {
       throw MerchantPredictApiException(
         '${body['msg'] ?? '请求失败'}',
         code: code,
+        localCode: body['msg'] == null ? 'request' : null,
       );
     }
   }
@@ -128,6 +129,7 @@ class MerchantPredictApi {
               ? '网络连接失败，请稍后重试'
               : '请求失败${status == null ? '' : '（$status）'}'),
       code: status,
+      localCode: msg == null ? (noResponse ? 'network' : 'http') : null,
       networkUnreachable: noResponse,
       outcomeUnknown: noResponse || (status != null && status >= 500),
     );
@@ -138,12 +140,14 @@ class MerchantPredictApiException implements Exception {
   const MerchantPredictApiException(
     this.message, {
     this.code,
+    this.localCode,
     this.networkUnreachable = false,
     this.outcomeUnknown = false,
   });
 
   final String message;
   final int? code;
+  final String? localCode;
   final bool networkUnreachable;
 
   /// 结果未确认:请求可能已被服务端受理(结算只此一次,不许自动重试)。

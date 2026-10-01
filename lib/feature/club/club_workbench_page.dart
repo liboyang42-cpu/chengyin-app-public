@@ -1,3 +1,4 @@
+import '../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -55,7 +56,7 @@ class _ClubWorkbenchPageState extends ConsumerState<ClubWorkbenchPage> {
       // 重试多少次都还是 401,与 club 域其余页面同口径走登录引导。
       setState(() {
         _loginRequired = clubLoginRequired(error);
-        _error = _loginRequired ? null : '加载你的俱乐部失败';
+        _error = _loginRequired ? null : stringsOf(context).clubWorkbenchLoadFailed;
       });
     }
   }
@@ -70,16 +71,16 @@ class _ClubWorkbenchPageState extends ConsumerState<ClubWorkbenchPage> {
         child: SafeArea(
           bottom: false,
           child: _loginRequired
-              ? ClubLoginGate(message: '登录后查看我的俱乐部', onSignedIn: _redirect)
+              ? ClubLoginGate(message: stringsOf(context).clubWorkbenchLogin, onSignedIn: _redirect)
               : _error == null
               ? const Center(child: CupertinoActivityIndicator())
               : StatusView(
                   // 与小程序 `pages/club/workbench` 同一套错误文案:
                   // 主标说清是哪件事失败,副标说清接下来能做什么。
-                  message: '没能进入俱乐部管理',
+                  message: stringsOf(context).clubWorkbenchUnavailable,
                   sub: _error!,
                   icon: CupertinoIcons.exclamationmark_triangle,
-                  retryLabel: '重试进入',
+                  retryLabel: stringsOf(context).clubWorkbenchRetry,
                   onRetry: () {
                     setState(() => _error = null);
                     _redirect();

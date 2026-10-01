@@ -1,3 +1,6 @@
+import '../../l10n/strings.dart';
+import 'merchant_directory_strings.dart';
+import 'merchant_recruit_strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -129,7 +132,7 @@ class MerchantRecruitPage extends ConsumerWidget {
         middle: Text(
           async.value?.topicName.trim().isNotEmpty == true
               ? async.value!.topicName.trim()
-              : '承接这条路线',
+              : stringsOf(context).merchantRecruitPageTitle,
         ),
       ),
       child: Material(
@@ -170,16 +173,16 @@ class _Body extends ConsumerWidget {
           switch (state.mode) {
             RecruitMode.categoryMissing => _Blocked(
               key: const Key('recruit-blocked-category'),
-              title: '先完善店铺品类',
-              sub: state.blockedMessage ?? '平台按品类为你匹配可承接章节',
-              actionLabel: '去完善品类',
+              title: stringsOf(context).merchantRecruitPageCategory,
+              sub: state.blockedMessage ?? stringsOf(context).merchantRecruitPageCategoryHint,
+              actionLabel: stringsOf(context).merchantRecruitPageCategoryAction,
               onAction: () => context.push('/merchant/coop-profile'),
             ),
             RecruitMode.notMerchant => _Blocked(
               key: const Key('recruit-blocked-not-merchant'),
-              title: '你还不是商家',
-              sub: state.blockedMessage ?? '申请入驻通过后可以承接路线',
-              actionLabel: '去申请入驻',
+              title: stringsOf(context).merchantRecruitPageNotMerchant,
+              sub: state.blockedMessage ?? stringsOf(context).merchantRecruitPageNotMerchantHint,
+              actionLabel: stringsOf(context).merchantRecruitPageApplyMerchant,
               onAction: () => context.push('/merchant/apply'),
             ),
             RecruitMode.chapterRecruit => _ChapterRecruit(
@@ -248,18 +251,18 @@ class _ChapterRecruit extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        const CySectionTitle('可承接章节'),
+        CySectionTitle(stringsOf(context).merchantRecruitPageChapters),
         Text(
-          '这些是按你的店铺品类匹配、且还在招商的章节。申请通过后才能填实际供给。',
+          stringsOf(context).merchantRecruitPageChaptersHint,
           style: t.bodySmall?.copyWith(color: p.textSecondary),
         ),
         const SizedBox(height: CyTokens.space3),
         if (state.chapters.isEmpty)
-          const StatusView(
+          StatusView(
             key: Key('recruit-chapters-empty'),
             icon: CupertinoIcons.tray,
-            message: '暂未配置可承接章节',
-            sub: '主办方开放合适章节后,你可以在这里申请承接',
+            message: stringsOf(context).merchantRecruitPageChaptersEmpty,
+            sub: stringsOf(context).merchantRecruitPageChaptersEmptyHint,
           )
         else
           ...state.chapters.map(
@@ -273,7 +276,7 @@ class _ChapterRecruit extends ConsumerWidget {
           ),
         if (state.applications.isNotEmpty) ...<Widget>[
           const SizedBox(height: CyTokens.space5),
-          const CySectionTitle('我的承接申请'),
+          CySectionTitle(stringsOf(context).merchantRecruitPageApplications),
           const SizedBox(height: CyTokens.space2),
           ...state.applications.map(
             (ChapterApplication a) => _ApplicationCard(
@@ -286,7 +289,7 @@ class _ChapterRecruit extends ConsumerWidget {
         ],
         if (state.nodes.isNotEmpty) ...<Widget>[
           const SizedBox(height: CyTokens.space5),
-          const CySectionTitle('我的点位'),
+          CySectionTitle(stringsOf(context).merchantRecruitPageNodes),
           const SizedBox(height: CyTokens.space2),
           ...state.nodes.map((MyChapterNode n) => _NodeCard(node: n)),
         ],
@@ -320,7 +323,7 @@ class _ChapterCardState extends ConsumerState<_ChapterCard> {
     final ChapterNodeDraft? draft = await showChapterApplyForm(
       context,
       ref,
-      chapterName: widget.chapter.name,
+      chapterName: merchantRecruitChapterName(context, widget.chapter),
     );
     if (draft == null || !mounted) return;
 
@@ -389,11 +392,11 @@ class _ChapterCardState extends ConsumerState<_ChapterCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text(c.name, style: t.titleSmall),
+          Text(merchantRecruitChapterName(context, c), style: t.titleSmall),
           const SizedBox(height: CyTokens.space1),
           // 公示项:品类 / 章节类型 / 条款档。招商时就该看得到的三样。
           Text(
-            '${c.categoryLabel} · ${c.requiredLabel} · ${c.termsLabel}',
+            '${merchantRecruitCategory(context, c)} · ${merchantRecruitRequired(context, c)} · ${c.termsLabel}',
             style: t.bodySmall?.copyWith(color: p.textSecondary),
           ),
           if (c.boundaryLabel.isNotEmpty)
@@ -407,13 +410,13 @@ class _ChapterCardState extends ConsumerState<_ChapterCard> {
               style: t.bodySmall?.copyWith(color: p.textSecondary),
             ),
           Text(
-            c.merchantLimitLabel,
+            merchantRecruitLimit(context, c),
             style: t.bodySmall?.copyWith(color: p.textTertiary),
           ),
           const SizedBox(height: CyTokens.space3),
           if (widget.applied)
             Text(
-              '已申请过这一章,进度看下面的承接申请',
+              stringsOf(context).merchantRecruitPageAlreadyApplied,
               style: t.bodySmall?.copyWith(color: p.textTertiary),
             )
           else
@@ -421,7 +424,7 @@ class _ChapterCardState extends ConsumerState<_ChapterCard> {
               width: double.infinity,
               child: CyNativeButton(
                 onPressed: _busy ? null : _apply,
-                label: '申请承接并配置点位',
+                label: stringsOf(context).merchantRecruitUiApplyTitle,
                 width: double.infinity,
                 loading: _busy,
               ),
@@ -475,17 +478,18 @@ class _ApplicationCardState extends ConsumerState<_ApplicationCard> {
   Future<void> _withdraw() async {
     final bool ok = await cyConfirm(
       context,
-      title: '撤回「${widget.application.displayTitle}」的申请?',
-      content: '撤回后当前申请不可恢复,已填的点位内容会保留;需要时可以重新申请。',
-      confirmText: '确认撤回',
-      cancelText: '暂不撤回',
+      title: stringsOf(context).merchantRecruitPageWithdrawTitle(merchantDirectoryChapterTitle(context, widget.application)),
+      content: stringsOf(context).merchantRecruitPageWithdrawHint,
+      confirmText: stringsOf(context).merchantRecruitPageWithdrawConfirm,
+      cancelText: stringsOf(context).merchantRecruitPageWithdrawCancel,
     );
-    if (!ok) return;
+    if (!ok || !mounted) return;
+    final successMessage = stringsOf(context).merchantRecruitPageWithdrawn;
     await _run(() async {
       await ref
           .read(merchantApiProvider)
           .withdrawChapterApplication(widget.application.id);
-      return '已撤回,可重新提交';
+      return successMessage;
     });
   }
 
@@ -496,13 +500,14 @@ class _ApplicationCardState extends ConsumerState<_ApplicationCard> {
       context,
       ref,
       chapterId: widget.application.chapterId ?? 0,
-      chapterName: widget.application.chapterName ?? '当前章节',
+      chapterName: widget.application.chapterName ?? stringsOf(context).merchantRecruitPageCurrentChapter,
       termsMode: mode,
     );
     if (payload == null || !mounted) return;
+    final successMessage = stringsOf(context).merchantRecruitPageSupplyActive;
     await _run(() async {
       await ref.read(coopApiProvider).enrollChapterOffer(payload);
-      return '实际供给已生效';
+      return successMessage;
     });
   }
 
@@ -511,9 +516,10 @@ class _ApplicationCardState extends ConsumerState<_ApplicationCard> {
   Future<void> _reconfirmSupply() async {
     final int? offerId = widget.action.offerId;
     if (offerId == null) return;
+    final successMessage = stringsOf(context).merchantRecruitPageReconfirmed;
     await _run(() async {
       await ref.read(coopApiProvider).reconfirmCircleSupply(offerId);
-      return '已重新确认';
+      return successMessage;
     });
   }
 
@@ -522,14 +528,15 @@ class _ApplicationCardState extends ConsumerState<_ApplicationCard> {
     if (offerId == null) return;
     final bool ok = await cyConfirm(
       context,
-      title: '暂停这份供给？',
-      content: '暂停后不会再进入新的圈层探索；历史记录不会删除。',
-      confirmText: '确认暂停',
+      title: stringsOf(context).merchantRecruitPagePauseTitle,
+      content: stringsOf(context).merchantRecruitPagePauseHint,
+      confirmText: stringsOf(context).merchantRecruitPagePauseConfirm,
     );
-    if (!ok) return;
+    if (!ok || !mounted) return;
+    final successMessage = stringsOf(context).merchantRecruitPagePaused;
     await _run(() async {
       await ref.read(coopApiProvider).pauseCircleSupply(offerId);
-      return '供给已暂停';
+      return successMessage;
     });
   }
 
@@ -565,19 +572,19 @@ class _ApplicationCardState extends ConsumerState<_ApplicationCard> {
           Text(
             a.chapterName?.trim().isNotEmpty == true
                 ? a.chapterName!.trim()
-                : '未命名章节',
+                : stringsOf(context).merchantRecruitPageUnnamedChapter,
             style: t.titleSmall,
           ),
           const SizedBox(height: CyTokens.space1),
           Text(
-            a.statusText,
+            merchantDirectoryChapterStatus(context, a),
             style: t.bodySmall?.copyWith(
               color: a.isRejected ? p.statusWarning : p.textSecondary,
             ),
           ),
           // 条款档读不出来时说实话 —— 别默认成权益档,那会让下面的表单收错数据。
           Text(
-            widget.chapter?.termsLabel ?? '承接档位暂时读不到',
+            widget.chapter?.termsLabel ?? stringsOf(context).merchantRecruitPageTermsUnavailable,
             style: t.bodySmall?.copyWith(color: p.textTertiary),
           ),
           if (act.offerReadOnly)
@@ -587,7 +594,7 @@ class _ApplicationCardState extends ConsumerState<_ApplicationCard> {
             ),
           if (a.isApproved && !act.offerReadOnly && !act.canSubmitOffer)
             Text(
-              '承接档位暂时没读出来,稍后再试 —— 现在提交会被判成档位不合法',
+              stringsOf(context).merchantRecruitPageTermsUnavailableHint,
               style: t.bodySmall?.copyWith(color: CyPalette.of(context).statusWarning),
             ),
           if (act.canWithdraw || act.canSubmitOffer) ...<Widget>[
@@ -599,7 +606,7 @@ class _ApplicationCardState extends ConsumerState<_ApplicationCard> {
                     child: CyNativeButton(
                       key: Key('recruit-withdraw-${a.id}'),
                       onPressed: _busy ? null : _withdraw,
-                      label: '撤回申请',
+                      label: stringsOf(context).merchantRecruitPageWithdraw,
                       role: CyNativeButtonRole.secondary,
                     ),
                   ),
@@ -610,7 +617,7 @@ class _ApplicationCardState extends ConsumerState<_ApplicationCard> {
                     child: CyNativeButton(
                       key: Key('recruit-offer-${a.id}'),
                       onPressed: _busy ? null : _offer,
-                      label: '填写实际供给',
+                      label: stringsOf(context).merchantRecruitUiOfferTitle,
                     ),
                   ),
               ],
@@ -627,7 +634,7 @@ class _ApplicationCardState extends ConsumerState<_ApplicationCard> {
                     key: Key('recruit-reconfirm-supply-${a.id}'),
                     onPressed: _busy ? null : _reconfirmSupply,
                     // 文案跟小程序 `merchantinfo.wxml:384` 一字不差(全角逗号)。
-                    label: '供给无变化，重新确认',
+                    label: stringsOf(context).merchantRecruitPageReconfirm,
                     role: CyNativeButtonRole.secondary,
                   ),
                 ),
@@ -636,7 +643,7 @@ class _ApplicationCardState extends ConsumerState<_ApplicationCard> {
                   child: CyNativeButton(
                     key: Key('recruit-pause-supply-${a.id}'),
                     onPressed: _busy ? null : _pauseSupply,
-                    label: '暂停供给',
+                    label: stringsOf(context).merchantRecruitPagePause,
                     role: CyNativeButtonRole.secondary,
                   ),
                 ),
@@ -678,9 +685,9 @@ class _NodeCard extends StatelessWidget {
         children: <Widget>[
           Row(
             children: <Widget>[
-              Expanded(child: Text(node.name, style: t.titleSmall)),
+              Expanded(child: Text(merchantRecruitNodeName(context, node), style: t.titleSmall)),
               Text(
-                node.auditLabel,
+                merchantRecruitNodeAudit(context, node),
                 style: t.labelSmall?.copyWith(
                   color: node.isRejected
                       ? CyPalette.of(context).statusDanger
@@ -693,7 +700,7 @@ class _NodeCard extends StatelessWidget {
           ),
           const SizedBox(height: CyTokens.space1),
           Text(
-            node.addressLabel,
+            (node.address ?? '').trim().isEmpty ? stringsOf(context).merchantRecruitPageAddressMissing : node.address!.trim(),
             style: t.bodySmall?.copyWith(color: p.textSecondary),
           ),
           // ★ 驳回原因是这张卡最有用的一行:没有它商家只知道"没过",不知道改什么。
@@ -702,8 +709,8 @@ class _NodeCard extends StatelessWidget {
               padding: const EdgeInsets.only(top: CyTokens.space2),
               child: Text(
                 (node.nodeAuditReason ?? '').trim().isEmpty
-                    ? '被驳回了,但主办方没填原因 —— 可以联系平台问一下'
-                    : '驳回原因:${node.nodeAuditReason!.trim()}',
+                    ? stringsOf(context).merchantRecruitPageMissingReason
+                    : stringsOf(context).merchantCatalogReason(node.nodeAuditReason!.trim()),
                 style: t.bodySmall,
               ),
             ),
@@ -718,7 +725,7 @@ class _NodeCard extends StatelessWidget {
               if (_canShowQr)
                 CyNativeButton(
                   key: Key('recruit-node-live-code-${node.id}'),
-                  label: '出示打卡码',
+                  label: stringsOf(context).merchantRecruitPageCheckinCode,
                   role: CyNativeButtonRole.secondary,
                   onPressed: () => showChapterNodeCodeSheet(
                     context,
@@ -729,7 +736,7 @@ class _NodeCard extends StatelessWidget {
               if (_canShowQr)
                 CyNativeButton(
                   key: Key('recruit-node-poster-code-${node.id}'),
-                  label: '店内海报码',
+                  label: stringsOf(context).merchantRecruitPagePosterCode,
                   role: CyNativeButtonRole.secondary,
                   onPressed: () => showChapterNodeCodeSheet(
                     context,
@@ -739,7 +746,7 @@ class _NodeCard extends StatelessWidget {
                 ),
               CyNativeButton(
                 key: Key('recruit-node-npc-${node.id}'),
-                label: '点位角色',
+                label: stringsOf(context).merchantRecruitPageNpc,
                 role: CyNativeButtonRole.secondary,
                 onPressed: () => context.push(
                   '/merchant/node-npc/${node.id}',
@@ -753,8 +760,8 @@ class _NodeCard extends StatelessWidget {
               padding: const EdgeInsets.only(top: CyTokens.space2),
               child: Text(
                 node.nodeAuditStatus == null
-                    ? '点位的打卡码要等审核状态读出来才能出示'
-                    : '点位通过审核后,这里会出现现场打卡码与店内海报码',
+                    ? stringsOf(context).merchantRecruitPageCodeUnknown
+                    : stringsOf(context).merchantRecruitPageCodePending,
                 style: t.bodySmall?.copyWith(color: p.textTertiary),
               ),
             ),
@@ -818,9 +825,9 @@ class _NodeRegistrationState extends ConsumerState<_NodeRegistration> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        const CySectionTitle('报名承接一个站点'),
+        CySectionTitle(stringsOf(context).merchantRecruitUiRegisterTitle),
         Text(
-          '这条路线按站点报名:选一个站点、说清你能怎么接待,平台会择优调配中标商家。',
+          stringsOf(context).merchantRecruitPageRegisterHint,
           style: t.bodySmall?.copyWith(color: p.textSecondary),
         ),
         const SizedBox(height: CyTokens.space3),
@@ -828,10 +835,10 @@ class _NodeRegistrationState extends ConsumerState<_NodeRegistration> {
           StatusView(
             key: const Key('recruit-already-registered'),
             icon: Icons.assignment_turned_in_outlined,
-            message: '你已经报名过这条路线',
-            sub: '进度、驳回原因和修改入口都在「我的报名」里',
+            message: stringsOf(context).merchantRecruitPageRegistered,
+            sub: stringsOf(context).merchantRecruitPageRegisteredHint,
             onRetry: () => context.push('/merchant/registrations'),
-            retryLabel: '去我的报名',
+            retryLabel: stringsOf(context).merchantRecruitPageMyApplications,
           )
         else ...<Widget>[
           // ★ 查不出来就说查不出来。装成"没报过"的话,商家填完整张表才被查重拒掉。
@@ -840,22 +847,22 @@ class _NodeRegistrationState extends ConsumerState<_NodeRegistration> {
               padding: const EdgeInsets.only(bottom: CyTokens.space2),
               child: Text(
                 key: const Key('recruit-registered-unknown'),
-                '没查出来你报过这条路线没有 —— 可以直接提交,重复报名平台会拦下并说明。',
+                stringsOf(context).merchantRecruitPageRegistrationUnknown,
                 style: t.bodySmall?.copyWith(color: CyPalette.of(context).statusWarning),
               ),
             ),
           if (s.selectableNodes.isEmpty)
-            const StatusView(
+            StatusView(
               key: Key('recruit-nodes-empty'),
               icon: CupertinoIcons.location,
-              message: '这条路线还没有可报名的站点',
-              sub: '主办方把站点排好之后再回来看看',
+              message: stringsOf(context).merchantRecruitPageNodesEmpty,
+              sub: stringsOf(context).merchantRecruitPageNodesEmptyHint,
             )
           else
             CyNativeButton(
               key: const Key('recruit-register-button'),
               onPressed: _busy ? null : _register,
-              label: '报名承接',
+              label: stringsOf(context).merchantRecruitPageRegister,
               width: double.infinity,
               loading: _busy,
             ),
@@ -883,7 +890,7 @@ class _UpcomingRuns extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        const CySectionTitle('即将到店的场次'),
+        CySectionTitle(stringsOf(context).merchantRecruitPageRuns),
         const SizedBox(height: CyTokens.space2),
         async.when(
           // ★ 骨架屏内部是 ListView,直接塞进外层 ListView 会 unbounded ——
@@ -895,18 +902,18 @@ class _UpcomingRuns extends ConsumerWidget {
           error: (Object e, StackTrace _) => StatusView(
             key: const Key('recruit-runs-error'),
             icon: CupertinoIcons.exclamationmark_triangle,
-            message: '场次没读出来',
+            message: stringsOf(context).merchantRecruitPageRunsError,
             sub: e.toString().replaceFirst('Exception: ', ''),
             onRetry: () =>
                 ref.invalidate(merchantUpcomingRunsProvider(topicId)),
           ),
           data: (List<UpcomingRun> rows) {
             if (rows.isEmpty) {
-              return const StatusView(
+              return StatusView(
                 key: Key('recruit-runs-empty'),
                 icon: Icons.event_available_outlined,
-                message: '暂时没有即将到店的场次',
-                sub: '玩家买票或俱乐部包团之后会出现在这里',
+                message: stringsOf(context).merchantRecruitPageRunsEmpty,
+                sub: stringsOf(context).merchantRecruitPageRunsEmptyHint,
               );
             }
             return Column(
@@ -915,11 +922,11 @@ class _UpcomingRuns extends ConsumerWidget {
                     (UpcomingRun r) => Padding(
                       padding: const EdgeInsets.only(bottom: CyTokens.space2),
                       child: CyCell(
-                        title: '${r.startLabel} · ${r.sourceLabel}',
+                        title: '${merchantRecruitStart(context, r)} · ${merchantRecruitSource(context, r)}',
                         subtitle: <String>[
-                          r.metaLabel,
-                          if (r.stepLabel.isNotEmpty) r.stepLabel,
-                          if (r.arrivalLabel.isNotEmpty) r.arrivalLabel,
+                          merchantRecruitMeta(context, r),
+                          if (r.stepLabel.isNotEmpty) merchantRecruitStep(context, r),
+                          if (r.arrivalLabel.isNotEmpty) merchantRecruitArrival(context, r),
                         ].join(' · '),
                       ),
                     ),
@@ -930,7 +937,7 @@ class _UpcomingRuns extends ConsumerWidget {
         ),
         const SizedBox(height: CyTokens.space2),
         Text(
-          '场次只统计你已中标路线的到店安排。',
+          stringsOf(context).merchantRecruitPageRunsHint,
           style: t.bodySmall?.copyWith(color: p.textTertiary),
         ),
       ],
@@ -972,7 +979,7 @@ class _StationEntryState extends ConsumerState<_StationEntry> {
           .toList(growable: false);
       if (!mounted) return;
       if (mine.isEmpty) {
-        CyNativeNotice.show(context, '这条路线还没开出场次');
+        CyNativeNotice.show(context, stringsOf(context).merchantRecruitPageNoSessions);
         return;
       }
       if (mine.length == 1) {
@@ -982,14 +989,14 @@ class _StationEntryState extends ConsumerState<_StationEntry> {
       final MerchantGameEntry? picked = await showCupertinoModalPopup(
         context: context,
         builder: (BuildContext sheetContext) => CupertinoActionSheet(
-          title: const Text('选择场次'),
+          title: Text(stringsOf(context).merchantRecruitPageChooseSession),
           actions: mine
               .map(
                 (MerchantGameEntry e) => CupertinoActionSheetAction(
                   key: Key('recruit-station-option-${e.activityId}'),
                   onPressed: () => Navigator.of(sheetContext).pop(e),
                   child: Text(
-                    e.activityName.isEmpty ? '未命名场次' : e.activityName,
+                    e.activityName.isEmpty ? stringsOf(context).merchantRecruitPageUnnamedSession : e.activityName,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -998,7 +1005,7 @@ class _StationEntryState extends ConsumerState<_StationEntry> {
               .toList(),
           cancelButton: CupertinoActionSheetAction(
             onPressed: () => Navigator.of(sheetContext).pop(),
-            child: const Text('取消'),
+            child: Text(stringsOf(context).merchantRecruitUiCancel),
           ),
         ),
       );
@@ -1022,8 +1029,8 @@ class _StationEntryState extends ConsumerState<_StationEntry> {
     return CyCell(
       key: const Key('recruit-station-entry'),
       leading: const Icon(CupertinoIcons.game_controller),
-      title: '本站',
-      subtitle: '怎么接待、服务时段、复盘与暂停都在里面',
+      title: stringsOf(context).merchantRecruitPageStation,
+      subtitle: stringsOf(context).merchantRecruitPageStationHint,
       onTap: _busy ? null : _open,
     );
   }
