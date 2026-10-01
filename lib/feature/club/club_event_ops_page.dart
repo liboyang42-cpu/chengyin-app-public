@@ -1551,7 +1551,7 @@ class _ClubEventOpsPageState extends ConsumerState<ClubEventOpsPage> {
       ),
       title: member.nickname,
       meta:
-          stringsOf(context).clubEventMember(member.memberId)
+          '${stringsOf(context).clubEventMember(member.memberId)}'
           '${_rosterTab == 'waitlist' && member.state.isNotEmpty ? ' · ${member.state}' : ''}',
       trailing: _rosterTab == 'waitlist'
           ? null

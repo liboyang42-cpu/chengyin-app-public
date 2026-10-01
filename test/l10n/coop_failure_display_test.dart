@@ -12,7 +12,7 @@ void main() {
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Builder(builder: (context) {
-          final strings = AppLocalizations.of(context)!;
+          final strings = AppLocalizations.of(context);
           expect(coopErrorSub(const CoopFailure.local(CoopFailureKind.operation, '操作失败'), context: context), strings.operationFailed);
           for (final message in ['操作失败', '  Business detail  ', '']) {
             expect(coopErrorSub(CoopFailure.server(message), context: context), message);

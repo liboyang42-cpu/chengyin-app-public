@@ -32,7 +32,7 @@ void main() {
     expect(find.textContaining('Capacity: 0 items'), findsOneWidget);
     expect(find.textContaining('Until 2026-12-31'), findsOneWidget);
     expect(rows.single.usable, isFalse);
-    final strings = AppLocalizations.of(tester.element(find.byType(CoopPerkTemplatePage)))!;
+    final strings = AppLocalizations.of(tester.element(find.byType(CoopPerkTemplatePage)));
     expect(strings.coopTemplateQuota(1), 'Capacity: 1 item');
     expect(strings.coopTemplateQuota(2), 'Capacity: 2 items');
     expect(strings.coopTemplateRetailError, contains('99999999.99'));

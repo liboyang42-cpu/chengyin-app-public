@@ -215,7 +215,7 @@ void main() {
     final first = ClubDirectorPendingStore(storage, ownerId: 1);
     final second = ClubDirectorPendingStore(storage, ownerId: 2);
     final pending = ClubDirectorPendingWrite.fromCommand(GameSessionCommand(
-      activityId: 41, requestId: 'owner-one-123', expectedRevision: 3,
+      activityId: 41, nodeId: null, requestId: 'owner-one-123', expectedRevision: 3,
       action: 'FINISH', payload: const {},
     ));
     await first.write(pending);

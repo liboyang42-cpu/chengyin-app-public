@@ -57,8 +57,8 @@ void main() {
     for (final entry in <(CouponLocalFailureKind, Future<Object?> Function(CouponApi), String)>[
       (CouponLocalFailureKind.load, (api) => api.myPublishedList(), '加载失败'),
       (CouponLocalFailureKind.publish, publish, '发布失败'),
-      (CouponLocalFailureKind.stop, (api) async { await api.stop(7); }, '停发失败，请稍后重试'),
-      (CouponLocalFailureKind.stop, (api) async { await api.stopIssuing(7); }, '停发失败，请稍后重试'),
+      (CouponLocalFailureKind.stop, (api) async { await api.stop(7); return null; }, '停发失败，请稍后重试'),
+      (CouponLocalFailureKind.stop, (api) async { await api.stopIssuing(7); return null; }, '停发失败，请稍后重试'),
     ]) {
       await expectLater(entry.$2(build({'code': 500}).api), throwsA(
         isA<CouponLocalFailure>().having((e) => e.kind, 'kind', entry.$1)

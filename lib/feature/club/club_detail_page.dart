@@ -1294,7 +1294,7 @@ class _ShareEditionSection extends ConsumerWidget {
                         key: Key('club-edition-share-${e.id}'),
                         padding: EdgeInsets.zero,
                         minimumSize: const Size(44, 44),
-                        onPressed: () => _shareEditionTicket(e),
+                        onPressed: () => _shareEditionTicket(context, e),
                         child: Text(stringsOf(context).clubMainShareWithTicket),
                       ),
                     ),
@@ -1310,7 +1310,7 @@ class _ShareEditionSection extends ConsumerWidget {
   /// 带票链接按真源 `utils/ticket-source.js` 的 `buildSharePath` 拼:
   /// `?id&sourceClubId&clubCode`,clubCode = `club-{cid}-t{topicId}`。
   /// 归因只来自本页 clubId 与冻结条款,不接受外部传入 —— 绝不产假的标记。
-  void _shareEditionTicket(EditionOption e) {
+  void _shareEditionTicket(BuildContext context, EditionOption e) {
     final name = e.topicName.isEmpty ? club.name : e.topicName;
     final code = Uri.encodeComponent('club-${club.id}-t${e.id}');
     SharePlus.instance.share(

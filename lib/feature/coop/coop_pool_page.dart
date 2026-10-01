@@ -173,7 +173,7 @@ class _PoolTileState extends ConsumerState<_PoolTile> {
             Padding(
               padding: const EdgeInsets.only(top: 2),
               child: Text(
-                stringsOf(context).coopInitiatorName(it.merchantNick),
+                stringsOf(context).coopInitiatorName(it.merchantNick!),
                 style: textTheme.bodySmall?.copyWith(
                   color: CyPalette.of(context).textTertiary,
                 ),
