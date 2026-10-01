@@ -15,7 +15,10 @@ class _Auth extends AuthController {
   static AuthState _state(int id) => AuthState(initialized: true,
     user: User(id: id, nickname: '用户$id', avatar: '', role: 'player'));
   void switchTo(int id) => state = _state(id);
-  void logout() => state = const AuthState(initialized: true);
+  @override
+  Future<void> logout() async {
+    state = const AuthState(initialized: true);
+  }
 }
 
 void main() {
@@ -44,7 +47,7 @@ void main() {
     final semantics = t.ensureSemantics();
     expect(find.bySemanticsLabel('Open 新账号主题'), findsOneWidget);
     semantics.dispose();
-    auth.logout();
+    await auth.logout();
     await t.pumpAndSettle();
     expect(find.text('Sign in to view saved topics'), findsOneWidget);
     expect(find.byKey(const Key('like-card-2')), findsNothing);
