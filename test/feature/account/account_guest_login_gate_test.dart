@@ -1,5 +1,4 @@
-import 'package:chengyin_app/l10n/app_localizations_zh.dart';
-import 'package:chengyin_app/l10n/strings_provider.dart';
+import 'package:chengyin_app/l10n/app_localizations_en.dart';
 // B1 账号/资料域修复线 REPORT-sim-account 的行为门禁(2026-09-19)。
 //
 // 覆盖报告里四条游客可见问题:
@@ -29,6 +28,8 @@ import 'package:chengyin_app/feature/account/participants_page.dart';
 import 'package:chengyin_app/feature/activity/participant_picker.dart';
 import 'package:chengyin_app/feature/auth/auth_controller.dart';
 import 'package:chengyin_app/main.dart';
+import 'package:chengyin_app/l10n/app_localizations_zh.dart';
+import 'package:chengyin_app/l10n/strings_provider.dart';
 
 import '../../support/fixed_auth.dart';
 import '../../support/source_text.dart';
@@ -57,6 +58,10 @@ Widget _app(List<dynamic> overrides, Widget home) => ProviderScope(
 
 void main() {
   group('P1-1 口径归一:错误文案函数', () {
+    test('401 summary follows selected English language', () {
+      final strings = AppLocalizationsEn();
+      expect(accountFailureCopy(_unauthorized(), networkFallback: 'Retry', strings: strings), strings.loginExpired);
+    });
     test('401 → 后端中文原话,绝不吐 DioException 英文栈', () {
       final String copy = accountFailureCopy(
         _unauthorized(),
@@ -293,9 +298,9 @@ void main() {
       expect(page.contains('收货地址'), isFalse);
       expect(page.contains('寄送实物奖励'), isFalse);
       // 真源标题与行内说明逐字在位(pages/address/address.wxml)。
-      expect(page.contains("CyPageTitle('参与人信息')"), isTrue);
-      expect(page.contains('用于报名联系和到场核验'), isTrue);
-      expect(page.contains("label: '新增参与人信息'"), isTrue);
+      expect(page.contains('CyPageTitle(stringsOf(context).accountParticipants)'), isTrue);
+      expect(page.contains('accountParticipantPurpose'), isTrue);
+      expect(page.contains('label: stringsOf(context).accountParticipantAdd'), isTrue);
     });
 
     test('设置页不再挂虚构的「收货地址」入口', () {

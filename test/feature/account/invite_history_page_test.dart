@@ -4,6 +4,7 @@
 //   把 rewardReady 接反了,用户看到的还是假话。
 
 import 'package:flutter/material.dart';
+import 'package:chengyin_app/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -26,7 +27,7 @@ InviteHistoryState _state({required bool ready}) => InviteHistoryState(
   earnedTotal: 0,
 );
 
-Future<void> _pump(WidgetTester t, {required bool ready}) async {
+Future<void> _pump(WidgetTester t, {required bool ready, bool english = false}) async {
   await t.pumpWidget(
     ProviderScope(
       overrides: <dynamic>[
@@ -35,13 +36,32 @@ Future<void> _pump(WidgetTester t, {required bool ready}) async {
           (Ref ref) async => _state(ready: ready),
         ),
       ].cast(),
-      child: const MaterialApp(home: InviteHistoryPage()),
+      child: MaterialApp(
+        locale: english ? const Locale('en') : const Locale('zh'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(english ? 2 : 1)),
+          child: child!,
+        ),
+        home: const InviteHistoryPage(),
+      ),
     ),
   );
   await t.pumpAndSettle();
 }
 
 void main() {
+  // NOT_RUN locally: Flutter SDK unavailable.
+  testWidgets('English large text preserves incomplete-reward uncertainty and names', (t) async {
+    await _pump(t, ready: false, english: true);
+    expect(find.text('Invitation history'), findsOneWidget);
+    expect(find.text('Joined · Reward sync pending'), findsOneWidget);
+    expect(find.text('小李'), findsOneWidget);
+    expect(find.text('+0'), findsNothing);
+    expect(t.takeException(), isNull);
+  });
+
   testWidgets('★★ 流水没拉全:说「待同步」,且必须横那条说明', (WidgetTester t) async {
     await _pump(t, ready: false);
     expect(find.text('已加入 · 奖励待同步'), findsOneWidget);

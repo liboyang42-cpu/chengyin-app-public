@@ -1,3 +1,4 @@
+import '../../l10n/strings.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
@@ -122,7 +123,7 @@ class _MarketingConsentSheetState
         _rows = rows;
         _savingKey = null;
       });
-      CyNativeNotice.show(context, optedIn ? '已同意' : '已退订');
+      CyNativeNotice.show(context, optedIn ? stringsOf(context).settingsResidualOptedIn : stringsOf(context).settingsResidualOptedOut);
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -152,7 +153,7 @@ class _MarketingConsentSheetState
           ),
           children: <Widget>[
             Text(
-              '营销消息与优惠券',
+              stringsOf(context).settingsResidualMarketing,
               textAlign: TextAlign.center,
               style: CyType.title2.copyWith(
                 fontWeight: FontWeight.w600,
@@ -161,7 +162,7 @@ class _MarketingConsentSheetState
             ),
             const SizedBox(height: CyTokens.space3),
             Text(
-              '商家营销同意默认关闭。只有你明确打开后,该商家才能按渠道触达;关闭即立即退订。',
+              stringsOf(context).miscMarketingDisclosure,
               style: TextStyle(
                 fontSize: CyTokens.typeBody,
                 height: CyTokens.leadingLoose,
@@ -175,16 +176,16 @@ class _MarketingConsentSheetState
                 child: Center(child: CupertinoActivityIndicator()),
               )
             else if (_loadError != null)
-              _LoadFailed(message: '营销设置没读出来:$_loadError', onRetry: _load)
+              _LoadFailed(message: stringsOf(context).settingsResidualMarketingError(_loadError!), onRetry: _load)
             else if (_needLogin)
               _LoadFailed(
-                message: '登录后查看营销设置',
+                message: stringsOf(context).settingsResidualMarketingLogin,
                 needLogin: true,
                 onRetry: _loginThenLoad,
               )
             else if (_rows.isEmpty)
               Text(
-                '完成一次真实报名后,可在这里管理对应商家的消息。',
+                stringsOf(context).settingsResidualMarketingEmpty,
                 key: const Key('marketing-consent-empty'),
                 style: t.bodyMedium?.copyWith(color: p.textSecondary),
               )
@@ -246,7 +247,7 @@ class _LoadFailed extends StatelessWidget {
           padding: EdgeInsets.zero,
           onPressed: onRetry,
           child: Text(
-            needLogin ? '去登录' : '重试',
+            needLogin ? stringsOf(context).settingsResidualSignIn : stringsOf(context).settingsResidualRetry,
             style: t.titleSmall?.copyWith(color: p.brand),
           ),
         ),
@@ -286,8 +287,8 @@ class _MerchantConsentCard extends StatelessWidget {
           const SizedBox(height: CyTokens.space2),
           _ChannelSwitch(
             key: Key('marketing-consent-${row.merchantRowId}-IN_APP'),
-            label: '站内活动消息',
-            sub: '活动提醒与商家动态',
+            label: stringsOf(context).settingsResidualInApp,
+            sub: stringsOf(context).settingsResidualInAppHint,
             value: row.inAppOptedIn,
             busy: savingKey != null,
             onChanged: (bool v) => onToggle(row, 'IN_APP', v),
@@ -300,8 +301,8 @@ class _MerchantConsentCard extends StatelessWidget {
           ),
           _ChannelSwitch(
             key: Key('marketing-consent-${row.merchantRowId}-COUPON'),
-            label: '商家优惠券',
-            sub: '真实入账到我的优惠券',
+            label: stringsOf(context).settingsResidualCoupons,
+            sub: stringsOf(context).settingsResidualCouponHint,
             value: row.couponOptedIn,
             busy: savingKey != null,
             onChanged: (bool v) => onToggle(row, 'COUPON', v),

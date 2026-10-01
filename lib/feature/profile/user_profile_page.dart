@@ -1,3 +1,5 @@
+import '../../l10n/im_api_display.dart';
+import '../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -101,9 +103,9 @@ class _UserProfilePageState extends ConsumerState<UserProfilePage> {
 
   /// 三态文案。null ≠ 未关注 —— 见 ProfileDetail.isFollow 的注释。
   String _followLabel(ProfileDetail p) => switch (p.isFollow) {
-    true => '已关注',
-    false => '关注',
-    null => '登录后关注',
+    true => stringsOf(context).profileDetailsFollowing,
+    false => stringsOf(context).profileDetailsFollow,
+    null => stringsOf(context).profileDetailsLoginFollow,
   };
 
   /// 给 TA 的推文点赞。
@@ -159,7 +161,7 @@ class _UserProfilePageState extends ConsumerState<UserProfilePage> {
       if (!mounted) return;
       CyNativeNotice.show(
         context,
-        e.toString().replaceFirst('Exception: ', ''),
+        imErrorText(e, stringsOf(context)),
         isError: true,
       );
     } finally {
@@ -203,15 +205,15 @@ class _UserProfilePageState extends ConsumerState<UserProfilePage> {
     // 看不懂的错误态;而这本来就不是"查不到",是"链接不完整"。
     if (widget.memberId <= 0) {
       return CupertinoPageScaffold(
-        navigationBar: const CupertinoNavigationBar(middle: Text('个人主页')),
+        navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).profileDetailsPublicTitle)),
         child: Material(
           color: Colors.transparent,
           child: StatusView(
-            message: '这个主页链接不完整',
-            sub: '链接里没有用户信息，暂时无法打开个人主页。',
+            message: stringsOf(context).profileDetailsIncompleteLink,
+            sub: stringsOf(context).profileDetailsIncompleteLinkHint,
             large: true,
             onRetry: () => context.go(kProfileRoute),
-            retryLabel: '回到我的主页',
+            retryLabel: stringsOf(context).profileDetailsMyProfile,
           ),
         ),
       );
@@ -236,7 +238,7 @@ class _UserProfilePageState extends ConsumerState<UserProfilePage> {
         subjectMerchant != null && !viewerIsMerchant ? subjectMerchant : null;
 
     return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(middle: Text('主页')),
+      navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).profileDetailsPageTitle)),
       child: Material(
         color: Colors.transparent,
         child: SafeArea(
@@ -244,7 +246,7 @@ class _UserProfilePageState extends ConsumerState<UserProfilePage> {
           child: async.when(
             loading: () => const Center(child: CupertinoActivityIndicator()),
             error: (Object e, _) => StatusView(
-              message: '看不到这个人的主页',
+              message: stringsOf(context).profileDetailsPublicUnavailable,
               sub: e.toString().replaceFirst('Exception: ', ''),
               large: true,
               onRetry: () =>
@@ -268,7 +270,7 @@ class _UserProfilePageState extends ConsumerState<UserProfilePage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
                           Text(
-                            p.nickname.trim().isEmpty ? '城瘾用户' : p.nickname,
+                            p.nickname.trim().isEmpty ? stringsOf(context).profileDetailsDefaultName : p.nickname,
                             style: textTheme.titleLarge,
                           ),
                           // 简介为空时整行不渲染,不留一段空白。
@@ -294,9 +296,9 @@ class _UserProfilePageState extends ConsumerState<UserProfilePage> {
                   children: <Widget>[
                     // 三格 = 好友 / 关注 / 粉丝(小程序 cy-profile index.wxml:76-82);
                     // 获赞/发布内容归下面那组公开统计,不在这里出现第二次。
-                    _stat(context, '好友', p.friendNum),
-                    _stat(context, '关注', p.followNum),
-                    _stat(context, '粉丝', p.fansNum),
+                    _stat(context, stringsOf(context).profileDetailsFriends, p.friendNum),
+                    _stat(context, stringsOf(context).profileDetailsFollow, p.followNum),
+                    _stat(context, stringsOf(context).profileDetailsFollowers, p.fansNum),
                   ],
                 ),
                 const SizedBox(height: CyTokens.space4),
@@ -311,7 +313,7 @@ class _UserProfilePageState extends ConsumerState<UserProfilePage> {
                 CyNativeButton(
                   width: double.infinity,
                   // 真源 components/cy/profile/index.wxml:119 写的就是「发消息」。
-                  label: _busy ? '正在打开…' : '发消息',
+                  label: _busy ? stringsOf(context).profileDetailsOpening : stringsOf(context).profileDetailsMessage,
                   onPressed: _busy ? null : _startChat,
                   loading: _busy,
                   icon: const CyNativeButtonIcon(
@@ -326,7 +328,7 @@ class _UserProfilePageState extends ConsumerState<UserProfilePage> {
                   CyNativeButton(
                     width: double.infinity,
                     role: CyNativeButtonRole.primary,
-                    label: '发起合作',
+                    label: stringsOf(context).profileDetailsCooperate,
                     key: const Key('profile-coop-btn'),
                     onPressed: () => _openCoopInvite(coopMerchant),
                   ),
@@ -378,9 +380,9 @@ class _UserProfilePageState extends ConsumerState<UserProfilePage> {
 
     return Row(
       children: <Widget>[
-        item(_PublicProfileTab.posts, '推文'),
-        item(_PublicProfileTab.achievements, '成就'),
-        item(_PublicProfileTab.about, '关于'),
+        item(_PublicProfileTab.posts, stringsOf(context).profileDetailsPosts),
+        item(_PublicProfileTab.achievements, stringsOf(context).profileDetailsAchievements),
+        item(_PublicProfileTab.about, stringsOf(context).profileDetailsAbout),
       ],
     );
   }
@@ -393,10 +395,10 @@ class _UserProfilePageState extends ConsumerState<UserProfilePage> {
     if (!ref.watch(authControllerProvider).isLoggedIn) {
       return StatusView(
         key: const Key('profile-posts-login-gate'),
-        message: '登录后查看 TA 的动态',
-        sub: '这一步需要登录，登录完会自动回到这一页。',
+        message: stringsOf(context).profileDetailsLoginPosts,
+        sub: stringsOf(context).profileDetailsLoginPostsHint,
         icon: CupertinoIcons.lock,
-        retryLabel: '去登录',
+        retryLabel: stringsOf(context).profileDetailsSignIn,
         onRetry: () async {
           if (!await requireLogin(context, ref)) return;
           if (!mounted) return;
@@ -408,14 +410,14 @@ class _UserProfilePageState extends ConsumerState<UserProfilePage> {
       // 动态流与广场同源,真源是 post-card 鱼骨(头像+长短三线+媒体),不是 card 封面。
       loading: () => const CySkeleton(type: CySkeletonType.postCard, count: 2),
       error: (Object error, StackTrace stack) => StatusView(
-        message: '动态没加载出来',
-        sub: '已发布的动态都还在，只是这次没取到',
+        message: stringsOf(context).profileDetailsPostsFailed,
+        sub: stringsOf(context).profileDetailsPostsFailedHint,
         onRetry: () => ref.invalidate(otherPostsProvider(widget.memberId)),
       ),
       data: (List<SquarePost> rows) {
         if (rows.isEmpty) {
           // 小程序 cy-empty:主标「还没有推文」,副标「TA 还没有发布推文」。
-          return const StatusView(message: '还没有推文', sub: 'TA 还没有发布推文');
+          return StatusView(message: stringsOf(context).profileDetailsPostsEmpty, sub: stringsOf(context).profileDetailsPostsEmptyHint);
         }
         return Column(
           children: <Widget>[for (final SquarePost row in rows) _postRow(row)],
@@ -438,7 +440,7 @@ class _UserProfilePageState extends ConsumerState<UserProfilePage> {
     return CupertinoListTile(
       padding: EdgeInsets.zero,
       title: Text(
-        (post.contents ?? '').isEmpty ? '图片推文' : post.contents!,
+        (post.contents ?? '').isEmpty ? stringsOf(context).profileDetailsPhotoPost : post.contents!,
         maxLines: 2,
         overflow: TextOverflow.ellipsis,
       ),
@@ -450,7 +452,7 @@ class _UserProfilePageState extends ConsumerState<UserProfilePage> {
       ),
       onTap: () {
         if (!communityOpen) {
-          CyNativeNotice.show(context, '社区广场灰度中，动态详情暂不开放');
+          CyNativeNotice.show(context, stringsOf(context).profileDetailsRollout);
           return;
         }
         context.push('/square/${post.id}');
@@ -460,9 +462,9 @@ class _UserProfilePageState extends ConsumerState<UserProfilePage> {
 
   Widget _achievements(ProfileDetail profile) => Row(
     children: <Widget>[
-      _publicStat('发布内容', profile.topicNum + profile.activityNum),
-      _publicStat('获赞', profile.likeNum),
-      _publicStat('粉丝', profile.fansNum),
+      _publicStat(stringsOf(context).profileDetailsPublished, profile.topicNum + profile.activityNum),
+      _publicStat(stringsOf(context).profileDetailsLikes, profile.likeNum),
+      _publicStat(stringsOf(context).profileDetailsFollowers, profile.fansNum),
     ],
   );
 
@@ -481,11 +483,11 @@ class _UserProfilePageState extends ConsumerState<UserProfilePage> {
     children: <Widget>[
       // 区块标题走共用层(L2/T2):同域「我的」页同一块标题用的也是它,
       // 自带 Semantics header,字号字重跟 iOS 阶梯。
-      const CySectionTitle('个人介绍'),
+      CySectionTitle(stringsOf(context).profileDetailsIntroduction),
       const SizedBox(height: CyTokens.space2),
       Text(
         profile.introduction.trim().isEmpty
-            ? '还没有写个人介绍，完善资料后可展示'
+            ? stringsOf(context).profileDetailsIntroductionEmpty
             : profile.introduction.trim(),
       ),
       // 小程序关于页(= 他人视角全部内容):个人介绍 → 兴趣标签 → 探索作品。
@@ -494,11 +496,11 @@ class _UserProfilePageState extends ConsumerState<UserProfilePage> {
       const SizedBox(height: CyTokens.space5),
       // 同「个人介绍」:区块标题统一走共用层(Title3 Semibold + Semantics header),
       // 不再 titleLarge 手搓。
-      const CySectionTitle('兴趣标签'),
+      CySectionTitle(stringsOf(context).profileDetailsInterests),
       const SizedBox(height: CyTokens.space2),
       if (profile.routePreferences.isEmpty)
         Text(
-          '完善资料后可展示兴趣',
+          stringsOf(context).profileDetailsInterestsEmpty,
           style: Theme.of(
             context,
           ).textTheme.bodySmall?.copyWith(color: CyTokens.textTertiary),
@@ -514,7 +516,7 @@ class _UserProfilePageState extends ConsumerState<UserProfilePage> {
         ),
       if (profile.casePics.isNotEmpty) ...<Widget>[
         const SizedBox(height: CyTokens.space5),
-        const CySectionTitle('探索作品'),
+        CySectionTitle(stringsOf(context).profileDetailsWork),
         const SizedBox(height: CyTokens.space2),
         Wrap(
           spacing: CyTokens.space2,
@@ -574,7 +576,7 @@ class _LikeAction extends StatelessWidget {
         : CyTokens.textSecondary;
     return Semantics(
       button: true,
-      label: liked ? '取消点赞，当前 $count 个赞' : '点赞，当前 $count 个赞',
+      label: liked ? stringsOf(context).profileDetailsUnlikeCount(count) : stringsOf(context).profileDetailsLikeCount(count),
       child: CupertinoButton(
         padding: EdgeInsets.zero,
         minimumSize: const Size(44, 44),

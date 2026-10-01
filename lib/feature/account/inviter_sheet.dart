@@ -1,3 +1,4 @@
+import '../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -49,7 +50,12 @@ class _InviterSheetState extends ConsumerState<_InviterSheet> {
       myMemberId: myId,
     );
     if (local != null) {
-      setState(() => _error = local);
+      setState(() => _error = switch (local) {
+        '邀请码是空的' => stringsOf(context).accountInviterEmpty,
+        '这个邀请码不对' => stringsOf(context).accountInviterInvalid,
+        '不能填自己的邀请码' => stringsOf(context).accountInviterSelf,
+        _ => local,
+      });
       return;
     }
     setState(() {
@@ -60,12 +66,15 @@ class _InviterSheetState extends ConsumerState<_InviterSheet> {
       await ref.read(registrationApiProvider).setInviter(_ctrl.text.trim());
       if (!mounted) return;
       Navigator.of(context).pop();
-      CyNativeNotice.show(context, '已绑定邀请人');
+      CyNativeNotice.show(context, stringsOf(context).accountInviterBound);
     } catch (e) {
       if (!mounted) return;
       // ★ 直接展示后端失败的完整说明(含"可能已绑过 · 重试不会有变化"),
       //   而不是压成一句「绑定失败」。
-      setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+      final message = e.toString().replaceFirst('Exception: ', '');
+      setState(() => _error = message == InviterBinding.remoteFailureHint
+          ? stringsOf(context).accountInviterFailureHint
+          : message);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -81,7 +90,7 @@ class _InviterSheetState extends ConsumerState<_InviterSheet> {
     return CupertinoPageScaffold(
       backgroundColor: palette.bgPage,
       resizeToAvoidBottomInset: true,
-      navigationBar: const CupertinoNavigationBar(middle: Text('填写邀请人')),
+      navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).accountInviterTitle)),
       child: SafeArea(
         top: false,
         child: ListView(
@@ -95,7 +104,7 @@ class _InviterSheetState extends ConsumerState<_InviterSheet> {
           children: <Widget>[
             const SizedBox(height: CyTokens.space1),
             Text(
-              '邀请人只能绑定一次,填写后无法更改。',
+              stringsOf(context).accountInviterOnce,
               style: textTheme.bodySmall?.copyWith(
                 color: palette.textSecondary,
               ),
@@ -109,7 +118,7 @@ class _InviterSheetState extends ConsumerState<_InviterSheet> {
               inputFormatters: <TextInputFormatter>[
                 FilteringTextInputFormatter.digitsOnly,
               ],
-              placeholder: '输入邀请码',
+              placeholder: stringsOf(context).accountInviterHint,
               placeholderStyle: textTheme.bodyMedium?.copyWith(
                 color: palette.textPlaceholder,
               ),
@@ -150,7 +159,7 @@ class _InviterSheetState extends ConsumerState<_InviterSheet> {
               onPressed: _busy ? null : () => _submit(myId),
               child: _busy
                   ? const CupertinoActivityIndicator()
-                  : const Text('绑定'),
+                  : Text(stringsOf(context).accountInviterBind),
             ),
           ],
         ),

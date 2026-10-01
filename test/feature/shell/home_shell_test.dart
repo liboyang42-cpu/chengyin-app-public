@@ -1,3 +1,4 @@
+import 'package:chengyin_app/l10n/app_localizations.dart';
 import 'dart:ui' as ui;
 
 import 'package:chengyin_app/feature/shell/home_shell.dart';
@@ -10,6 +11,39 @@ import 'package:go_router/go_router.dart';
 import 'package:native_liquid_glass/native_liquid_glass.dart';
 
 void main() {
+  for (final merchant in [false, true]) {
+    testWidgets('English ${merchant ? 'merchant' : 'player'} tabs update with language and keep routes', (tester) async {
+      final router = merchant ? _merchantRouter() : _testRouter(liquidGlassSupported: false);
+      addTearDown(router.dispose);
+      Future<void> render(String language) async {
+        await tester.pumpWidget(MaterialApp.router(
+          routerConfig: router,
+          locale: Locale(language),
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+        ));
+        await tester.pumpAndSettle();
+      }
+      await render('en');
+      final expected = merchant
+        ? ['Workspace', 'Marketing', 'Templates', 'Cooperation', 'Profile']
+        : ['Home', 'Roam', 'Publish', 'Clubs', 'Profile'];
+      final native = tester.widget<LiquidGlassTabBar>(find.byType(LiquidGlassTabBar, skipOffstage: false));
+      expect(native.items.map((item) => item.label), expected);
+      final fallback = tester.widget<CupertinoTabBar>(find.byType(CupertinoTabBar));
+      expect(fallback.items.map((item) => item.label), expected);
+      fallback.onTap!(1);
+      await tester.pumpAndSettle();
+      final destination = merchant ? '/merchant/marketing' : '/roam';
+      expect(router.routeInformationProvider.value.uri.path, destination);
+      await render('zh');
+      expect(router.routeInformationProvider.value.uri.path, destination);
+      final chinese = tester.widget<CupertinoTabBar>(find.byType(CupertinoTabBar));
+      expect(chinese.items.first.label, merchant ? '工作台' : '首页');
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('Liquid Glass 五个 Tab 仍分别暴露 VoiceOver 名称与动作', (
     WidgetTester tester,
   ) async {

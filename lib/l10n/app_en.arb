@@ -10496,5 +10496,10 @@
   "advancedContractOperation": "The advanced play operation failed",
   "advancedContractTransportUnknown": "The result is unconfirmed. Check the server state.",
   "advancedContractTransportNetwork": "Could not connect. Please try again later.",
-  "playPackContinueStatic": "Continue opening"
+  "playPackContinueStatic": "Continue opening",
+  "accountDeleteConfirmBody": "After submission, your account enters a cooling-off period. When it ends, your account will be permanently deleted: you will no longer be able to sign in, and your personal information will be anonymized. This action cannot be reversed.\n\nYou can return to this page during the cooling-off period to withdraw your request.",
+  "accountDeleteNoticeIrreversible": "After account deletion, you will no longer be able to sign in, and your personal information will be anonymized. This action cannot be reversed.",
+  "accountDeleteNoticeCoolingOff": "A seven-day cooling-off period begins after submission. Deletion takes effect only when it ends. You can withdraw your request at any time during these seven days.",
+  "accountDeleteNoticeOutstanding": "You cannot delete your account while it has a balance, a pending withdrawal, an ongoing order or an active registration. Resolve these first.",
+  "accountDeleteNoticeRoles": "Accounts with merchant or club roles must first complete the corresponding exit process."
 }

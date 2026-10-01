@@ -1,3 +1,7 @@
+import '../../l10n/error_presentation.dart';
+import '../../data/api/play_api.dart';
+import '../../core/network/request_session_scope.dart';
+import '../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
@@ -24,7 +28,12 @@ import '../auth/auth_controller.dart';
 import '../auth/login_gate.dart';
 
 final myProfileProvider = FutureProvider.autoDispose<ProfileDetail>((ref) {
-  return ref.watch(registrationApiProvider).userDetail();
+  final auth = ref.watch(authControllerProvider.select((state) => (state.user?.id, state.loading)));
+  final owner = auth.$1;
+  if (owner == null || auth.$2) throw StateError('Authentication required');
+  final scope = ref.read(authControllerProvider.notifier).requestScope(owner);
+  final api = ref.watch(registrationApiProvider);
+  return RequestSessionScope.run(scope, () => api.userDetail());
 });
 
 /// 编辑个人资料。对齐小程序 `pages/gerenziliao`。
@@ -42,6 +51,25 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
   ProfileEditForm _form = const ProfileEditForm();
   bool _saving = false;
   bool _uploading = false;
+
+  RequestSessionScope? _actionScope() {
+    final owner = ref.read(authControllerProvider).user?.id;
+    if (owner == null) return null;
+    final session = ref.read(authControllerProvider.notifier).requestScope(owner);
+    return RequestSessionScope(() => mounted && session.isCurrent());
+  }
+
+  void _resetForm() {
+    _original = null;
+    _form = const ProfileEditForm();
+    _routePreferences = const [];
+    _nameController.clear();
+    _introductionController.clear();
+    _saveError = null;
+    _saving = false;
+    _uploading = false;
+  }
+
 
   /// 「资料没有保存」那行行内错误(真源 cy-inline-error)。保存失败只弹 toast 时,
   /// 用户划走了提示就再也不知道上一次到底存没存上。
@@ -64,12 +92,14 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
   }
 
   Future<void> _pickRoutePreferences() async {
+    final scope = _actionScope();
+    if (scope == null || !scope.isCurrent()) return;
     final List<Category>? picked = await showProfileRoutePreferenceSheet(
       context,
       ref,
       selected: _routePreferences,
     );
-    if (!mounted || picked == null) return;
+    if (!scope.isCurrent() || picked == null) return;
     setState(() {
       _routePreferences = picked;
       _form = _form.copyWith(
@@ -88,6 +118,8 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
   }
 
   Future<void> _pickAvatar(BuildContext avatarContext) async {
+    final scope = _actionScope();
+    if (_uploading || scope == null || !scope.isCurrent()) return;
     // 选图走共用层 action sheet(对照表 #31):真源 `app.chooseImage` 是
     // `sourceType: ['album','camera']`,App 之前直接进相册、没有拍照这一路。
     // S4:锚点 = 触发元素(那个头像)自己的矩形。
@@ -95,27 +127,30 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
       context,
       sourceRect: cySourceRectOf(avatarContext),
     );
-    if (source == null || !mounted) return;
+    if (source == null || !scope.isCurrent()) return;
     final XFile? file = await ImagePicker().pickImage(
       source: source == CyImagePickSource.camera
           ? ImageSource.camera
           : ImageSource.gallery,
     );
-    if (file == null) return;
+    if (file == null || !scope.isCurrent()) return;
     setState(() => _uploading = true);
     try {
-      final url = await ref.read(playApiProvider).uploadImage(file.path);
-      if (!mounted) return;
+      final url = await RequestSessionScope.run(scope, () => ref.read(playApiProvider).uploadImage(file.path));
+      if (!scope.isCurrent()) return;
       setState(() => _form = _form.copyWith(avatar: url));
     } catch (e) {
-      if (!mounted) return;
+      if (!scope.isCurrent()) return;
       CyNativeNotice.show(
         context,
-        '头像没传上去:${e.toString().replaceFirst('Exception: ', '')}',
+        presentError(e, stringsOf(context),
+          fallback: stringsOf(context).profileAvatarUploadFailed,
+          originalApiMessage: e is PlayException ? e.message : null,
+        ).noticeText,
         isError: true,
       );
     } finally {
-      if (mounted) setState(() => _uploading = false);
+      if (scope.isCurrent()) setState(() => _uploading = false);
     }
   }
 
@@ -124,7 +159,7 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
     const int maxPics = 9;
     final int remaining = maxPics - _form.casePics.length;
     if (remaining <= 0) {
-      CyNativeNotice.show(context, '最多只能上传9张图片');
+      CyNativeNotice.show(context, stringsOf(context).profileDetailsMaxPhotos);
       return;
     }
     await _uploadInto(
@@ -155,67 +190,90 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
     required int maxCount,
     required ValueChanged<List<String>> onUploaded,
   }) async {
-    final List<String> urls = await pickAndUploadImages(
+    final scope = _actionScope();
+    if (scope == null || !scope.isCurrent()) return;
+    final List<String> urls = await RequestSessionScope.run(scope, () => pickAndUploadImages(
       context,
       ref,
       maxCount: maxCount,
-    );
-    if (!mounted || urls.isEmpty) return;
+    ));
+    if (!scope.isCurrent() || urls.isEmpty) return;
     onUploaded(urls);
   }
 
   Future<void> _save() async {
+    final scope = _actionScope();
+    if (_saving || scope == null || !scope.isCurrent()) return;
+    final form = _form;
     setState(() {
       _saving = true;
       _saveError = null;
     });
     try {
-      await ref.read(registrationApiProvider).updateProfile(_form);
+      await RequestSessionScope.run(scope, () => ref.read(registrationApiProvider).updateProfile(form));
+      if (!scope.isCurrent()) return;
       ref.invalidate(myProfileProvider);
-      if (!mounted) return;
-      CyNativeNotice.show(context, '已保存');
+      if (!scope.isCurrent()) return;
+      CyNativeNotice.show(context, stringsOf(context).profileDetailsSaved);
       if (context.canPop()) context.pop();
     } catch (e) {
-      if (!mounted) return;
+      if (!scope.isCurrent()) return;
       // ★ 内容被审核拒了,重试没用 —— 要让用户去改文字。
       //   统统说「保存失败,请重试」,用户会一直重试一段永远过不了的文案。
       if (e is ProfileUpdateException && e.contentRejected) {
         setState(() => _saveError = e.message);
         await cyConfirm(
           context,
-          title: '内容没能通过审核',
-          content: '${e.message}\n\n请修改昵称或简介后再保存。',
-          confirmText: '去修改',
+          title: stringsOf(context).profileDetailsContentRejected,
+          content: stringsOf(context).profileDetailsContentRejectedHint(e.message),
+          confirmText: stringsOf(context).profileDetailsEditContent,
           showCancel: false,
         );
         return;
       }
-      final String message = e.toString().replaceFirst('Exception: ', '');
+      final String message = presentError(e, stringsOf(context),
+        fallback: stringsOf(context).profileSaveFailed,
+        originalApiMessage: e is ProfileUpdateException
+            ? (e.isLocalFallback ? null : e.message)
+            : legacyApiMessage(e),
+      ).noticeText;
       setState(() => _saveError = message);
       CyNativeNotice.show(context, message, isError: true);
     } finally {
-      if (mounted) setState(() => _saving = false);
+      if (scope.isCurrent()) setState(() => _saving = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(authControllerProvider.select((state) => (state.user?.id, state.loading)), (previous, next) {
+      if (previous?.$1 != next.$1 || next.$2) setState(_resetForm);
+    });
     // 游客深链先挡(报告 #217 P1):这一页整页要登录(真源 gerenziliao 只从
     // 登录后的「我的」进),但路由对游客开放。不挡的话下面立刻打
     // `/api/user/info`,401 落进错误态 —— 显示的是裸 `DioException` 英文,
     // 只有「重试/回首页」,而重试多少次都还是 401(死路)。
     // 口径照同域 /profile 的游客态:就地给登录引导,登完留在本页。
-    if (!ref.watch(authControllerProvider).isLoggedIn) {
+    final auth = ref.watch(authControllerProvider);
+    if (auth.loading) {
+      return CupertinoPageScaffold(
+        navigationBar: CupertinoNavigationBar(
+          middle: Text(stringsOf(context).profileDetailsEditTitle),
+        ),
+        child: const LoadingView(),
+      );
+    }
+    if (!auth.isLoggedIn) {
       return CupertinoPageScaffold(
         // 导航栏与系统返回留着 —— 游客能原路退回去,不是被关在这一屏。
-        navigationBar: const CupertinoNavigationBar(middle: Text('编辑资料')),
+        navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).profileDetailsEditTitle)),
         child: StatusView(
-          message: '登录后编辑我的资料',
-          sub: '昵称、头像、城市签名都在这里修改',
+          message: stringsOf(context).profileDetailsEditLogin,
+          sub: stringsOf(context).profileDetailsEditLoginHint,
           icon: CupertinoIcons.person_crop_circle,
           large: true,
           onRetry: () => showLoginSheet(context),
-          retryLabel: '登录 / 注册',
+          retryLabel: stringsOf(context).profileDetailsLogin,
         ),
       );
     }
@@ -223,30 +281,19 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
     final textTheme = Theme.of(context).textTheme;
 
     return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(middle: Text('编辑资料')),
+      navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).profileDetailsEditTitle)),
       child: SafeArea(
         top: false,
         child: async.when(
-          loading: () => Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                const CupertinoActivityIndicator(),
-                const SizedBox(height: CyTokens.space2),
-                Text(
-                  // 真源 gerenziliao.wxml:7-15 —— 首次进来是「正在读取个人资料」,
-                  // 已有内容时的刷新态才是「正在核对个人资料…」。两句都不能省:
-                  // 刷新时不说这句,用户会以为刚填的东西被清空了。
-                  _original == null ? '正在读取个人资料' : '正在核对个人资料…',
-                  style: textTheme.bodySmall?.copyWith(
-                    color: CyTokens.textSecondary,
-                  ),
-                ),
-              ],
-            ),
+          skipLoadingOnReload: false,
+          skipLoadingOnRefresh: false,
+          loading: () => LoadingView(
+            message: _original == null
+                ? stringsOf(context).profileDetailsReadProfile
+                : stringsOf(context).profileDetailsCheckProfile,
           ),
           error: (Object e, _) => StatusView(
-            message: '个人资料没能加载出来',
+            message: stringsOf(context).profileDetailsLoadFailed,
             sub: e.toString().replaceFirst('Exception: ', ''),
             large: true,
             onRetry: () => ref.invalidate(myProfileProvider),
@@ -282,7 +329,7 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
                   Padding(
                     padding: const EdgeInsets.only(top: CyTokens.space2),
                     child: Text(
-                      '正在核对个人资料…',
+                      stringsOf(context).profileDetailsCheckProfile,
                       style: textTheme.bodySmall?.copyWith(
                         color: CyTokens.textSecondary,
                       ),
@@ -317,7 +364,7 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
                                     ),
                                     const SizedBox(height: CyTokens.space1),
                                     Text(
-                                      _uploading ? '上传中…' : '换头像',
+                                      _uploading ? stringsOf(context).profileDetailsUploading : stringsOf(context).profileDetailsChangeAvatar,
                                       style: textTheme.bodySmall?.copyWith(
                                         color: CyTokens.textSecondary,
                                       ),
@@ -329,11 +376,11 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
                       ),
                       const SizedBox(height: CyTokens.space4),
                       CyField(
-                        label: '昵称',
+                        label: stringsOf(context).profileDetailsName,
                         child: CupertinoTextField(
                           key: const Key('profile-name-field'),
                           controller: _nameController,
-                          placeholder: '填写昵称',
+                          placeholder: stringsOf(context).profileDetailsNamePlaceholder,
                           keyboardType: TextInputType.name,
                           textInputAction: TextInputAction.next,
                           autofillHints: const <String>[AutofillHints.nickname],
@@ -350,13 +397,13 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
                         //   在两个客户端叫两个名字,用户会以为是两回事。
                         //   ⚠️ 只改这一处:小程序的俱乐部/模板/发布都叫「简介」,
                         //     全局替换会把那三处也改错。
-                        label: '城市签名',
+                        label: stringsOf(context).profileDetailsSignature,
                         child: CupertinoTextField(
                           key: const Key('profile-introduction-field'),
                           controller: _introductionController,
                           maxLines: 3,
                           minLines: 3,
-                          placeholder: '写一句你喜欢的城市探索方式',
+                          placeholder: stringsOf(context).profileDetailsSignaturePlaceholder,
                           keyboardType: TextInputType.multiline,
                           textInputAction: TextInputAction.newline,
                           textCapitalization: TextCapitalization.sentences,
@@ -371,7 +418,7 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
                       // 探索作品 / 联系二维码 / 路线偏好 —— 真源 gerenziliao.wxml
                       // 的 8 个区块里 App 缺的三个(手机号那格见页面注释)。
                       CyField(
-                        label: '探索作品',
+                        label: stringsOf(context).profileDetailsWork,
                         child: _CasePicsField(
                           pics: _form.casePics,
                           busy: _uploading,
@@ -385,12 +432,12 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
                         ),
                       ),
                       CyField(
-                        label: '联系二维码',
+                        label: stringsOf(context).profileDetailsContactQr,
                         child: _SingleImageField(
                           key: const Key('profile-wechat-field'),
                           url: _form.wechat,
                           busy: _uploading,
-                          actionLabel: '上传联系二维码',
+                          actionLabel: stringsOf(context).profileDetailsUploadQr,
                           onPick: _pickWechat,
                           onRemove: () => setState(
                             () => _form = _form.copyWith(wechat: ''),
@@ -398,7 +445,7 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
                         ),
                       ),
                       CyField(
-                        label: '路线偏好',
+                        label: stringsOf(context).profileDetailsPreferences,
                         child: _RoutePreferenceField(
                           key: const Key('profile-route-preference-field'),
                           categories: _routePreferences,
@@ -437,7 +484,7 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
                                   child: Text(
                                     // 真源 cy-inline-error title + sub:标题点名
                                     // 「资料没有保存」,副行说清这次为什么。
-                                    '资料没有保存：$_saveError',
+                                    stringsOf(context).profileDetailsNotSaved(_saveError!),
                                     key: const Key('profile-save-error'),
                                     style: textTheme.bodySmall?.copyWith(
                                       color: CyPalette.of(
@@ -469,7 +516,7 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
                             onPressed: (!_form.canSubmit || !changed || _saving)
                                 ? null
                                 : _save,
-                            label: _saving ? '正在保存' : (changed ? '保存' : '没有改动'),
+                            label: _saving ? stringsOf(context).profileDetailsSaving : (changed ? stringsOf(context).profileDetailsSave : stringsOf(context).profileDetailsNoChanges),
                             loading: _saving,
                           ),
                         ),
@@ -509,8 +556,8 @@ class _CasePicsField extends StatelessWidget {
     if (pics.isEmpty) {
       return _EmptySlot(
         key: const Key('profile-case-pics-empty'),
-        label: '上传路线照片',
-        hint: '未填写',
+        label: stringsOf(context).profileDetailsUploadPhotos,
+        hint: stringsOf(context).profileDetailsNotProvided,
         busy: busy,
         onTap: onAdd,
       );
@@ -525,13 +572,13 @@ class _CasePicsField extends StatelessWidget {
             for (final (int index, String url) in pics.indexed)
               _PictureThumb(
                 url: url,
-                semanticLabel: '删除这张作品图',
+                semanticLabel: stringsOf(context).profileDetailsRemovePhoto,
                 onRemove: () => onRemove(index),
               ),
             if (pics.length < maxPics)
               _EmptySlot(
                 key: const Key('profile-case-pics-add'),
-                label: '上传路线照片',
+                label: stringsOf(context).profileDetailsUploadPhotos,
                 busy: busy,
                 onTap: onAdd,
               ),
@@ -539,7 +586,7 @@ class _CasePicsField extends StatelessWidget {
         ),
         const SizedBox(height: CyTokens.space1),
         Text(
-          '${pics.length}/$maxPics 张',
+          stringsOf(context).profileDetailsPhotosCount(pics.length, maxPics),
           style: Theme.of(
             context,
           ).textTheme.bodySmall?.copyWith(color: palette.textTertiary),
@@ -572,14 +619,14 @@ class _SingleImageField extends StatelessWidget {
       return _EmptySlot(
         key: const Key('profile-wechat-empty'),
         label: actionLabel,
-        hint: '未填写',
+        hint: stringsOf(context).profileDetailsNotProvided,
         busy: busy,
         onTap: onPick,
       );
     }
     return _PictureThumb(
       url: url,
-      semanticLabel: '清除联系二维码',
+      semanticLabel: stringsOf(context).profileDetailsClearQr,
       onRemove: onRemove,
     );
   }
@@ -606,7 +653,7 @@ class _RoutePreferenceField extends StatelessWidget {
       children: <Widget>[
         if (categories.isEmpty)
           Text(
-            '未填写',
+            stringsOf(context).profileDetailsNotProvided,
             style: Theme.of(
               context,
             ).textTheme.bodySmall?.copyWith(color: palette.textTertiary),
@@ -632,7 +679,7 @@ class _RoutePreferenceField extends StatelessWidget {
           alignment: Alignment.centerLeft,
           onPressed: onEdit,
           child: Text(
-            '编辑路线偏好',
+            stringsOf(context).profileDetailsEditPreferences,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: palette.textSecondary,
               decoration: TextDecoration.underline,
@@ -675,7 +722,7 @@ class _PreferenceChip extends StatelessWidget {
           const SizedBox(width: CyTokens.space2),
           Semantics(
             button: true,
-            label: '移除该分类',
+            label: stringsOf(context).profileDetailsRemoveCategory,
             child: CupertinoButton(
               key: Key('profile-preference-remove-$name'),
               padding: EdgeInsets.zero,
@@ -789,7 +836,7 @@ class _EmptySlot extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               Text(
-                busy ? '上传中…' : label,
+                busy ? stringsOf(context).profileDetailsUploading : label,
                 style: Theme.of(
                   context,
                 ).textTheme.bodySmall?.copyWith(color: palette.textSecondary),
@@ -915,7 +962,7 @@ class _RoutePreferenceSheetState extends ConsumerState<_RoutePreferenceSheet> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: <Widget>[
                   Text(
-                    '选择分类',
+                    stringsOf(context).profileDetailsChooseCategories,
                     style: TextStyle(
                       fontSize: CyTokens.typeBody,
                       fontWeight: FontWeight.w700,
@@ -924,7 +971,7 @@ class _RoutePreferenceSheetState extends ConsumerState<_RoutePreferenceSheet> {
                   ),
                   Semantics(
                     button: true,
-                    label: '关闭分类选择',
+                    label: stringsOf(context).profileDetailsCloseCategories,
                     child: CupertinoButton(
                       padding: EdgeInsets.zero,
                       minimumSize: const Size(44, 44),
@@ -945,7 +992,7 @@ class _RoutePreferenceSheetState extends ConsumerState<_RoutePreferenceSheet> {
                 width: double.infinity,
                 child: CyNativeButton(
                   key: const Key('profile-preference-save'),
-                  label: '保存',
+                  label: stringsOf(context).profileDetailsSave,
                   onPressed: _loading || _error != null
                       ? null
                       : () => Navigator.of(context).pop(_selected),
@@ -962,10 +1009,10 @@ class _RoutePreferenceSheetState extends ConsumerState<_RoutePreferenceSheet> {
     if (_loading) return const LoadingView();
     if (_error != null) {
       return StatusView(
-        message: '分类没拉出来',
-        sub: '$_error\n分类没拉到时先别保存，可重试',
+        message: stringsOf(context).profileDetailsCategoriesFailed,
+        sub: stringsOf(context).profileDetailsCategoryError(_error!),
         onRetry: _load,
-        retryLabel: '重试',
+        retryLabel: stringsOf(context).profileDetailsRetry,
       );
     }
     if (_categories.isEmpty) {
@@ -973,7 +1020,7 @@ class _RoutePreferenceSheetState extends ConsumerState<_RoutePreferenceSheet> {
       // 「再试」两个字会被 test/status_view_retry_gate_test.dart 判成
       // 「承诺了动作却没给按钮」。空态本来就没有出路(后台没配分类,重试也一样),
       // 所以这里只砍掉那半句承诺,不改立场。
-      return const StatusView(message: '暂无可选分类', sub: '当前类型下还没有配置分类。');
+      return StatusView(message: stringsOf(context).profileDetailsCategoriesEmpty, sub: stringsOf(context).profileDetailsCategoriesEmptyHint);
     }
     return ListView.builder(
       controller: widget.scrollController,

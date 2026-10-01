@@ -103,11 +103,34 @@ void main() {
       final s = stub(<String, dynamic>{'code': 200});
       await AddressApi(s.client).setDefault(7);
 
+      expect(s.sent.single.method, 'POST');
       expect(s.sent.single.path, '/api/user/address/setDefault');
       expect(form(s.sent.single), <String, String>{
         'id': '7',
         'isDefault': '1',
       });
+    });
+
+    test('设默认失败保留后端归属错误，不回退为保存整行', () async {
+      final s = stub(<String, dynamic>{'code': 500, 'msg': '地址不可用'});
+
+      await expectLater(
+        AddressApi(s.client).setDefault(7),
+        throwsA(predicate((Object e) => e.toString().contains('地址不可用'))),
+      );
+      expect(s.sent, hasLength(1));
+      expect(s.sent.single.path, '/api/user/address/setDefault');
+      expect(form(s.sent.single), <String, String>{
+        'id': '7',
+        'isDefault': '1',
+      });
+    });
+
+    test('设默认响应缺少成功码时拒绝成功，不发后续写入', () async {
+      final s = stub(<String, dynamic>{});
+
+      await expectLater(AddressApi(s.client).setDefault(7), throwsException);
+      expect(s.sent, hasLength(1));
     });
   });
 
@@ -115,7 +138,7 @@ void main() {
     test('① 删除的确认文案说清参与人也会消失', () {
       final String page = codeOf('lib/feature/account/address_list_page.dart');
       expect(
-        page.contains('参与人列表里也会一起消失'),
+        page.contains('accountDeleteParticipantWarning(row.fullName)'),
         isTrue,
         reason: '只说"删除地址"的话,用户不知道报名时那个人也没了',
       );
@@ -144,12 +167,12 @@ void main() {
       final String page = codeOf('lib/feature/account/address_list_page.dart');
       // 真源列表行显示姓名 + 手机号 + 「用于报名联系和到场核验」
       // (pages/address/address.wxml:17-21)——不再自造「没有地址」提示。
-      expect(page.contains('用于报名联系和到场核验'), isTrue);
+      expect(page.contains('accountParticipantPurpose'), isTrue);
     });
 
     test('★ 编辑页按小程序参与人真源限制可见字段', () {
       final String page = codeOf('lib/feature/account/address_edit_page.dart');
-      expect(page.contains('用于报名联系和到场核验'), isTrue);
+      expect(page.contains('accountParticipantFullPurpose'), isTrue);
       expect(page.contains("const Text('省市区')"), isFalse);
       expect(page.contains("const Text('设为默认')"), isFalse);
     });

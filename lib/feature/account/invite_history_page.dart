@@ -15,6 +15,9 @@ import '../../core/widgets/cy_widgets.dart';
 import '../../core/widgets/status_view.dart';
 import '../../data/models/points_statistics.dart';
 import 'account_login_gate.dart';
+import '../../core/widgets/localized_error_status.dart';
+import '../../l10n/error_presentation.dart';
+import '../../l10n/strings.dart';
 import 'invite_history_logic.dart';
 
 /// 一次性把邀请人和奖励流水都拉回来。
@@ -82,7 +85,7 @@ final inviteHistoryProvider = FutureProvider.autoDispose<InviteHistoryState>((
           .map(
             (InvitedMember m) => (
               id: m.id,
-              name: m.displayName,
+              name: m.nickname?.trim() ?? '',
               avatar: m.avatar,
               createTime: m.createTime,
             ),
@@ -109,7 +112,7 @@ class InviteHistoryPage extends ConsumerWidget {
         ? const AsyncValue<InviteHistoryState>.loading()
         : ref.watch(inviteHistoryProvider);
     return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(middle: Text('邀请记录')),
+      navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).inviteHistoryTitle)),
       child: Material(
         color: Colors.transparent,
         child: SafeArea(
@@ -117,8 +120,8 @@ class InviteHistoryPage extends ConsumerWidget {
           child: guest
               ? AccountLoginGate(
                   key: const Key('invites-login-gate'),
-                  message: '登录后查看邀请记录',
-                  sub: '邀请了谁、奖励到没到账,都记在账号里。',
+                  message: stringsOf(context).inviteHistoryLogin,
+                  sub: stringsOf(context).inviteHistoryLoginDetail,
                   onSignedIn: () => ref.invalidate(inviteHistoryProvider),
                 )
               : state.when(
@@ -127,24 +130,24 @@ class InviteHistoryPage extends ConsumerWidget {
                       const CySkeleton(type: CySkeletonType.card, count: 4),
                   error: (Object e, StackTrace _) => accountLoginRequired(e)
                       ? AccountLoginGate(
-                          message: '登录后查看邀请记录',
-                          sub: '邀请了谁、奖励到没到账,都记在账号里。',
+                          message: stringsOf(context).inviteHistoryLogin,
+                          sub: stringsOf(context).inviteHistoryLoginDetail,
                           onSignedIn: () =>
                               ref.invalidate(inviteHistoryProvider),
                         )
-                      : StatusView(
-                          message: '邀请记录没加载出来',
-                          // ★ 说清「你的邀请关系还在」—— 否则用户会以为邀请白做了。
-                          sub: '网络可能不稳定,你的邀请关系还在',
-                          large: true,
+                      : LocalizedErrorStatus(
+                          error: e,
+                          fallback: stringsOf(context).errorInvitesLoad,
+                          originalApiMessage: legacyApiMessage(e),
+                                      hint: stringsOf(context).errorInvitesHint,
                           onRetry: () => ref.invalidate(inviteHistoryProvider),
                         ),
                   data: (InviteHistoryState s) => s.groups.isEmpty
                       // 空态对齐小程序 `cy-empty`:只说「怎么才会有」,不给重试
                       // (真源的重试只挂在 cy-error 上)。
                       ? StatusView(
-                          message: '还没有邀请记录',
-                          sub: '好友通过你的邀请加入后,会按时间出现在这里',
+                          message: stringsOf(context).inviteHistoryEmpty,
+                          sub: stringsOf(context).inviteHistoryEmptyDetail,
                           large: true,
                         )
                       : RefreshIndicator.adaptive(
@@ -188,7 +191,7 @@ class _Summary extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Text(
-                  '累计邀请',
+                  stringsOf(context).inviteHistoryTotal,
                   style: TextStyle(fontSize: 12, color: p.textTertiary),
                 ),
                 const SizedBox(height: 4),
@@ -206,7 +209,7 @@ class _Summary extends StatelessWidget {
                     ),
                     const SizedBox(width: 2),
                     Text(
-                      '人',
+                      stringsOf(context).inviteHistoryPeopleUnit,
                       style: TextStyle(fontSize: 12, color: p.textTertiary),
                     ),
                   ],
@@ -214,18 +217,18 @@ class _Summary extends StatelessWidget {
               ],
             ),
           ),
-          Column(
+          Expanded(child: Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: <Widget>[
               Text(
-                '首购奖励积分',
+                stringsOf(context).inviteHistoryRewards,
                 style: TextStyle(fontSize: 12, color: p.textTertiary),
               ),
               const SizedBox(height: 4),
               // ★ 流水没拉全时显示「待同步」而不是「+0」——
               //   「+0」是个数字,会被当成已结算的事实。
               Text(
-                s.rewardReady ? '+${pointText(s.earnedTotal)}' : '待同步',
+                s.rewardReady ? '+${pointText(s.earnedTotal)}' : stringsOf(context).inviteHistorySync,
                 key: const Key('invite-earned-total'),
                 style: TextStyle(
                   fontSize: 20,
@@ -234,7 +237,7 @@ class _Summary extends StatelessWidget {
                 ),
               ),
             ],
-          ),
+          )),
         ],
       ),
     );
@@ -249,7 +252,7 @@ class _SyncNote extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(top: CyTokens.space4),
       child: Text(
-        '邀请记录已到达,奖励流水暂未同步',
+        stringsOf(context).inviteHistorySyncNote,
         key: const Key('invite-sync-note'),
         style: TextStyle(fontSize: 12, color: p.textTertiary),
       ),
@@ -269,11 +272,12 @@ class _Group extends StatelessWidget {
       children: <Widget>[
         Padding(
           padding: const EdgeInsets.fromLTRB(4, CyTokens.space5, 4, 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          child: Wrap(
+            spacing: CyTokens.space3,
+            runSpacing: CyTokens.space1,
             children: <Widget>[
               Text(
-                g.label,
+                g.earnedTotal == null ? g.label : _month(context, g.monthSource),
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
@@ -281,7 +285,9 @@ class _Group extends StatelessWidget {
                 ),
               ),
               Text(
-                g.rewardText,
+                g.earnedTotal == null ? g.rewardText : g.earnedTotal! > 0
+                    ? stringsOf(context).inviteHistoryPoints(pointText(g.earnedTotal))
+                    : stringsOf(context).inviteHistoryPeople(g.rows.length),
                 style: TextStyle(fontSize: 12, color: p.textTertiary),
               ),
             ],
@@ -315,14 +321,14 @@ class _Row extends StatelessWidget {
         children: <Widget>[
           // 真源 `cy-avatar size="sm" src name`:无图时显示名称首字,
           // 裸 ClipOval(CyNetImage) 只会留一个无字空圆。
-          CyAvatar(url: r.avatar, fallback: r.name, size: 36),
+          CyAvatar(url: r.avatar, fallback: r.name.isEmpty ? null : r.name, size: 36),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Text(
-                  r.name,
+                  r.name.isEmpty ? stringsOf(context).inviteHistoryUser : r.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -334,27 +340,60 @@ class _Row extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   // 真源 `.ir-time` 是 secondary,不是 tertiary。
-                  r.timeText,
+                  r.rewardEarned == null ? r.timeText : _time(context, r.joinedAtRaw).isEmpty
+                      ? stringsOf(context).inviteHistoryTimeUnknown : _time(context, r.joinedAtRaw),
                   style: TextStyle(fontSize: 11, color: p.textSecondary),
                 ),
                 Text(
-                  r.statusText,
+                  _status(context, r),
                   style: TextStyle(fontSize: 11, color: p.textTertiary),
                 ),
               ],
             ),
           ),
-          Text(
+          Flexible(child: Text(
             // 真源 `.ir-reward`:label 12 / tertiary —— 奖励状态不许和人名抢亮度。
-            r.rewardText,
+            _reward(context, r),
             style: TextStyle(
               fontSize: CyTokens.typeLabel,
               fontWeight: FontWeight.w600,
               color: p.textTertiary,
             ),
-          ),
+          )),
         ],
       ),
     );
   }
+}
+
+DateTime? _date(String? raw) => raw == null || raw.isEmpty
+    ? null : DateTime.tryParse(raw.replaceFirst(' ', 'T'));
+
+String _month(BuildContext context, String? raw) {
+  final date = _date(raw);
+  return date == null ? stringsOf(context).inviteHistoryOther
+      : stringsOf(context).inviteHistoryMonth(date.year, date.month);
+}
+
+String _time(BuildContext context, String? raw) {
+  final date = _date(raw);
+  if (date == null) return '';
+  final time = '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+  return stringsOf(context).inviteHistoryTime(date.month, date.day, time);
+}
+
+String _status(BuildContext context, InviteRow row) {
+  if (row.rewardEarned == null) return row.statusText;
+  final strings = stringsOf(context);
+  if (!row.rewardEarned!) return row.rewardReady
+      ? strings.inviteHistoryPurchasePending : strings.inviteHistoryRewardPending;
+  final rewardAt = _time(context, row.rewardAtRaw);
+  return '${strings.inviteHistoryCredited}${_time(context, row.joinedAtRaw).isEmpty && rewardAt.isNotEmpty ? ' · $rewardAt' : ''}';
+}
+
+String _reward(BuildContext context, InviteRow row) {
+  if (row.rewardEarned == null) return row.rewardText;
+  final strings = stringsOf(context);
+  return row.rewardEarned! ? strings.inviteHistoryPoints(pointText(row.rewardPoints))
+      : row.rewardReady ? strings.inviteHistoryUnlockPending : strings.inviteHistorySync;
 }

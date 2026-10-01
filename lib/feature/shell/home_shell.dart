@@ -1,3 +1,4 @@
+import '../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -31,10 +32,10 @@ class HomeShell extends StatelessWidget {
   final bool? liquidGlassSupported;
   final bool bottomNavigationBarVisible;
 
-  static const List<_ShellTab> _tabs = <_ShellTab>[
+  static List<_ShellTab> _tabs(BuildContext context) => <_ShellTab>[
     (
       path: kHomeRoute,
-      label: '首页',
+      label: stringsOf(context).shellHome,
       icon: CupertinoIcons.house,
       activeIcon: CupertinoIcons.house_fill,
       sfSymbol: 'house',
@@ -42,7 +43,7 @@ class HomeShell extends StatelessWidget {
     ),
     (
       path: kRoamRoute,
-      label: '漫游',
+      label: stringsOf(context).shellRoam,
       icon: CupertinoIcons.compass,
       activeIcon: CupertinoIcons.compass_fill,
       sfSymbol: 'safari',
@@ -50,7 +51,7 @@ class HomeShell extends StatelessWidget {
     ),
     (
       path: kPublishRoute,
-      label: '发布',
+      label: stringsOf(context).shellPublish,
       icon: CupertinoIcons.folder,
       activeIcon: CupertinoIcons.folder_fill,
       sfSymbol: 'folder',
@@ -58,7 +59,7 @@ class HomeShell extends StatelessWidget {
     ),
     (
       path: kClubsRoute,
-      label: '俱乐部',
+      label: stringsOf(context).shellClubs,
       icon: CupertinoIcons.bubble_left_bubble_right,
       activeIcon: CupertinoIcons.bubble_left_bubble_right_fill,
       sfSymbol: 'bubble.left.and.bubble.right',
@@ -66,7 +67,7 @@ class HomeShell extends StatelessWidget {
     ),
     (
       path: kProfileRoute,
-      label: '我的',
+      label: stringsOf(context).shellProfile,
       // 真源 icon_f5/icon_f01d 为裸人形(无圆环),crop.circle 会多一枚实心圆盘。
       icon: CupertinoIcons.person,
       activeIcon: CupertinoIcons.person_fill,
@@ -77,7 +78,7 @@ class HomeShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => _RootShell(
-    tabs: _tabs,
+    tabs: _tabs(context),
     liquidGlassSupported: liquidGlassSupported,
     bottomNavigationBarVisible: bottomNavigationBarVisible,
     navigationShell: navigationShell,
@@ -95,10 +96,10 @@ class MerchantHomeShell extends StatelessWidget {
   final Widget child;
   final StatefulNavigationShell? navigationShell;
 
-  static const List<_ShellTab> _tabs = <_ShellTab>[
+  static List<_ShellTab> _tabs(BuildContext context) => <_ShellTab>[
     (
       path: '/merchant',
-      label: '工作台',
+      label: stringsOf(context).shellWorkspace,
       icon: CupertinoIcons.rectangle_grid_2x2,
       activeIcon: CupertinoIcons.rectangle_grid_2x2_fill,
       sfSymbol: 'rectangle.grid.2x2',
@@ -106,7 +107,7 @@ class MerchantHomeShell extends StatelessWidget {
     ),
     (
       path: '/merchant/marketing',
-      label: '营销',
+      label: stringsOf(context).shellMarketing,
       icon: CupertinoIcons.speaker_2,
       activeIcon: CupertinoIcons.speaker_2_fill,
       sfSymbol: 'megaphone',
@@ -114,7 +115,7 @@ class MerchantHomeShell extends StatelessWidget {
     ),
     (
       path: '/merchant/templates',
-      label: '模板',
+      label: stringsOf(context).shellTemplates,
       icon: CupertinoIcons.square_stack_3d_up,
       activeIcon: CupertinoIcons.square_stack_3d_up_fill,
       sfSymbol: 'square.stack.3d.up',
@@ -122,7 +123,7 @@ class MerchantHomeShell extends StatelessWidget {
     ),
     (
       path: '/merchant/relations',
-      label: '合作',
+      label: stringsOf(context).shellCooperation,
       icon: CupertinoIcons.person_2,
       activeIcon: CupertinoIcons.person_2_fill,
       sfSymbol: 'person.2',
@@ -130,7 +131,7 @@ class MerchantHomeShell extends StatelessWidget {
     ),
     (
       path: '/merchant/profile',
-      label: '我的',
+      label: stringsOf(context).shellProfile,
       // 商家侧 icon_tab_mine 同为头+肩裸人形,不带圆环。
       icon: CupertinoIcons.person,
       activeIcon: CupertinoIcons.person_fill,
@@ -141,7 +142,7 @@ class MerchantHomeShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) =>
-      _RootShell(tabs: _tabs, navigationShell: navigationShell, child: child);
+      _RootShell(tabs: _tabs(context), navigationShell: navigationShell, child: child);
 }
 
 class _RootShell extends StatelessWidget {

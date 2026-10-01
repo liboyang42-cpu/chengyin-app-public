@@ -1,3 +1,4 @@
+import '../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -50,8 +51,8 @@ class AddressListPage extends ConsumerWidget {
     final Widget body = guest
         ? AccountLoginGate(
             key: const Key('address-login-gate'),
-            message: '登录后查看参与人信息',
-            sub: '参与人存在账号里,登录完就能看到。',
+            message: stringsOf(context).accountParticipantsLogin,
+            sub: stringsOf(context).accountParticipantsLoginHint,
             onSignedIn: () => ref.invalidate(addressListProvider),
           )
         : _AddressListBody(onAdd: openAdd);
@@ -76,7 +77,7 @@ class _AddressListBody extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        const CyPageTitle('参与人信息'),
+        CyPageTitle(stringsOf(context).accountParticipants),
         Expanded(
           child: async.when(
             // 真源 `cy-skeleton type="list" count="4"`(address.wxml:13)。
@@ -84,27 +85,28 @@ class _AddressListBody extends ConsumerWidget {
                 const CySkeleton(type: CySkeletonType.card, count: 4),
             error: (Object e, StackTrace st) => accountLoginRequired(e)
                 ? AccountLoginGate(
-                    message: '登录后查看参与人信息',
-                    sub: '参与人存在账号里,登录完就能看到。',
+                    message: stringsOf(context).accountParticipantsLogin,
+                    sub: stringsOf(context).accountParticipantsLoginHint,
                     onSignedIn: () => ref.invalidate(addressListProvider),
                   )
                 : StatusView(
                     // 真源 cy-error:title=后端原话,sub 固定一句「数据不会丢失」。
                     message: accountFailureCopy(
                       e,
-                      networkFallback: '参与人没能加载出来',
+                      strings: stringsOf(context),
+                      networkFallback: stringsOf(context).accountParticipantsLoadError,
                     ),
-                    sub: '请检查网络后再进来，数据不会丢失',
+                    sub: stringsOf(context).accountDataSafeRetry,
                     large: true,
                     onRetry: () => ref.invalidate(addressListProvider),
                   ),
             data: (List<MemberAddress> rows) {
               if (rows.isEmpty) {
                 // 真源 cy-empty 逐字(address.wxml:34-35)。
-                return const StatusView(
+                return StatusView(
                   icon: CupertinoIcons.person_2,
-                  message: '还没有参与人信息',
-                  sub: '报名活动需要填写联系人；新增后可在报名时直接选用',
+                  message: stringsOf(context).accountParticipantsEmpty,
+                  sub: stringsOf(context).accountParticipantsEmptyHint,
                   large: true,
                 );
               }
@@ -133,7 +135,7 @@ class _AddressListBody extends ConsumerWidget {
             ),
             child: CyNativeButton(
               key: const Key('address-add'),
-              label: '新增参与人信息',
+              label: stringsOf(context).accountParticipantAdd,
               icon: const CyNativeButtonIcon(
                 sfSymbol: 'person.badge.plus',
                 fallback: CupertinoIcons.person_add,
@@ -157,7 +159,7 @@ class _Card extends ConsumerWidget {
     final TextTheme t = Theme.of(context).textTheme;
     final Widget editRow = Semantics(
       container: true,
-      label: '编辑${row.fullName}',
+      label: stringsOf(context).accountEditPerson(row.fullName),
       button: true,
       child: ExcludeSemantics(
         child: CupertinoButton(
@@ -193,7 +195,8 @@ class _Card extends ConsumerWidget {
               const SizedBox(height: CyTokens.space1),
               // 真源行内说明逐字(address.wxml:21)。
               Text(
-                '用于报名联系和到场核验',
+                stringsOf(context).accountParticipantPurpose,
+                key: const Key('address-participant-purpose'),
                 style: t.bodySmall?.copyWith(color: p.textSecondary),
               ),
             ],
@@ -215,7 +218,7 @@ class _Card extends ConsumerWidget {
           // 真源行上有独立的「编辑」钮(address.wxml:22),与整行点击同途。
           Semantics(
             container: true,
-            label: '编辑${row.fullName}',
+            label: stringsOf(context).accountEditPerson(row.fullName),
             button: true,
             enabled: true,
             onTap: () async {
@@ -236,13 +239,13 @@ class _Card extends ConsumerWidget {
                   ).push('/address/edit/${row.id}');
                   if (ok == true) ref.invalidate(addressListProvider);
                 },
-                child: const Text('编辑'),
+                child: Text(stringsOf(context).accountEdit),
               ),
             ),
           ),
           Semantics(
             container: true,
-            label: '删除${row.fullName}',
+            label: stringsOf(context).accountDeletePerson(row.fullName),
             button: true,
             enabled: true,
             onTap: () => _remove(context, ref),
@@ -268,10 +271,10 @@ class _Card extends ConsumerWidget {
   Future<void> _remove(BuildContext context, WidgetRef ref) async {
     final bool ok = await cyConfirm(
       context,
-      title: '删除这条?',
+      title: stringsOf(context).accountDeleteTitle,
       // ★★ 同一张表 —— 必须说清"参与人"那边也会消失。
-      content: '「${row.fullName}」在报名时的参与人列表里也会一起消失。',
-      confirmText: '删除',
+      content: stringsOf(context).accountDeleteParticipantWarning(row.fullName),
+      confirmText: stringsOf(context).accountDelete,
       danger: true,
     );
     if (!ok) return;
@@ -282,7 +285,7 @@ class _Card extends ConsumerWidget {
       if (!context.mounted) return;
       CyNativeNotice.show(
         context,
-        accountFailureCopy(e, networkFallback: '删除没有成功,请稍后重试'),
+        accountFailureCopy(e, strings: stringsOf(context), networkFallback: stringsOf(context).accountDeleteError),
         isError: true,
       );
     }

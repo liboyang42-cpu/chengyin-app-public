@@ -1,3 +1,4 @@
+import '../data/api/object_card_api.dart';
 import '../feature/account/pending_inviter.dart';
 import 'network/session_data.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -313,4 +314,9 @@ final advancedPlayGatewayProvider = Provider<AdvancedPlayGateway>((ref) {
 final merchantCrmConsoleApiProvider = Provider<MerchantCrmConsoleApi>((ref) {
   ref.watch(sessionDataKeyProvider);
   return MerchantCrmConsoleApi(ref.watch(dioClientProvider));
+});
+
+final objectCardApiProvider = Provider<ObjectCardApi>((ref) {
+  ref.watch(sessionDataKeyProvider);
+  return ObjectCardApi(ref.watch(dioClientProvider));
 });

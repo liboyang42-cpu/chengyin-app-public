@@ -1,3 +1,4 @@
+import '../../feature/p3/object_cards/object_cards_page.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
@@ -495,6 +496,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         },
       ),
       GoRoute(path: '/points', builder: (context, state) => const PointsPage()),
+      GoRoute(
+        path: '/object-cards',
+        builder: (context, state) => const ObjectCardsPage(),
+      ),
       // 成长中心(对齐小程序 subpackageP3/pages/growthcenter)。
       GoRoute(
         path: '/growth',

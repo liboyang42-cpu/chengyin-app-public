@@ -1,5 +1,4 @@
-import '../../l10n/strings.dart';
-import '../../l10n/locale_preference.dart';
+import '../../l10n/account_local_failure.dart';
 import '../../core/widgets/cy_native_action_sheet.dart';
 import '../../core/theme/cy_palette.dart';
 import 'package:flutter/cupertino.dart';
@@ -14,6 +13,8 @@ import 'package:mjn_liquid_ui/mjn_liquid_ui.dart';
 import 'package:native_liquid_glass/native_liquid_glass.dart';
 
 import '../../core/providers.dart';
+import '../../l10n/locale_preference.dart';
+import '../../l10n/strings.dart';
 import '../../core/router/route_paths.dart';
 import '../../core/theme/cy_tokens.dart';
 import '../../core/widgets/cy_native_button.dart';
@@ -109,9 +110,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     // 标题原来是「提示」—— 那等于什么都没说。标题就该说清在做什么。
     final bool ok = await cyConfirm(
       context,
-      title: '退出账号',
-      content: '退出后需要重新登录才能查看订单和票券。',
-      confirmText: '退出',
+      title: stringsOf(context).settingsLogout,
+      content: stringsOf(context).settingsLogoutMessage,
+      confirmText: stringsOf(context).settingsLogoutConfirm,
       danger: true,
     );
     if (!ok || !mounted) return;
@@ -124,7 +125,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final choice = await showCyNativeActionSheet<String>(
       context: context,
       title: strings.language,
-      cancelLabel: strings.cancel,
       actions: <CyNativeAction<String>>[
         CyNativeAction(value: 'system', label: strings.followSystem),
         CyNativeAction(value: 'zh', label: strings.chineseLanguage),
@@ -190,14 +190,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   children: <Widget>[
                     _cell(
                       icon: Icons.person_outline,
-                      title: '个人资料',
-                      subtitle: '昵称、头像与介绍',
+                      title: stringsOf(context).settingsProfile,
+                      subtitle: stringsOf(context).settingsProfileHint,
                       onTap: _goProfile,
                     ),
                     _cell(
                       icon: Icons.groups_outlined,
-                      title: '参与人信息',
-                      subtitle: '报名时可直接选,不用每次手填',
+                      title: stringsOf(context).settingsParticipants,
+                      subtitle: stringsOf(context).settingsParticipantsHint,
                       onTap: () => context.push('/participants'),
                     ),
                     // 「收货地址」行已删(B1 账号域报告 P1-3):真源 shezhi 没有
@@ -205,78 +205,78 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     // 上面「参与人信息」一条。
                     _cell(
                       icon: Icons.card_giftcard_outlined,
-                      title: '填写邀请人',
-                      subtitle: '只能绑定一次',
+                      title: stringsOf(context).settingsInviter,
+                      subtitle: stringsOf(context).settingsInviterHint,
                       onTap: () => showInviterSheet(context),
                     ),
                     if (!_isMerchant && !_isClub)
                       _cell(
                         icon: Icons.flag_outlined,
-                        title: '成为俱乐部主理人',
-                        subtitle: '主理人身份 · 之后可创建俱乐部带团',
+                        title: stringsOf(context).settingsClubApply,
+                        subtitle: stringsOf(context).settingsClubApplyHint,
                         onTap: _goClubs,
                       ),
                     if (!_isMerchant && !_isClub)
                       _cell(
                         icon: Icons.storefront_outlined,
-                        title: '成为商家',
-                        subtitle: '提供场地 · 参与招募 · 发布优惠',
+                        title: stringsOf(context).settingsMerchantApply,
+                        subtitle: stringsOf(context).settingsMerchantApplyHint,
                         onTap: _goMerchantApply,
                       ),
                     _cell(
                       icon: Icons.public,
-                      title: '城瘾玩法',
-                      subtitle: '城市探索说明',
+                      title: stringsOf(context).settingsPlayGuide,
+                      subtitle: stringsOf(context).settingsPlayGuideHint,
                       onTap: () => context.push('/play-guide'),
                     ),
                     _cell(
                       icon: Icons.route_outlined,
-                      title: '我走过的',
-                      subtitle: '完成过的路线',
+                      title: stringsOf(context).settingsMyRoutes,
+                      subtitle: stringsOf(context).settingsMyRoutesHint,
                       onTap: () => context.push('/my-plays'),
                     ),
                     _cell(
                       icon: Icons.favorite_border,
-                      title: '我的喜欢',
-                      subtitle: '已收藏的主题',
+                      title: stringsOf(context).settingsLikes,
+                      subtitle: stringsOf(context).settingsLikesHint,
                       onTap: () => context.push('/my-likes'),
                     ),
                     _cell(
                       icon: Icons.volume_up_outlined,
-                      title: '声音与触感',
-                      subtitle: '声音与触感',
+                      title: stringsOf(context).settingsSoundHaptics,
+                      subtitle: stringsOf(context).settingsSoundHaptics,
                       onTap: _openSoundHaptics,
                     ),
                     _cell(
                       icon: Icons.privacy_tip_outlined,
-                      title: '隐私与定位',
-                      subtitle: '管理漫游定位同意',
+                      title: stringsOf(context).settingsPrivacyLocation,
+                      subtitle: stringsOf(context).settingsPrivacyLocationHint,
                       onTap: _openPrivacy,
                     ),
                     // 真源 `pages/shezhi/shezhi.wxml:23` 的
                     // `settings-marketing-consent`:隐私与定位的下一行。
                     _cell(
                       icon: Icons.campaign_outlined,
-                      title: '营销消息与优惠券',
-                      subtitle: '按商家管理同意与退订',
+                      title: stringsOf(context).settingsMarketing,
+                      subtitle: stringsOf(context).settingsMarketingHint,
                       onTap: () => showMarketingConsentSheet(context),
                     ),
                     _cell(
                       icon: Icons.description_outlined,
-                      title: '用户服务协议',
-                      subtitle: '查看服务条款',
+                      title: stringsOf(context).settingsResidualTerms,
+                      subtitle: stringsOf(context).settingsTermsHint,
                       onTap: _goAgreement,
                     ),
                     _cell(
                       icon: Icons.person_remove_outlined,
-                      title: '账号注销',
-                      subtitle: '申请或撤销注销，注销后账号不可恢复',
+                      title: stringsOf(context).settingsDeregister,
+                      subtitle: stringsOf(context).settingsDeregisterHint,
                       onTap: _goDeregister,
                     ),
                     _cell(
                       icon: Icons.info_outline,
-                      title: '关于',
-                      subtitle: '版本、协议、联系与我的二维码',
+                      title: stringsOf(context).settingsAbout,
+                      subtitle: stringsOf(context).settingsAboutHint,
                       onTap: _goAbout,
                     ),
                   ],
@@ -290,7 +290,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   ),
                   child: CyNativeButton(
                     onPressed: _logout,
-                    label: '退出账号',
+                    label: stringsOf(context).settingsLogout,
                     role: CyNativeButtonRole.secondary,
                     icon: const CyNativeButtonIcon(
                       sfSymbol: 'rectangle.portrait.and.arrow.right',
@@ -335,13 +335,13 @@ class _Attribution extends StatelessWidget {
         borderRadius: BorderRadius.circular(CyTokens.radiusLg),
       ),
       child: Semantics(
-        label: '素材署名',
+        label: stringsOf(context).settingsAttribution,
         container: true,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Text(
-              '素材署名',
+              stringsOf(context).settingsAttribution,
               style: textTheme.bodyLarge?.copyWith(
                 color: palette.textPrimary,
                 fontWeight: FontWeight.w700,
@@ -353,7 +353,7 @@ class _Attribution extends StatelessWidget {
               name: 'game-icons.net 游戏图标 · Creative Commons BY 3.0（要求署名）',
               body: '作者：Delapouite、Lorc、Skoll、Sbed、Quoting、Lord Berandas',
               link: 'https://game-icons.net/',
-              linkLabel: '复制来源地址 · game-icons.net',
+              linkLabel: stringsOf(context).settingsCopyGameIcons,
             ),
             Container(
               height: 1,
@@ -365,7 +365,7 @@ class _Attribution extends StatelessWidget {
               name: '像素城市场景 · Luis Zuno（ansimuz）· CC0 1.0',
               body: '底图：Synth Cities、Warped City、Warped Miami Synth',
               link: 'https://ansimuz.itch.io/',
-              linkLabel: '复制来源地址 · ansimuz.itch.io',
+              linkLabel: stringsOf(context).settingsCopyAnsimuz,
             ),
           ],
         ),
@@ -418,10 +418,10 @@ class _Attribution extends StatelessWidget {
     try {
       await Clipboard.setData(ClipboardData(text: link));
       if (!context.mounted) return;
-      CyNativeNotice.show(context, '来源地址已复制');
+      CyNativeNotice.show(context, stringsOf(context).settingsSourceCopied);
     } catch (_) {
       if (!context.mounted) return;
-      CyNativeNotice.show(context, '复制失败，可长按选中地址', isError: true);
+      CyNativeNotice.show(context, stringsOf(context).settingsSourceCopyError, isError: true);
     }
   }
 }
@@ -433,11 +433,11 @@ class _ProfileCard extends StatelessWidget {
   final User? user;
   final VoidCallback onEdit;
 
-  String get _roleLabel {
+  String _roleLabel(BuildContext context) {
     final role = user?.effectiveRole;
-    if (role == 'merchant') return '商家';
-    if (role == 'club') return '俱乐部主理人';
-    return '城瘾玩家';
+    if (role == 'merchant') return stringsOf(context).settingsMerchantRole;
+    if (role == 'club') return stringsOf(context).settingsClubRole;
+    return stringsOf(context).settingsPlayerRole;
   }
 
   @override
@@ -477,7 +477,7 @@ class _ProfileCard extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
                 Text(
-                  hasUser ? user!.nickname : '未登录',
+                  hasUser ? user!.nickname : stringsOf(context).settingsSignedOut,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -497,7 +497,7 @@ class _ProfileCard extends StatelessWidget {
                     const SizedBox(width: CyTokens.space1_5),
                     Flexible(
                       child: Text(
-                        _roleLabel,
+                        _roleLabel(context),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -516,7 +516,7 @@ class _ProfileCard extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(left: CyTokens.space2),
             child: CyNativeIconButton(
-              label: '编辑资料',
+              label: stringsOf(context).settingsEditProfile,
               icon: const CyNativeButtonIcon(
                 sfSymbol: 'pencil',
                 fallback: CupertinoIcons.pencil,
@@ -585,7 +585,7 @@ class _SoundHapticsSheetState extends ConsumerState<_SoundHapticsSheet> {
       await ref.read(soundHapticsSettingsStoreProvider).write(next);
       if (mounted) setState(() => _values = next);
     } catch (_) {
-      if (mounted) setState(() => _saveError = '设置没保存，请重试');
+      if (mounted) setState(() => _saveError = stringsOf(context).settingsSoundSaveError);
     } finally {
       if (mounted) setState(() => _saving.remove(key));
     }
@@ -616,7 +616,7 @@ class _SoundHapticsSheetState extends ConsumerState<_SoundHapticsSheet> {
           ),
           children: <Widget>[
             Text(
-              '声音与触感',
+              stringsOf(context).settingsSoundHaptics,
               textAlign: TextAlign.center,
               style: CyType.title2.copyWith(
                 fontWeight: FontWeight.w600,
@@ -625,7 +625,7 @@ class _SoundHapticsSheetState extends ConsumerState<_SoundHapticsSheet> {
             ),
             const SizedBox(height: CyTokens.space4),
             if (_loadError != null)
-              StatusView(message: '声音与触感没读出来', onRetry: _load)
+              StatusView(message: stringsOf(context).settingsSoundLoadError, onRetry: _load)
             else if (_values == null)
               const SizedBox(
                 height: 240,
@@ -643,9 +643,9 @@ class _SoundHapticsSheetState extends ConsumerState<_SoundHapticsSheet> {
     return <Widget>[
       _SoundCard(
         children: <Widget>[
-          _row(values, 'sound', Icons.volume_up_outlined, '声音'),
+          _row(values, 'sound', Icons.volume_up_outlined, stringsOf(context).settingsSound),
           _divider(),
-          _row(values, 'haptics', Icons.touch_app_outlined, '触感'),
+          _row(values, 'haptics', Icons.touch_app_outlined, stringsOf(context).settingsHaptics),
         ],
       ),
       Padding(
@@ -656,7 +656,7 @@ class _SoundHapticsSheetState extends ConsumerState<_SoundHapticsSheet> {
           CyTokens.space3,
         ),
         child: Text(
-          '环境音',
+          stringsOf(context).settingsAmbientSound,
           style: TextStyle(
             fontSize: CyTokens.typeCardTitle,
             fontWeight: FontWeight.w600,
@@ -666,13 +666,13 @@ class _SoundHapticsSheetState extends ConsumerState<_SoundHapticsSheet> {
       ),
       _SoundCard(
         children: <Widget>[
-          _row(values, 'airplane', Icons.flight_takeoff, '飞机引擎'),
+          _row(values, 'airplane', Icons.flight_takeoff, stringsOf(context).settingsAirplane),
           _divider(),
-          _row(values, 'ocean', Icons.waves, '海浪'),
+          _row(values, 'ocean', Icons.waves, stringsOf(context).settingsOcean),
           _divider(),
-          _row(values, 'raindrop', Icons.grain, '雨滴'),
+          _row(values, 'raindrop', Icons.grain, stringsOf(context).settingsRaindrop),
           _divider(),
-          _row(values, 'forest', Icons.forest, '森林'),
+          _row(values, 'forest', Icons.forest, stringsOf(context).settingsForest),
         ],
       ),
       if (_saveError != null)
@@ -755,7 +755,7 @@ class _SoundRow extends StatelessWidget {
     return Semantics(
       container: true,
       label: label,
-      value: on ? '已开启' : '已关闭',
+      value: on ? stringsOf(context).settingsEnabled : stringsOf(context).settingsDisabled,
       toggled: on,
       enabled: !saving,
       onTap: saving ? null : () => change(!on),
@@ -846,10 +846,11 @@ class _PrivacySheetState extends ConsumerState<_PrivacySheet> {
       await ref
           .read(accountApiProvider)
           .revokeRoamLocationConsent(requestId: _requestId);
-    } catch (_) {
+    } catch (error) {
       if (mounted) {
         setState(() {
-          _feedback = '撤回记录失败，请检查网络后重试';
+          _feedback = accountFailureMessage(context, error,
+              fallback: stringsOf(context).settingsRevokeRecordError);
           _feedbackIsError = true;
         });
       }
@@ -863,7 +864,7 @@ class _PrivacySheetState extends ConsumerState<_PrivacySheet> {
     } catch (_) {
       if (mounted) {
         setState(() {
-          _feedback = '撤回已记录，但定位尚未停止，请重试';
+          _feedback = stringsOf(context).settingsRevokeTrackingError;
           _feedbackIsError = true;
         });
       }
@@ -878,7 +879,7 @@ class _PrivacySheetState extends ConsumerState<_PrivacySheet> {
       ref.invalidate(mapPageDataProvider);
       if (mounted) {
         setState(() {
-          _feedback = '撤回已记录，定位已停止；本地状态保存失败，请重试';
+          _feedback = stringsOf(context).settingsRevokeStorageError;
           _feedbackIsError = true;
         });
       }
@@ -890,7 +891,7 @@ class _PrivacySheetState extends ConsumerState<_PrivacySheet> {
     ref.invalidate(mapPageDataProvider);
     if (mounted) {
       setState(() {
-        _feedback = '已撤回漫游定位同意';
+        _feedback = stringsOf(context).settingsRevoked;
         _feedbackIsError = false;
       });
     }
@@ -925,7 +926,7 @@ class _PrivacySheetState extends ConsumerState<_PrivacySheet> {
             ),
             children: <Widget>[
               Text(
-                '隐私与定位',
+                stringsOf(context).settingsPrivacyLocation,
                 textAlign: TextAlign.center,
                 style: CyType.title2.copyWith(
                   fontWeight: FontWeight.w600,
@@ -934,7 +935,7 @@ class _PrivacySheetState extends ConsumerState<_PrivacySheet> {
               ),
               const SizedBox(height: CyTokens.space4),
               Text(
-                '城瘾会在你使用相关功能时处理必要信息。漫游定位仅用于实时位置展示、到点打卡和轨迹记录；不使用时不会在后台持续采集。',
+                stringsOf(context).settingsLocationPurpose,
                 style: TextStyle(
                   fontSize: CyTokens.typeBody,
                   height: CyTokens.leadingLoose,
@@ -954,7 +955,7 @@ class _PrivacySheetState extends ConsumerState<_PrivacySheet> {
                           LegalDocPage.routeOf(LegalDocType.privacyPolicy),
                         ),
                   child: Text(
-                    '查看《用户隐私保护指引》',
+                    stringsOf(context).settingsViewPrivacyDocument,
                     style: TextStyle(
                       fontSize: CyTokens.typeBody,
                       color: CyPalette.of(context).textPrimary,
@@ -966,7 +967,7 @@ class _PrivacySheetState extends ConsumerState<_PrivacySheet> {
               ),
               const SizedBox(height: CyTokens.space5),
               Text(
-                '漫游定位',
+                stringsOf(context).settingsRoamingLocation,
                 style: TextStyle(
                   fontSize: CyTokens.typeCardTitle,
                   fontWeight: FontWeight.w600,
@@ -975,7 +976,7 @@ class _PrivacySheetState extends ConsumerState<_PrivacySheet> {
               ),
               const SizedBox(height: CyTokens.space1_5),
               Text(
-                '撤回后，漫游不会继续读取实时位置或记录新的轨迹。',
+                stringsOf(context).settingsWithdrawalExplanation,
                 style: TextStyle(
                   fontSize: CyTokens.typeLabel,
                   height: CyTokens.leadingNormal,
@@ -985,7 +986,7 @@ class _PrivacySheetState extends ConsumerState<_PrivacySheet> {
               const SizedBox(height: CyTokens.space3),
               CyNativeButton(
                 key: const Key('privacy-revoke-button'),
-                label: _submitting ? '撤回中…' : '撤回漫游定位同意',
+                label: _submitting ? stringsOf(context).settingsWithdrawing : stringsOf(context).settingsWithdraw,
                 onPressed: _submitting ? null : _runWithdrawal,
                 loading: _submitting,
                 role: CyNativeButtonRole.destructive,

@@ -1,3 +1,4 @@
+import '../../core/network/request_session_scope.dart';
 import 'package:dio/dio.dart';
 import '../../core/network/dio_client.dart';
 import '../models/im.dart';
@@ -7,9 +8,10 @@ import '../models/im.dart';
 /// 而不是去解析 msg 文案(文案会改,码不会)。
 /// 口径照抄 `team_map_api.dart` 的 `TeamMapApiException`。
 class ImApiException implements Exception {
-  const ImApiException(this.message, {this.errorCode = ''});
+  const ImApiException(this.message, {this.errorCode = '', this.localReason});
 
   final String message;
+  final ImLocalFailure? localReason;
 
   /// 后端回执顶层的 errorCode(如 HANGOUT_CLOSED),没有就空串。
   final String errorCode;
@@ -33,6 +35,7 @@ class ImApi {
   Future<List<Conversation>> conversations() async {
     final resp = await _client.dio.post<Map<String, dynamic>>(
       '/api/im/conversations',
+      options: RequestSessionScope.options(),
       data: FormData.fromMap(<String, dynamic>{}),
     );
     final body = resp.data ?? <String, dynamic>{};
@@ -52,6 +55,7 @@ class ImApi {
   }) async {
     final resp = await _client.dio.post<Map<String, dynamic>>(
       '/api/im/messages',
+      options: RequestSessionScope.options(),
       data: FormData.fromMap(<String, dynamic>{
         'conversation_id': conversationId.toString(),
         'cursor_id': cursorId.toString(),
@@ -81,6 +85,7 @@ class ImApi {
   }) async {
     final resp = await _client.dio.post<Map<String, dynamic>>(
       '/api/im/send',
+      options: RequestSessionScope.options(),
       data: FormData.fromMap(<String, dynamic>{
         'conversation_id': conversationId.toString(),
         'msg_type': msgType.toString(),
@@ -99,6 +104,7 @@ class ImApi {
   Future<void> read(int conversationId) async {
     final resp = await _client.dio.post<Map<String, dynamic>>(
       '/api/im/read',
+      options: RequestSessionScope.options(),
       data: FormData.fromMap(<String, dynamic>{
         'conversation_id': conversationId.toString(),
       }),
@@ -115,6 +121,7 @@ class ImApi {
   Future<String> uploadImage(String filePath) async {
     final resp = await _client.dio.post<Map<String, dynamic>>(
       '/api/common/uploadOSS',
+      options: RequestSessionScope.options(),
       data: FormData.fromMap(<String, dynamic>{
         'file': await MultipartFile.fromFile(filePath),
       }),
@@ -123,7 +130,7 @@ class ImApi {
     _ensureOk(body);
     final String url = (body['url'] ?? '').toString();
     // 空 URL 就当失败:发一条 content 为空的图片消息,比报错更难解释。
-    if (url.isEmpty) throw Exception('上传失败，请重试');
+    if (url.isEmpty) throw const ImApiException('上传失败，请重试', localReason: ImLocalFailure.uploadMissingUrl);
     return url;
   }
 
@@ -132,6 +139,7 @@ class ImApi {
   Future<int> unreadTotal() async {
     final resp = await _client.dio.post<Map<String, dynamic>>(
       '/api/im/unread-total',
+      options: RequestSessionScope.options(),
       data: FormData.fromMap(<String, dynamic>{}),
     );
     final body = resp.data ?? <String, dynamic>{};
@@ -146,6 +154,7 @@ class ImApi {
       throw ImApiException(
         (body['msg'] as String?) ?? '请求失败',
         errorCode: (body['errorCode'] ?? '').toString().trim(),
+        localReason: body['msg'] == null ? ImLocalFailure.request : null,
       );
     }
   }
@@ -154,25 +163,31 @@ class ImApi {
   void _ensureOk(Map<String, dynamic> body) {
     final code = (body['code'] as num?)?.toInt();
     if (code != 200) {
-      throw Exception((body['msg'] as String?) ?? '请求失败');
+      throw ImApiException((body['msg'] as String?) ?? '请求失败',
+        localReason: body['msg'] == null ? ImLocalFailure.request : null);
     }
   }
 
   /// 拉黑 / 取消拉黑:`POST /api/im/block` · `/api/im/unblock`(参数 target_member_id)。
   ///
   /// ★ Apple 审核指南 1.2 要求 UGC 应用必须能**屏蔽滥用用户**。
-  Future<String> block(int targetMemberId, {bool blocked = true}) async {
+  Future<String> block(int targetMemberId, {bool blocked = true}) async =>
+      (await blockReceipt(targetMemberId, blocked: blocked)).legacyMessage;
+
+  Future<ImReceipt> blockReceipt(int targetMemberId, {bool blocked = true}) async {
     final resp = await _client.dio.post<Map<String, dynamic>>(
       blocked ? '/api/im/block' : '/api/im/unblock',
+      options: RequestSessionScope.options(),
       data: FormData.fromMap(
         <String, dynamic>{'target_member_id': targetMemberId.toString()},
       ),
     );
     final body = resp.data ?? <String, dynamic>{};
     if ((body['code'] as num?)?.toInt() != 200) {
-      throw Exception((body['msg'] as String?) ?? '操作失败');
+      throw ImApiException((body['msg'] as String?) ?? '操作失败',
+        localReason: body['msg'] == null ? ImLocalFailure.operation : null);
     }
-    return (body['msg'] as String?) ?? (blocked ? '已拉黑' : '已取消');
+    return ImReceipt(blocked ? ImReceiptKind.blocked : ImReceiptKind.unblocked, serverMessage: body['msg'] as String?);
   }
 
   /// 举报一条消息:`POST /api/im/report`(message_id + reason)。
@@ -182,9 +197,13 @@ class ImApi {
   ///   两件事不能互相顶替:被拉黑的人对别人还是照发。
   ///
   /// ⚠️ 举报的是**消息**不是会话 —— 后端参数就是 message_id。
-  Future<String> reportMessage(int messageId, String reason) async {
+  Future<String> reportMessage(int messageId, String reason) async =>
+      (await reportMessageReceipt(messageId, reason)).legacyMessage;
+
+  Future<ImReceipt> reportMessageReceipt(int messageId, String reason) async {
     final resp = await _client.dio.post<Map<String, dynamic>>(
       '/api/im/report',
+      options: RequestSessionScope.options(),
       data: FormData.fromMap(<String, dynamic>{
         'message_id': messageId.toString(),
         'reason': reason,
@@ -192,17 +211,22 @@ class ImApi {
     );
     final body = resp.data ?? <String, dynamic>{};
     if ((body['code'] as num?)?.toInt() != 200) {
-      throw Exception((body['msg'] as String?) ?? '举报失败');
+      throw ImApiException((body['msg'] as String?) ?? '举报失败',
+        localReason: body['msg'] == null ? ImLocalFailure.report : null);
     }
     // ⚠️ 与广场举报同一条纪律:后端只入审核队列,**不立即删消息**。
     //    提示不能说「已删除」。
-    return (body['msg'] as String?) ?? '举报已提交,将进入审核';
+    return ImReceipt(ImReceiptKind.reported, serverMessage: body['msg'] as String?);
   }
 
   /// 会话免打扰:`POST /api/im/mute`(conversation_id + muted)。
-  Future<String> mute(int conversationId, {required bool muted}) async {
+  Future<String> mute(int conversationId, {required bool muted}) async =>
+      (await muteReceipt(conversationId, muted: muted)).legacyMessage;
+
+  Future<ImReceipt> muteReceipt(int conversationId, {required bool muted}) async {
     final resp = await _client.dio.post<Map<String, dynamic>>(
       '/api/im/mute',
+      options: RequestSessionScope.options(),
       data: FormData.fromMap(<String, dynamic>{
         'conversation_id': conversationId.toString(),
         // ApiImController 用 Convert.toInt(muted, 0) == 1，只认 1/0。
@@ -211,27 +235,33 @@ class ImApi {
     );
     final body = resp.data ?? <String, dynamic>{};
     if ((body['code'] as num?)?.toInt() != 200) {
-      throw Exception((body['msg'] as String?) ?? '操作失败');
+      throw ImApiException((body['msg'] as String?) ?? '操作失败',
+        localReason: body['msg'] == null ? ImLocalFailure.operation : null);
     }
-    return (body['msg'] as String?) ?? (muted ? '已开启免打扰' : '已关闭免打扰');
+    return ImReceipt(muted ? ImReceiptKind.muted : ImReceiptKind.unmuted, serverMessage: body['msg'] as String?);
   }
 
   /// 删除会话:`POST /api/im/delete`(conversation_id)。
   ///
   /// ⚠️ 删的是**我这一侧的会话**,不是把消息从对方那儿撤回 ——
   ///   文案别写成「撤回」或「已销毁」,那是对用户撒谎。
-  Future<String> deleteConversation(int conversationId) async {
+  Future<String> deleteConversation(int conversationId) async =>
+      (await deleteConversationReceipt(conversationId)).legacyMessage;
+
+  Future<ImReceipt> deleteConversationReceipt(int conversationId) async {
     final resp = await _client.dio.post<Map<String, dynamic>>(
       '/api/im/delete',
+      options: RequestSessionScope.options(),
       data: FormData.fromMap(
         <String, dynamic>{'conversation_id': conversationId.toString()},
       ),
     );
     final body = resp.data ?? <String, dynamic>{};
     if ((body['code'] as num?)?.toInt() != 200) {
-      throw Exception((body['msg'] as String?) ?? '删除失败');
+      throw ImApiException((body['msg'] as String?) ?? '删除失败',
+        localReason: body['msg'] == null ? ImLocalFailure.delete : null);
     }
-    return (body['msg'] as String?) ?? '已删除会话';
+    return ImReceipt(ImReceiptKind.deleted, serverMessage: body['msg'] as String?);
   }
 
   /// 发起单聊:`POST /api/im/start`(表单 target_member_id)→ {conversationId}。
@@ -241,18 +271,38 @@ class ImApi {
   Future<int> startChat(int targetMemberId) async {
     final resp = await _client.dio.post<Map<String, dynamic>>(
       '/api/im/start',
+      options: RequestSessionScope.options(),
       data: FormData.fromMap(
         <String, dynamic>{'target_member_id': targetMemberId.toString()},
       ),
     );
     final body = resp.data ?? <String, dynamic>{};
     if ((body['code'] as num?)?.toInt() != 200) {
-      throw Exception((body['msg'] as String?) ?? '没能开始聊天');
+      throw ImApiException((body['msg'] as String?) ?? '没能开始聊天',
+        localReason: body['msg'] == null ? ImLocalFailure.start : null);
     }
     final data = (body['data'] as Map<String, dynamic>?) ?? <String, dynamic>{};
     final id = (data['conversationId'] as num?)?.toInt() ?? 0;
     // ★ 拿不到会话 id 就不要跳转 —— 跳到 /im/chat/0 会进一个空聊天。
-    if (id <= 0) throw Exception('没能开始聊天,请稍后再试');
+    if (id <= 0) throw const ImApiException('没能开始聊天,请稍后再试', localReason: ImLocalFailure.missingConversation);
     return id;
   }
+}
+
+enum ImLocalFailure { request, operation, report, delete, start, missingConversation, uploadMissingUrl }
+enum ImReceiptKind { blocked, unblocked, reported, muted, unmuted, deleted }
+
+/// A successful action with separately identified original server text.
+class ImReceipt {
+  const ImReceipt(this.kind, {this.serverMessage});
+  final ImReceiptKind kind;
+  final String? serverMessage;
+  String get legacyMessage => serverMessage ?? switch (kind) {
+    ImReceiptKind.blocked => '已拉黑',
+    ImReceiptKind.unblocked => '已取消',
+    ImReceiptKind.reported => '举报已提交,将进入审核',
+    ImReceiptKind.muted => '已开启免打扰',
+    ImReceiptKind.unmuted => '已关闭免打扰',
+    ImReceiptKind.deleted => '已删除会话',
+  };
 }

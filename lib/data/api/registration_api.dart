@@ -1,6 +1,7 @@
-import '../../core/network/request_session_scope.dart';
+import '../models/registration_read_failure.dart';
 import 'package:dio/dio.dart';
 import '../../core/network/dio_client.dart';
+import '../../core/network/request_session_scope.dart';
 import '../models/balance_detail.dart';
 import '../models/role_info.dart';
 import '../models/points_statistics.dart';
@@ -8,6 +9,13 @@ import '../models/profile_detail.dart';
 import '../models/scan_result.dart';
 import '../models/profile_edit.dart';
 import '../models/invitation.dart';
+
+/// A locally malformed successful signup-state response; not server copy.
+class MalformedSignupState implements Exception {
+  const MalformedSignupState();
+  @override
+  String toString() => 'Exception: 报名状态数据异常';
+}
 
 /// 个人中心相关接口。对齐后端:
 /// - `ApiUmsMemberController`(/api/user)的 `/info`(完整资料卡)。
@@ -106,6 +114,7 @@ class RegistrationApi {
   Future<ProfileDetail> userDetail({int? memberId}) async {
     final resp = await _client.dio.post<Map<String, dynamic>>(
       '/api/user/info',
+      options: RequestSessionScope.options(),
       data: FormData.fromMap(<String, dynamic>{
         if (memberId != null && memberId > 0) 'member_id': memberId.toString(),
       }),
@@ -196,6 +205,7 @@ class RegistrationApi {
   }) async {
     final resp = await _client.dio.post<Map<String, dynamic>>(
       '/api/registration/scan_group_member_ticket',
+      options: RequestSessionScope.options(),
       data: FormData.fromMap(<String, dynamic>{
         'code': code,
         'activityId': activityId.toString(),
@@ -225,7 +235,7 @@ class RegistrationApi {
     final Object? data = body['data'];
     if (data is! Map<String, dynamic> ||
         ((data['id'] as num?)?.toInt() ?? 0) <= 0) {
-      throw Exception('报名状态数据异常');
+      throw const MalformedSignupState();
     }
     return data;
   }
@@ -246,12 +256,17 @@ class RegistrationApi {
   Future<void> updateProfile(ProfileEditForm form) async {
     final resp = await _client.dio.post<Map<String, dynamic>>(
       '/api/user/update',
+      options: RequestSessionScope.options(),
       data: form.toJson(),
     );
     final body = resp.data ?? <String, dynamic>{};
     if ((body['code'] as num?)?.toInt() != 200) {
-      final msg = (body['msg'] as String?) ?? '保存失败';
-      throw ProfileUpdateException(msg, contentRejected: isContentRejected(msg));
+      final remote = body['msg'] as String?;
+      final msg = remote ?? '保存失败';
+      throw ProfileUpdateException(msg,
+        contentRejected: isContentRejected(msg),
+        isLocalFallback: remote == null,
+      );
     }
   }
 
@@ -401,7 +416,7 @@ class RegistrationApi {
     );
     final body = resp.data ?? <String, dynamic>{};
     if ((body['code'] as num?)?.toInt() != 200) {
-      throw Exception((body['msg'] as String?) ?? '完局面读取失败');
+      throw RegistrationReadFailure.fromResponse(RegistrationReadKind.completion, body, '完局面读取失败');
     }
     return (body['data'] as Map<String, dynamic>?) ?? <String, dynamic>{};
   }
@@ -429,13 +444,17 @@ class RegistrationApi {
     final body = resp.data ?? <String, dynamic>{};
     final String msg = (body['msg'] ?? '').toString();
     if ((body['code'] as num?)?.toInt() != 200) {
-      throw Exception(msg.isEmpty ? '操作失败' : msg);
+      throw RegistrationFollowFailure(
+        msg.isEmpty ? '操作失败' : msg,
+        originalMessage: body['msg'] is String ? body['msg'] as String : null,
+      );
     }
     // 先判"取消",因为「取消关注成功」里也含「关注成功」四个字。
     if (msg.contains('取消关注')) return false;
     if (msg.contains('关注成功')) return true;
     // ⚠️ 文案给用户看,所以说人话;调试信息靠 msg 本身带出来。
-    throw Exception('关注状态没确认下来:$msg');
+    throw RegistrationFollowFailure('关注状态没确认下来:$msg',
+      originalMessage: body['msg'] is String ? body['msg'] as String : null);
   }
 
   /// 公开会员列表:`POST /api/user/list`(表单 user_type / keyword)。
@@ -483,11 +502,21 @@ class RegistrationApi {
 
 /// 资料更新失败。[contentRejected] 为真表示是**内容审核**拒了,不是故障。
 class ProfileUpdateException implements Exception {
-  ProfileUpdateException(this.message, {required this.contentRejected});
+  ProfileUpdateException(this.message, {required this.contentRejected, this.isLocalFallback = false});
 
   final String message;
   final bool contentRejected;
+  final bool isLocalFallback;
 
   @override
   String toString() => message;
+}
+
+/// App-owned follow-result summary with separately preserved API detail.
+class RegistrationFollowFailure implements Exception {
+  const RegistrationFollowFailure(this.legacyMessage, {this.originalMessage});
+  final String legacyMessage;
+  final String? originalMessage;
+  @override
+  String toString() => 'Exception: $legacyMessage';
 }

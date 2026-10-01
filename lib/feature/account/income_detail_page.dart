@@ -1,3 +1,5 @@
+import '../../l10n/strings.dart';
+import '../../l10n/app_localizations.dart';
 // 收益明细页 —— 对应小程序 subpackageA/pages/assetcenter/income-detail(壳)+
 // subpackageA/components/scene-asset-income-detail(正文)。
 //
@@ -51,7 +53,7 @@ String incomeDirectionText(BalanceDetail d) => d.isIncome ? '收入' : '支出';
 /// 今天 / 昨天 / M月D日 —— 相对日,不带时分秒。流水页看的是「哪天」,
 /// 秒级精度在资金记录上没有信息量,反而把行撑满。
 /// 解析不了的日期不编不藏,原样透传。
-String? incomeDateText(String? raw, {DateTime? now}) {
+String? incomeDateText(String? raw, {DateTime? now, AppLocalizations? strings}) {
   final String s = (raw ?? '').trim();
   if (s.isEmpty) return null;
   final DateTime? d = DateTime.tryParse(s.replaceFirst(' ', 'T'));
@@ -62,9 +64,9 @@ String? incomeDateText(String? raw, {DateTime? now}) {
     today.month,
     today.day,
   ).difference(DateTime(d.year, d.month, d.day)).inDays;
-  if (dayDiff == 0) return '今天';
-  if (dayDiff == 1) return '昨天';
-  return '${d.month}月${d.day}日';
+  if (dayDiff == 0) return strings?.accountIncomeToday ?? '今天';
+  if (dayDiff == 1) return strings?.accountIncomeYesterday ?? '昨天';
+  return strings?.accountIncomeDate(d.month, d.day) ?? '${d.month}月${d.day}日';
 }
 
 class IncomeDetailPage extends ConsumerStatefulWidget {
@@ -80,7 +82,7 @@ class _IncomeDetailPageState extends ConsumerState<IncomeDetailPage> {
   Widget build(BuildContext context) {
     final CyPalette p = CyPalette.of(context);
     return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(middle: Text('收益明细')),
+      navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).accountIncomeTitle)),
       backgroundColor: p.bgPage,
       child: Material(
         color: Colors.transparent,
@@ -126,7 +128,12 @@ class _Chips extends StatelessWidget {
         active: active.name,
         tabs: <CyTab>[
           for (final IncomeEventFilter f in IncomeEventFilter.values)
-            CyTab(key: f.name, label: f.label),
+            CyTab(key: f.name, label: switch (f) {
+              IncomeEventFilter.all => stringsOf(context).accountIncomeAll,
+              IncomeEventFilter.create => stringsOf(context).accountIncomeCreate,
+              IncomeEventFilter.brand => stringsOf(context).accountIncomeBrand,
+              IncomeEventFilter.club => stringsOf(context).accountIncomeClub,
+            }),
         ],
         onChanged: (String k) => onPick(
           IncomeEventFilter.values.firstWhere(
@@ -152,8 +159,8 @@ class _List extends ConsumerWidget {
       // `cy-skeleton type="list" count="4"`,不是转圈。
       loading: () => const CySkeleton(type: CySkeletonType.list, count: 4),
       error: (Object e, StackTrace _) => StatusView(
-        message: '收益明细没加载出来',
-        sub: '网络可能不稳定,你的收益记录还在',
+        message: stringsOf(context).accountIncomeError,
+        sub: stringsOf(context).accountIncomeErrorHint,
         large: true,
         onRetry: () => ref.invalidate(incomeDetailProvider(filter)),
       ),
@@ -164,11 +171,11 @@ class _List extends ConsumerWidget {
               // ★ 空态不给重试 —— 真源的重试只挂在 cy-error 上(空态是 cy-empty),
               //   给「重试」等于承诺一个按了也不会变的出口。
               message: filter == IncomeEventFilter.all
-                  ? '暂无收益记录'
-                  : '当前筛选暂无收益记录',
+                  ? stringsOf(context).accountIncomeEmpty
+                  : stringsOf(context).accountIncomeFilteredEmpty,
               sub: filter == IncomeEventFilter.all
-                  ? '产生收益后,明细会显示在这里'
-                  : '切换其他收益类型查看记录',
+                  ? stringsOf(context).accountIncomeEmptyHint
+                  : stringsOf(context).accountIncomeFilteredHint,
               large: true,
             )
           : RefreshIndicator.adaptive(
@@ -208,7 +215,7 @@ class _Row extends StatelessWidget {
               children: <Widget>[
                 Text(
                   (d.changeReason ?? '').trim().isEmpty
-                      ? '收益记录'
+                      ? stringsOf(context).accountIncomeRecord
                       : d.changeReason!.trim(),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -218,7 +225,7 @@ class _Row extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   // 事由 · 时间(今天/昨天/M月D日) · 方向。时间拿不到给「—」,不编。
-                  '${d.eventLabel} · ${incomeDateText(d.createTime) ?? '—'} · ${incomeDirectionText(d)}',
+                  '${_eventLabel(context, d.eventType)} · ${incomeDateText(d.createTime, strings: stringsOf(context)) ?? '—'} · ${d.isIncome ? stringsOf(context).accountIncomeIn : stringsOf(context).accountIncomeOut}',
                   // 时间戳档 = Caption1 12。
                   style: CyType.caption1.copyWith(color: p.textTertiary),
                 ),
@@ -244,4 +251,16 @@ class _Row extends StatelessWidget {
       ),
     );
   }
+}
+
+String _eventLabel(BuildContext context, int? type) {
+  final s = stringsOf(context);
+  return switch (type) {
+    1 => s.accountIncomeTopic,
+    2 => s.accountIncomeActivity,
+    3 => s.accountIncomeWithdraw,
+    4 => s.accountIncomeRejected,
+    5 => s.accountIncomeInvite,
+    _ => s.accountIncomeOther,
+  };
 }

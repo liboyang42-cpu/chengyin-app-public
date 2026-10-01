@@ -41,12 +41,17 @@ class ScanChoice {
   String get label => (name ?? '').trim().isEmpty ? '#$id' : name!.trim();
 }
 
+/// Identifies only messages synthesized locally when the server omits `msg`.
+/// A matching server sentence never receives fallback metadata.
+enum ScanMessageFallback { chapterChoice, stationChoice, redeemed, failed }
+
 class ScanResult {
   const ScanResult({
     required this.outcome,
     required this.message,
     this.choices = const <ScanChoice>[],
     this.choiceKind,
+    this.messageFallback,
   });
 
   final ScanOutcome outcome;
@@ -54,6 +59,10 @@ class ScanResult {
   /// 后端原话。★ 一律透传 —— 「您在本路线没有生效的权益供给,或该章节已核销」
   /// 这类提示带着商家下一步该做什么,换成「核销失败」就没了。
   final String message;
+
+  /// Null for explicit backend messages and existing constructor callers.
+  /// [message] retains its original Chinese fallback for API compatibility.
+  final ScanMessageFallback? messageFallback;
 
   final List<ScanChoice> choices;
 
@@ -73,6 +82,7 @@ class ScanResult {
       return ScanResult(
         outcome: ScanOutcome.needsChoice,
         message: msg.isEmpty ? '请选择要核销的章节' : msg,
+        messageFallback: msg.isEmpty ? ScanMessageFallback.chapterChoice : null,
         choiceKind: 'chapter',
         choices: _parseChoices(
           ids: data['chapterIds'],
@@ -85,6 +95,7 @@ class ScanResult {
       return ScanResult(
         outcome: ScanOutcome.needsChoice,
         message: msg.isEmpty ? '请选择要核销的站点' : msg,
+        messageFallback: msg.isEmpty ? ScanMessageFallback.stationChoice : null,
         choiceKind: 'station',
         choices: _parseChoices(
           ids: null,
@@ -97,6 +108,9 @@ class ScanResult {
     return ScanResult(
       outcome: ok ? ScanOutcome.redeemed : ScanOutcome.failed,
       message: msg.isEmpty ? (ok ? '核销成功' : '核销失败') : msg,
+      messageFallback: msg.isEmpty
+          ? (ok ? ScanMessageFallback.redeemed : ScanMessageFallback.failed)
+          : null,
     );
   }
 
@@ -134,4 +148,13 @@ class ScanResult {
     }
     return const <ScanChoice>[];
   }
+}
+
+/// Keeps a non-redeemed receipt intact when a single-step UI cannot resolve it.
+/// Does not change outcome or discard candidate choices.
+class ScanResultFailure implements Exception {
+  const ScanResultFailure(this.result);
+  final ScanResult result;
+  @override
+  String toString() => 'Exception: ${result.message}';
 }

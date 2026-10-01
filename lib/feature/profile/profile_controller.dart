@@ -1,6 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/providers.dart';
+import '../../core/network/session_data.dart';
+import '../../core/network/request_session_scope.dart';
 import '../../data/models/growth.dart';
 import '../../data/models/profile_detail.dart';
 import '../../data/models/square_post.dart';
@@ -10,13 +12,15 @@ import '../../data/models/user.dart';
 /// 后端结构:AjaxResult{code, appUser:AppUser};非 200 抛错进入 error 态,
 /// 不把空/错误体兜底成 id=0 的假用户。
 final userInfoProvider = FutureProvider.autoDispose<User>((ref) async {
-  final body = await ref.watch(authApiProvider).userInfo();
+  final body = await readSessionData(ref,
+    () => ref.read(authApiProvider).userInfo());
   if ((body['code'] as num?)?.toInt() != 200) {
-    throw Exception((body['msg'] ?? '未登录或会话已过期').toString());
+    throw ProfileLoadFailure(ProfileLoadReason.userInfoRejected,
+      backendMessage: body['msg']?.toString());
   }
   final data = body['appUser'] as Map<String, dynamic>?;
   if (data == null) {
-    throw Exception('用户信息为空');
+    throw const ProfileLoadFailure(ProfileLoadReason.missingUser);
   }
   return User.fromJson(data);
 });
@@ -24,7 +28,8 @@ final userInfoProvider = FutureProvider.autoDispose<User>((ref) async {
 /// 完整资料卡:`POST /api/user/info`(本人)。含关注/粉丝/赞/简介/等级。
 /// `/api/userInfo`(AppUser)不含这些字段,所以单独拉一次;未登录走 error 态。
 final profileDetailProvider = FutureProvider.autoDispose<ProfileDetail>((ref) {
-  return ref.watch(registrationApiProvider).userDetail();
+  return readSessionData(ref,
+    () => ref.read(registrationApiProvider).userDetail());
 });
 
 /// 本人是否有进行中的报名。小程序个人主页用它决定“开始探索”落到票夹还是首页。
@@ -64,6 +69,8 @@ class MyCreativesController extends AsyncNotifier<List<SquarePost>> {
   static const int _pageSize = 10;
   bool _hasMore = true;
   bool _loadingMore = false;
+  int _generation = 0;
+  RequestSessionScope? _scope;
 
   bool get hasMore => _hasMore;
 
@@ -71,6 +78,7 @@ class MyCreativesController extends AsyncNotifier<List<SquarePost>> {
     final client = ref.read(dioClientProvider);
     final resp = await client.dio.post<Map<String, dynamic>>(
       '/api/creativesquare/list',
+      options: RequestSessionScope.options(),
       data: FormData.fromMap(<String, dynamic>{
         'is_my': '1',
         'pageNum': pageNum.toString(),
@@ -79,7 +87,8 @@ class MyCreativesController extends AsyncNotifier<List<SquarePost>> {
     );
     final body = resp.data ?? <String, dynamic>{};
     if ((body['code'] as num?)?.toInt() != 200) {
-      throw Exception((body['msg'] as String?) ?? '动态加载失败');
+      throw ProfileLoadFailure(ProfileLoadReason.postsFailed,
+        backendMessage: body['msg'] as String?);
     }
     final data = (body['data'] as Map<String, dynamic>?) ?? <String, dynamic>{};
     final rows = (data['rows'] as List<dynamic>?) ?? <dynamic>[];
@@ -90,26 +99,38 @@ class MyCreativesController extends AsyncNotifier<List<SquarePost>> {
 
   @override
   Future<List<SquarePost>> build() async {
+    final generation = ++_generation;
+    _scope = null;
     _pageNum = 1;
-    _hasMore = true;
-    final page = await _fetch(_pageNum);
+    _hasMore = false;
+    _loadingMore = false;
+    final session = watchSessionDataScope(ref);
+    final scope = RequestSessionScope(() => generation == _generation && session.isCurrent());
+    _scope = scope;
+    final page = await RequestSessionScope.run(scope, () => _fetch(1));
+    if (!scope.isCurrent()) throw const SessionDataUnavailable();
     _hasMore = page.length >= _pageSize;
     return page;
   }
 
-  /// 触底加载下一页;追加到现有列表。失败静默(保留已加载内容)。
+  /// 触底加载下一页;旧会话结果不能追加到新会话。
   Future<void> loadMore() async {
-    if (_loadingMore || !_hasMore) return;
-    final current = state.value;
-    if (current == null) return;
+    final scope = _scope;
+    if (_loadingMore || !_hasMore || state.isLoading || scope == null || !scope.isCurrent()) return;
+    if (state.value == null) return;
+    final requestedPage = _pageNum + 1;
     _loadingMore = true;
     try {
-      final next = await _fetch(_pageNum + 1);
-      _pageNum += 1;
+      final next = await RequestSessionScope.run(scope, () => _fetch(requestedPage));
+      if (!scope.isCurrent() || requestedPage != _pageNum + 1) return;
+      _pageNum = requestedPage;
       _hasMore = next.length >= _pageSize;
+      final current = state.value ?? <SquarePost>[];
       state = AsyncData<List<SquarePost>>(<SquarePost>[...current, ...next]);
+    } catch (_) {
+      if (scope.isCurrent()) rethrow;
     } finally {
-      _loadingMore = false;
+      if (scope.isCurrent()) _loadingMore = false;
     }
   }
 }
@@ -122,3 +143,19 @@ final unreadTotalProvider = FutureProvider.autoDispose<int>((ref) async {
     return 0;
   }
 });
+
+/// Local fallback provenance is independent of server-supplied message text.
+enum ProfileLoadReason { userInfoRejected, missingUser, postsFailed }
+
+class ProfileLoadFailure implements Exception {
+  const ProfileLoadFailure(this.reason, {this.backendMessage});
+  final ProfileLoadReason reason;
+  final String? backendMessage;
+
+  @override
+  String toString() => 'Exception: ${backendMessage ?? switch (reason) {
+    ProfileLoadReason.userInfoRejected => '未登录或会话已过期',
+    ProfileLoadReason.missingUser => '用户信息为空',
+    ProfileLoadReason.postsFailed => '动态加载失败',
+  }}';
+}

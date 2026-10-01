@@ -79,7 +79,17 @@ class InviteRow {
     required this.timeText,
     required this.statusText,
     required this.rewardText,
+    this.rewardEarned,
+    this.rewardReady = true,
+    this.rewardPoints,
+    this.joinedAtRaw,
+    this.rewardAtRaw,
   });
+  final bool? rewardEarned;
+  final bool rewardReady;
+  final num? rewardPoints;
+  final String? joinedAtRaw;
+  final String? rewardAtRaw;
   final int id;
   final String name;
   final String? avatar;
@@ -89,7 +99,9 @@ class InviteRow {
 }
 
 class InviteGroup {
-  const InviteGroup(this.label, this.rows, this.rewardText);
+  const InviteGroup(this.label, this.rows, this.rewardText, {this.monthSource, this.earnedTotal});
+  final String? monthSource;
+  final num? earnedTotal;
   final String label;
   final List<InviteRow> rows;
   final String rewardText;
@@ -134,11 +146,16 @@ List<InviteGroup> buildInviteGroups({
     if (!byLabel.containsKey(label)) {
       byLabel[label] = <InviteRow>[];
       totals[label] = 0;
-      groups.add(InviteGroup(label, byLabel[label]!, ''));
+      groups.add(InviteGroup(label, byLabel[label]!, '', monthSource: m.createTime));
     }
     if (earned) totals[label] = totals[label]! + reward.points;
 
     byLabel[label]!.add(InviteRow(
+      rewardEarned: earned,
+      rewardReady: rewardReady,
+      rewardPoints: reward?.points,
+      joinedAtRaw: m.createTime,
+      rewardAtRaw: reward?.createTime,
       id: m.id,
       name: m.name,
       avatar: m.avatar,
@@ -163,6 +180,8 @@ List<InviteGroup> buildInviteGroups({
         (totals[g.label] ?? 0) > 0
             ? '+${pointText(totals[g.label])} 积分'
             : '${g.rows.length} 人',
+        monthSource: g.monthSource,
+        earnedTotal: totals[g.label] ?? 0,
       ),
   ];
 }
