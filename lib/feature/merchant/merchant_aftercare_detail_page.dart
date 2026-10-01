@@ -430,7 +430,7 @@ class _MerchantAftercareDetailPageState
               ),
             if (detail.refundDeadline != null)
               Text(
-                stringsOf(context).merchantOperationsRefundDeadline(_minute(detail.refundDeadline!)),
+                stringsOf(context).merchantOperationsRefundDeadline(_minute(detail.refundDeadline)!),
                 style: textTheme.bodySmall,
               ),
           ],
