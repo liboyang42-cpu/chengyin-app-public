@@ -1,3 +1,4 @@
+import '../../core/network/request_session_scope.dart';
 import 'package:dio/dio.dart';
 
 import '../../core/network/dio_client.dart';
@@ -19,6 +20,7 @@ class ClubLeadApi {
   Future<TeamProgress> teamProgress(int activityId) async {
     final resp = await _client.dio.get<Map<String, dynamic>>(
       '/api/club/lead/team-progress',
+      options: RequestSessionScope.options(),
       queryParameters: <String, dynamic>{'activityId': activityId},
     );
     final body = resp.data ?? <String, dynamic>{};
@@ -86,6 +88,7 @@ class ClubLeadApi {
   Future<void> _post(String path, Map<String, dynamic> form) async {
     final resp = await _client.dio.post<Map<String, dynamic>>(
       path,
+      options: RequestSessionScope.options(),
       data: FormData.fromMap(
         form.map((String k, dynamic v) => MapEntry<String, String>(k, '$v')),
       ),

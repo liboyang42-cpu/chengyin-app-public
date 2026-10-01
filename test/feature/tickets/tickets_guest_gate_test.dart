@@ -17,6 +17,7 @@ import 'package:chengyin_app/feature/tickets/pass_page.dart';
 import 'package:chengyin_app/feature/tickets/ticket_detail_page.dart';
 import 'package:chengyin_app/feature/tickets/tickets_page.dart';
 import 'package:flutter/material.dart';
+import 'package:chengyin_app/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -100,7 +101,7 @@ class _Harness {
   void signIn() => (auth as _MutableAuth).signIn();
 }
 
-Future<_Harness> _pump(WidgetTester tester, Widget page) async {
+Future<_Harness> _pump(WidgetTester tester, Widget page, {bool english = false}) async {
   final _FakeActivityApi api = _FakeActivityApi();
   final _MutableAuth auth = _MutableAuth();
   final container = ProviderContainer(
@@ -114,7 +115,16 @@ Future<_Harness> _pump(WidgetTester tester, Widget page) async {
   await tester.pumpWidget(
     UncontrolledProviderScope(
       container: container,
-      child: MaterialApp(home: page),
+      child: MaterialApp(
+        locale: english ? const Locale('en') : const Locale('zh'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(english ? 2 : 1)),
+          child: child!,
+        ),
+        home: page,
+      ),
     ),
   );
   await tester.pump();
@@ -138,6 +148,15 @@ Future<void> _signInFromGate(WidgetTester tester, _Harness h) async {
 }
 
 void main() {
+  // NOT_RUN locally: Flutter SDK unavailable.
+  testWidgets('English pass guest gate makes no issuance request at large text', (tester) async {
+    final h = await _pump(tester, const PassPage(registrationId: 11), english: true);
+    expect(find.text('Sign in to show your redemption code'), findsOneWidget);
+    expect(h.api.issueCalls, 0);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('票夹:游客见登录门,登完就地重拉', (WidgetTester tester) async {
     final _Harness h = await _pump(tester, const TicketsPage());
 

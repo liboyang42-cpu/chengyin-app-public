@@ -10501,5 +10501,6 @@
   "accountDeleteNoticeIrreversible": "After account deletion, you will no longer be able to sign in, and your personal information will be anonymized. This action cannot be reversed.",
   "accountDeleteNoticeCoolingOff": "A seven-day cooling-off period begins after submission. Deletion takes effect only when it ends. You can withdraw your request at any time during these seven days.",
   "accountDeleteNoticeOutstanding": "You cannot delete your account while it has a balance, a pending withdrawal, an ongoing order or an active registration. Resolve these first.",
-  "accountDeleteNoticeRoles": "Accounts with merchant or club roles must first complete the corresponding exit process."
+  "accountDeleteNoticeRoles": "Accounts with merchant or club roles must first complete the corresponding exit process.",
+  "imSessionChanged": "Your account changed. Open the conversation again from Messages."
 }

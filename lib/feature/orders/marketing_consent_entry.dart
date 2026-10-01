@@ -13,11 +13,13 @@ class ConsentOffer {
     required this.merchantRowId,
     required this.merchantOwnerMemberId,
     required this.merchantName,
+    this.hasServerMerchantName = true,
   });
 
   final int merchantRowId;
   final int merchantOwnerMemberId;
   final String merchantName;
+  final bool hasServerMerchantName;
 }
 
 /// 从同意记录里挑本单商家的 offer:ownerMemberId 必须为正、恰好一条匹配、
@@ -39,6 +41,7 @@ ConsentOffer? pickConsentOffer(
     merchantRowId: row.merchantRowId,
     merchantOwnerMemberId: row.merchantOwnerMemberId,
     merchantName: row.merchantName.isEmpty ? '商家' : row.merchantName,
+    hasServerMerchantName: row.hasServerMerchantName && row.merchantName.isNotEmpty,
   );
 }
 
@@ -68,6 +71,8 @@ Future<String?> submitConsent(
   required ConsentOffer offer,
   required bool optedIn,
   required String requestId,
+  String saveFailureText = '同意没有保存成功，请重试',
+  String networkFailureText = '网络连接失败，请重试',
 }) async {
   try {
     await api.setMarketingConsent(
@@ -80,8 +85,8 @@ Future<String?> submitConsent(
     return null;
   } on PageParityApiException catch (error) {
     final String message = error.message.trim();
-    return message.isEmpty ? '同意没有保存成功，请重试' : message;
+    return message.isEmpty ? saveFailureText : message;
   } on DioException catch (_) {
-    return '网络连接失败，请重试';
+    return networkFailureText;
   }
 }

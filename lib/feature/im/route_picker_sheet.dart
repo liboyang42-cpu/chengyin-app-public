@@ -11,6 +11,9 @@ import 'dart:convert';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/strings.dart';
+import '../../l10n/error_presentation.dart';
+import '../../core/widgets/localized_error_status.dart';
 import '../../core/providers.dart';
 import '../../core/theme/cy_palette.dart';
 import '../../core/theme/cy_tokens.dart';
@@ -57,9 +60,9 @@ class _SheetState extends ConsumerState<_Sheet> {
     final AsyncValue<List<Topic>> async = ref.watch(_routeSearchProvider(_kw));
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
-        middle: const Text('选择路线'),
+        middle: Text(stringsOf(context).imRemainingChooseRoute),
         trailing: CyNativeIconButton(
-          label: '关闭',
+          label: stringsOf(context).imRemainingClose,
           icon: const CyNativeButtonIcon(
             sfSymbol: 'xmark',
             fallback: CupertinoIcons.xmark,
@@ -77,7 +80,7 @@ class _SheetState extends ConsumerState<_Sheet> {
               child: CySearchField(
                 key: const Key('route-picker-search'),
                 value: _kw,
-                placeholder: '搜索路线',
+                placeholder: stringsOf(context).imRemainingSearchRoutes,
                 onChanged: (String v) => setState(() => _kw = v),
               ),
             ),
@@ -85,21 +88,22 @@ class _SheetState extends ConsumerState<_Sheet> {
               child: async.when(
                 loading: () => Semantics(
                   liveRegion: true,
-                  label: '正在加载路线',
+                  label: stringsOf(context).imRemainingLoadingRoutes,
                   child: const ExcludeSemantics(
                     child: Center(child: CupertinoActivityIndicator()),
                   ),
                 ),
-                error: (Object e, StackTrace _) => StatusView(
-                  message: '路线没能加载出来',
-                  sub: e.toString().replaceFirst('Exception: ', ''),
+                error: (Object e, StackTrace _) => LocalizedErrorStatus(
+                  error: e,
+                  fallback: stringsOf(context).imRemainingRouteLoadFailed,
+                  originalApiMessage: legacyApiMessage(e),
                   large: true,
                   onRetry: () => ref.invalidate(_routeSearchProvider(_kw)),
                 ),
                 data: (List<Topic> rows) => rows.isEmpty
                     ? StatusView(
-                        message: '没有找到路线',
-                        sub: _kw.isEmpty ? '还没有可分享的路线' : '换个关键词试试',
+                        message: stringsOf(context).imRemainingNoRoutes,
+                        sub: _kw.isEmpty ? stringsOf(context).imRemainingNoShareRoutes : stringsOf(context).imRemainingTryKeyword,
                         large: true,
                       )
                     : ListView(
@@ -116,8 +120,8 @@ class _SheetState extends ConsumerState<_Sheet> {
                                     container: true,
                                     excludeSemantics: true,
                                     label: introduction.isEmpty
-                                        ? '选择${route.name}'
-                                        : '选择${route.name}，$introduction',
+                                        ? stringsOf(context).imRemainingSelectRoute(route.name)
+                                        : stringsOf(context).imRemainingSelectRouteDetail(route.name, introduction),
                                     button: true,
                                     onTap: selectRoute,
                                     child: CupertinoListTile(

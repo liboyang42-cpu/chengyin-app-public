@@ -94,7 +94,7 @@ typedef ChatCardData = ({
 /// [fallbackTitle] 是这条消息的 content —— 系统卡没有 title 时拿它兜底
 /// (小程序 `decorate`:`if (card.cardType === 'generic' && !card.title)
 /// card.title = m.content || '通知'`)。标题拿不到就只剩一个空壳卡片。
-ChatCardData? parseChatCard(String? extraJson, {String? fallbackTitle}) {
+ChatCardData? parseChatCard(String? extraJson, {String? fallbackTitle, String notificationTitle = '通知'}) {
   final String s = (extraJson ?? '').trim();
   if (s.isEmpty) return null;
   try {
@@ -190,7 +190,7 @@ ChatCardData? parseChatCard(String? extraJson, {String? fallbackTitle}) {
     // (小程序 decorate:`card.title = m.content || '通知'`)。
     final String title = rawTitle.isNotEmpty
         ? rawTitle
-        : (fallback.isNotEmpty ? fallback : '通知');
+        : (fallback.isNotEmpty ? fallback : notificationTitle);
 
     return (
       type: 'generic',

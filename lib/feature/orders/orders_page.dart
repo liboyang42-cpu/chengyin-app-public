@@ -1,9 +1,15 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/providers.dart';
+import '../../core/network/request_session_scope.dart';
+import '../club/registration_cancellation_display.dart';
+import '../../l10n/strings.dart';
+import 'registration_order_strings.dart';
+import '../auth/auth_controller.dart';
 import '../../core/theme/cy_palette.dart';
 import '../../core/theme/cy_tokens.dart';
 import '../../core/widgets/cy_confirm.dart';
@@ -27,6 +33,10 @@ import '../../core/widgets/cy_native_notice.dart';
 final myOrdersProvider = FutureProvider.autoDispose<List<MyRegistration>>((
   ref,
 ) {
+  final userId = ref.watch(
+    authControllerProvider.select((auth) => auth.user?.id),
+  );
+  if (userId == null) return Future.value(const <MyRegistration>[]);
   return ref.watch(activityApiProvider).orderList();
 });
 
@@ -42,6 +52,8 @@ class OrdersPage extends ConsumerStatefulWidget {
 class _OrdersPageState extends ConsumerState<OrdersPage> {
   int? _payingId;
   int? _cancellingId;
+  final Set<(int, int)> _submittedCancellations = <(int, int)>{};
+  int? _displayedOrdersUserId;
   OrderListFilter _filter = OrderListFilter.all;
   bool _openedInitialDetail = false;
   Future<void>? _detailPresentation;
@@ -55,7 +67,7 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
   /// 客户端回应不是订单真源,一律只刷新 + 提示,不在本地改订单态。
   Future<void> _pay(MyRegistration order) async {
     if (!wechatPaymentFlowGate.tryAcquire()) {
-      _toast('已有一笔支付正在处理中，请完成后再试', isError: true);
+      _toast(stringsOf(context).registrationOrdersAPaymentIsAlreadyInProgressCompleteItBeforeTryingAgain, isError: true);
       return;
     }
     setState(() => _payingId = order.id);
@@ -71,7 +83,7 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
         if (!r.ready) {
           if (!mounted) return;
           _toast(
-            r.message.isEmpty ? '支付服务暂不可用,请稍后再试' : r.message,
+            r.message.isEmpty ? stringsOf(context).registrationOrdersPaymentServiceIsUnavailableTryAgainLater : r.message,
             isError: true,
           );
           return;
@@ -81,21 +93,12 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
       }
 
       final params = await ref.read(activityApiProvider).payApp(order.id);
-      final outcome = await const WechatPayment().pay(params);
+      await const WechatPayment().pay(params);
       if (!mounted) return;
-      // 与报名弹窗同一条链:SDK 回应只决定往哪个分支走,结论一律以
-      // 服务端回读为准 —— success/unknown 都轮询终态,进结果面板。
-      switch (outcome) {
-        case WechatPayOutcome.cancelled:
-          _toast('已取消支付');
-        case WechatPayOutcome.failed:
-          await _presentResultSheet(order, presetFailMessage: '支付未完成');
-        case WechatPayOutcome.success:
-        case WechatPayOutcome.unknown:
-          await _reconcile(order);
-      }
+      // SDK responses, including cancellation, cannot prove settlement.
+      await _reconcile(order);
     } catch (e) {
-      _toast(orderUserErrorText(e), isError: true);
+      _toast(localizedOrderError(context, e), isError: true);
     } finally {
       wechatPaymentFlowGate.release();
       if (mounted) setState(() => _payingId = null);
@@ -121,12 +124,10 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
   Future<void> _presentResultSheet(
     MyRegistration order, {
     Future<PaymentVerifyOutcome> Function()? reconcile,
-    String? presetFailMessage,
   }) async {
     final PaymentSheetOutcome? r = await showPaymentResultSheet(
       context,
       reconcile: reconcile,
-      presetFailMessage: presetFailMessage,
     );
     if (!mounted) return;
     switch (r?.result) {
@@ -140,9 +141,9 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
       case PaymentSheetResult.unknown:
         await cyConfirm(
           context,
-          title: '支付结果待确认',
-          content: '暂不要重复支付，请稍后刷新订单查看最终状态。',
-          confirmText: '知道了',
+          title: stringsOf(context).registrationOrdersPaymentResultUnconfirmed,
+          content: stringsOf(context).registrationOrdersDoNotPayAgainYetRefreshYourOrdersLaterForTheFinalStatus,
+          confirmText: stringsOf(context).registrationOrdersGotIt,
           showCancel: false,
         );
         if (!mounted) return;
@@ -156,35 +157,47 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
   /// ★ 走哪个接口由**是否已支付**决定,不是由界面文案决定 ——
   ///   已支付却调 `/cancel`,票没了钱不退。判据用 registrationStatus == 2,
   ///   与小程序同一条。
-  Future<void> _cancel(MyRegistration order) async {
+  Future<void> _cancel(MyRegistration order, int? owner) async {
+    if (owner == null || _cancellingId != null) return;
+    final scope = ref.read(authControllerProvider.notifier).requestScope(owner);
+    if (!scope.isCurrent() || _submittedCancellations.contains((owner, order.id))) return;
     final bool paid = order.registrationStatus == 2;
     final bool ok = await cyConfirm(
       context,
-      title: paid ? '取消报名并退款' : '取消订单',
+      title: paid ? stringsOf(context).registrationOrdersCancelRegistrationAndRequestRefund : stringsOf(context).registrationOrdersCancelOrder,
       content: paid
           ? '退款将原路退回微信（预计1～3个工作日），已用积分一并返还。已核销或已过开始时间不可退。确认取消报名？'
-          : '确定要取消这个待支付订单吗？取消后不可恢复。',
-      confirmText: paid ? '取消并退款' : '确定取消',
-      cancelText: '再想想',
+          : stringsOf(context).registrationOrdersCancelThisUnpaidOrderThisCannotBeUndone,
+      confirmText: paid ? stringsOf(context).registrationOrdersCancelAndRequestRefund : stringsOf(context).registrationOrdersConfirmCancellation,
+      cancelText: stringsOf(context).registrationOrdersKeepOrder,
       danger: true,
     );
-    if (!ok || !mounted) return;
+    if (!ok || !mounted || !scope.isCurrent() || _cancellingId != null || _submittedCancellations.contains((owner, order.id))) return;
     setState(() => _cancellingId = order.id);
     try {
-      final String msg = await ref
+      final outcome = await RequestSessionScope.run(scope, () => ref
           .read(activityApiProvider)
-          .cancelRegistration(registrationId: order.id, paid: paid);
-      if (!mounted) return;
+          .cancelRegistrationWithOutcome(registrationId: order.id, paid: paid));
+      if (!mounted || !scope.isCurrent()) return;
+      _submittedCancellations.add((owner, order.id));
       ref.invalidate(myOrdersProvider);
-      _toast(msg);
+      _toast(registrationCancellationNotice(context, outcome));
     } catch (e) {
-      _toast(orderUserErrorText(e), isError: true);
+      if (!mounted || !scope.isCurrent()) return;
+      if (e is DioException && (e.response == null || (e.response?.statusCode ?? 0) >= 500)) {
+        _submittedCancellations.add((owner, order.id));
+        ref.invalidate(myOrdersProvider);
+        _toast(stringsOf(context).clubCheckinRefundUnknownBody, isError: true);
+        return;
+      }
+      _toast(localizedOrderError(context, e), isError: true);
     } finally {
-      if (mounted) setState(() => _cancellingId = null);
+      if (mounted && scope.isCurrent()) setState(() => _cancellingId = null);
     }
   }
 
   Future<void> _showOrderDetail(MyRegistration order) {
+    final owner = _displayedOrdersUserId;
     final Future<void>? active = _detailPresentation;
     if (active != null) return active.then<void>((_) {});
 
@@ -196,7 +209,7 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
             orderId: order.id,
             scrollController: controller,
             onPay: () => _pay(order),
-            onCancel: () => _cancel(order),
+            onCancel: () => _cancel(order, owner),
           ),
     );
     _detailPresentation = presentation;
@@ -217,6 +230,10 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
 
   @override
   Widget build(BuildContext context) {
+    final userId = ref.watch(
+      authControllerProvider.select((auth) => auth.user?.id),
+    );
+    if (_displayedOrdersUserId != userId) _cancellingId = null;
     final orders = ref.watch(myOrdersProvider);
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
@@ -226,7 +243,7 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
         //   (同主题已有处理中的投诉就不再建单)。
         trailing: Semantics(
           button: true,
-          label: '发起投诉',
+          label: stringsOf(context).registrationOrdersMakeAComplaint,
           child: SizedBox.square(
             dimension: 44,
             child: CupertinoButton(
@@ -247,7 +264,7 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
             // 不显式 stretch 会把 58rpx 大标题推到屏幕正中,与小程序完全不同。
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              const CyPageTitle('我的订单'),
+              CyPageTitle(stringsOf(context).registrationOrdersMyOrders),
               _OrderFilterBar(filter: _filter, onSelected: _selectFilter),
               Expanded(
                 child: RefreshIndicator.adaptive(
@@ -258,7 +275,9 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
                     //   (`errorMsg && list.length>0`)保留已加载订单,只在顶部加一条
                     //   刷新失败条;整屏错误只留给「一条都没有」的情况。
                     error: (Object err, StackTrace st) {
-                      final List<MyRegistration>? kept = orders.value;
+                      // Retain a failed refresh only for the same account.
+                      final List<MyRegistration>? kept =
+                          _displayedOrdersUserId == userId ? orders.value : null;
                       if (kept == null || kept.isEmpty) {
                         return _OrderLoadError(onRetry: _retry);
                       }
@@ -269,7 +288,10 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
                         ],
                       );
                     },
-                    data: _ordersBody,
+                    data: (rows) {
+                      _displayedOrdersUserId = userId;
+                      return _ordersBody(rows);
+                    },
                   ),
                 ),
               ),
@@ -284,6 +306,7 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
 
   /// 订单列表正文:数据态与「刷新失败但保留列表」态共用,两处各写一遍会走形。
   Widget _ordersBody(List<MyRegistration> list) {
+    final owner = _displayedOrdersUserId;
     if (!_openedInitialDetail && widget.initialDetailId != null) {
       final MyRegistration? target = list
           .where((MyRegistration order) => order.id == widget.initialDetailId)
@@ -297,17 +320,17 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
     }
     if (list.isEmpty) {
       return _OrderEmptyState(
-        title: '还没有城市路线订单',
-        subtitle: '报名或购买城市路线后，订单会出现在这里。',
-        action: '去发现城市路线',
+        title: stringsOf(context).registrationOrdersNoCityRouteOrdersYet,
+        subtitle: stringsOf(context).registrationOrdersYourOrdersWillAppearHereAfterRegisteringOrBuyingACityRoute,
+        action: stringsOf(context).registrationOrdersDiscoverCityRoutes,
         onAction: () => context.go('/feed'),
       );
     }
     final List<MyRegistration> filtered = filterOrderList(list, _filter);
     if (filtered.isEmpty) {
-      return const _OrderEmptyState(
-        title: '当前筛选暂无订单',
-        subtitle: '试试切换其他状态查看订单。',
+      return _OrderEmptyState(
+        title: stringsOf(context).registrationOrdersNoOrdersMatchThisFilter,
+        subtitle: stringsOf(context).registrationOrdersTryAnotherStatusToSeeYourOrders,
       );
     }
     return ListView.separated(
@@ -320,7 +343,7 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
         paying: _payingId == filtered[i].id,
         onPay: () => _pay(filtered[i]),
         cancelling: _cancellingId == filtered[i].id,
-        onCancel: () => _cancel(filtered[i]),
+        onCancel: () => _cancel(filtered[i], owner),
         onOpen: () => _showOrderDetail(filtered[i]),
       ),
     );
@@ -347,7 +370,7 @@ class _OrderFilterBar extends StatelessWidget {
             for (final OrderListFilter item in OrderListFilter.values)
               _OrderFilterPill(
                 key: ValueKey<String>('order-filter-${item.name}'),
-                label: item.label,
+                label: localOrderModelText(context, item.label),
                 selected: filter == item,
                 palette: palette,
                 reduceMotion: reduceMotion,
@@ -381,7 +404,7 @@ class _OrderFilterPill extends StatelessWidget {
     return Semantics(
       button: true,
       selected: selected,
-      label: '$label${selected ? '，已选中' : ''}',
+      label: selected ? stringsOf(context).registrationOrdersSelectedLabel(label) : label,
       child: CupertinoButton(
         minimumSize: const Size(44, 44),
         pressedOpacity: reduceMotion ? 1 : 0.4,
@@ -446,9 +469,9 @@ class _OrderRefreshError extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text('订单刷新失败', style: textTheme.labelLarge),
+                Text(stringsOf(context).registrationOrdersCouldNotRefreshOrders, style: textTheme.labelLarge),
                 Text(
-                  '已加载的订单仍为你保留',
+                  stringsOf(context).registrationOrdersPreviouslyLoadedOrdersAreStillAvailable,
                   style: textTheme.bodySmall?.copyWith(
                     color: palette.textSecondary,
                   ),
@@ -460,7 +483,7 @@ class _OrderRefreshError extends StatelessWidget {
             minimumSize: const Size(44, 44),
             padding: const EdgeInsets.symmetric(horizontal: CyTokens.space2),
             onPressed: onRetry,
-            child: const Text('重试'),
+            child: Text(stringsOf(context).retry),
           ),
         ],
       ),
@@ -486,17 +509,17 @@ class _OrderLoadError extends StatelessWidget {
             color: CyPalette.of(context).textDisabled,
           ),
           const SizedBox(height: CyTokens.space3),
-          const Text('订单暂时没有加载出来'),
+          Text(stringsOf(context).registrationOrdersCouldNotLoadOrders),
           const SizedBox(height: CyTokens.space1_5),
           Text(
-            '可能是网络波动或服务正在同步数据。点「重试」即可，已支付订单不会丢失。',
+            stringsOf(context).registrationOrdersThereMayBeAConnectionIssueOrADataSyncInProgressTapRetryYourPaidOrdersA,
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: CyPalette.of(context).textSecondary,
             ),
           ),
           const SizedBox(height: CyTokens.space4),
-          CyNativeButton(label: '重试', onPressed: onRetry),
+          CyNativeButton(label: stringsOf(context).retry, onPressed: onRetry),
         ],
       ),
     ),
@@ -600,7 +623,7 @@ class _OrderCard extends StatelessWidget {
                     child: (order.registrationNo ?? '').isEmpty
                         ? const SizedBox.shrink()
                         : Text(
-                            '订单号 ${order.registrationNo}',
+                            stringsOf(context).registrationOrdersOrderNumberValue(order.registrationNo.toString()),
                             style: textTheme.labelMedium?.copyWith(
                               color: palette.textSecondary,
                             ),
@@ -608,7 +631,7 @@ class _OrderCard extends StatelessWidget {
                   ),
                   SizedBox(width: CyTokens.space3),
                   Text(
-                    orderListStateLabel(order),
+                    localOrderModelText(context, orderListStateLabel(order)),
                     style: textTheme.labelMedium?.copyWith(
                       color: _stateColor(palette),
                     ),
@@ -645,7 +668,7 @@ class _OrderCard extends StatelessWidget {
                 Text(
                   order.payableAmount! > 0
                       ? '¥${order.payableAmount!.toStringAsFixed(2)}'
-                      : '免费',
+                      : stringsOf(context).registrationOrdersFree,
                   style: textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.w700,
                     fontFeatures: const <FontFeature>[
@@ -655,7 +678,7 @@ class _OrderCard extends StatelessWidget {
                 ),
               ],
               SizedBox(height: CyTokens.space3),
-              Row(children: <Widget>[..._actions()]),
+              Row(children: <Widget>[..._actions(context)]),
             ],
           ),
         ),
@@ -663,11 +686,11 @@ class _OrderCard extends StatelessWidget {
     );
   }
 
-  List<Widget> _actions() => switch (state) {
+  List<Widget> _actions(BuildContext context) => switch (state) {
     OrderListState.pendingPayment => <Widget>[
       Expanded(
         child: CyNativeButton(
-          label: cancelling ? '处理中…' : '取消订单',
+          label: cancelling ? stringsOf(context).registrationOrdersProcessing : stringsOf(context).registrationOrdersCancelOrder,
           role: CyNativeButtonRole.destructive,
           onPressed: cancelling ? null : onCancel,
           loading: cancelling,
@@ -676,7 +699,7 @@ class _OrderCard extends StatelessWidget {
       const SizedBox(width: CyTokens.space2),
       Expanded(
         child: CyNativeButton(
-          label: paying ? '支付中…' : '立即支付',
+          label: paying ? stringsOf(context).registrationOrdersPaymentInProgress : stringsOf(context).registrationOrdersPayNow,
           onPressed: paying ? null : onPay,
           loading: paying,
         ),
@@ -685,7 +708,7 @@ class _OrderCard extends StatelessWidget {
     OrderListState.notStarted || OrderListState.inProgress => <Widget>[
       Expanded(
         child: CyNativeButton(
-          label: cancelling ? '处理中…' : '申请退款',
+          label: cancelling ? stringsOf(context).registrationOrdersProcessing : stringsOf(context).registrationOrdersRequestRefund,
           role: CyNativeButtonRole.destructive,
           onPressed: cancelling ? null : onCancel,
           loading: cancelling,
@@ -693,20 +716,20 @@ class _OrderCard extends StatelessWidget {
       ),
       const SizedBox(width: CyTokens.space2),
       Expanded(
-        child: CyNativeButton(label: '查看票夹', onPressed: onOpen),
+        child: CyNativeButton(label: stringsOf(context).registrationOrdersViewTickets, onPressed: onOpen),
       ),
     ],
     OrderListState.completed || OrderListState.nonRefundable => <Widget>[
       Expanded(
         child: CyNativeButton(
-          label: state == OrderListState.completed ? '查看详情' : '查看票夹',
+          label: state == OrderListState.completed ? stringsOf(context).registrationOrdersViewDetails : stringsOf(context).registrationOrdersViewTickets,
           onPressed: onOpen,
         ),
       ),
     ],
     OrderListState.refunding || OrderListState.refunded => <Widget>[
       Expanded(
-        child: CyNativeButton(label: '查看退款详情', onPressed: onOpen),
+        child: CyNativeButton(label: stringsOf(context).registrationOrdersViewRefundDetails, onPressed: onOpen),
       ),
     ],
     OrderListState.cancelled || OrderListState.unknown => const <Widget>[],
@@ -740,7 +763,7 @@ class _OrderCardSummary extends StatelessWidget {
                     vertical: 2,
                   ),
                   child: Text(
-                    mode.label,
+                    localOrderModelText(context, mode.label),
                     style: textTheme.labelSmall?.copyWith(
                       color: mode == OrderListMode.freeExplore
                           ? CyTokens.statusSuccess
@@ -753,7 +776,7 @@ class _OrderCardSummary extends StatelessWidget {
               const SizedBox(width: CyTokens.space1_5),
               Expanded(
                 child: Text(
-                  mode.summary,
+                  localOrderModelText(context, mode.summary),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: textTheme.labelSmall?.copyWith(

@@ -2,7 +2,10 @@ import 'dart:math';
 
 import 'package:dio/dio.dart';
 import '../../core/network/dio_client.dart';
+import '../../core/network/request_session_scope.dart';
+import '../models/registration_cancellation_outcome.dart';
 import '../models/activity.dart';
+import '../models/registration_read_failure.dart';
 import '../models/activity_publish.dart';
 
 /// 活动接口。对齐后端 `ApiActivityController`(/api/activity)与
@@ -131,7 +134,7 @@ class ActivityApi {
     );
     final body = resp.data ?? <String, dynamic>{};
     if (body['code'] != 200) {
-      throw Exception((body['msg'] as String?) ?? '没能取得报价');
+      throw RegistrationReadFailure.fromResponse(RegistrationReadKind.quote, body, '没能取得报价');
     }
     return RegistrationQuote.fromJson(
       (body['data'] as Map<String, dynamic>?) ?? <String, dynamic>{},
@@ -198,6 +201,7 @@ class ActivityApi {
       throw RegistrationCheckoutException(
         _ajaxCodeOf(code),
         (body['msg'] as String?) ?? '报名失败',
+        hasServerMessage: body['msg'] is String,
       );
     }
     final data = (body['data'] as Map<String, dynamic>?) ?? <String, dynamic>{};
@@ -218,21 +222,28 @@ class ActivityApi {
   ///   走错接口的后果不对称:已支付却调 cancel,票没了钱不退。
   ///
   /// 返回后端下发的提示原文 —— 退款到账时效那句是后端写的,前端别自己编。
-  Future<String> cancelRegistration({
+  /// Compatibility caller: preserve supplied message, never fabricate payout success.
+  Future<String> cancelRegistration({required int registrationId, required bool paid}) async {
+    final outcome = await cancelRegistrationWithOutcome(registrationId: registrationId, paid: paid);
+    return outcome.message.isNotEmpty ? outcome.message : '取消结果尚未确认，请查看订单';
+  }
+
+  Future<RegistrationCancellationOutcome> cancelRegistrationWithOutcome({
     required int registrationId,
     required bool paid,
   }) async {
     final resp = await _client.dio.post<Map<String, dynamic>>(
       paid ? '/api/registration/cancel-refund' : '/api/registration/cancel',
+      options: RequestSessionScope.options(),
       data: FormData.fromMap(<String, dynamic>{
         'id': registrationId.toString(),
       }),
     );
     final body = resp.data ?? <String, dynamic>{};
     if (body['code'] != 200) {
-      throw Exception((body['msg'] as String?) ?? '取消失败');
+      throw RegistrationReadFailure.fromResponse(RegistrationReadKind.cancellation, body, '取消失败');
     }
-    return (body['msg'] as String?) ?? (paid ? '已取消并退款' : '报名已取消');
+    return RegistrationCancellationOutcome.fromResponse(body);
   }
 
   /// 支付服务是否就绪:`POST /api/registration/payment-readiness`。
@@ -253,7 +264,7 @@ class ActivityApi {
     );
     final body = resp.data ?? <String, dynamic>{};
     if ((body['code'] as num?)?.toInt() != 200) {
-      throw Exception((body['msg'] as String?) ?? '查询失败');
+      throw RegistrationReadFailure.fromResponse(RegistrationReadKind.paymentReadiness, body, '查询失败');
     }
     final data = (body['data'] as Map<String, dynamic>?) ?? <String, dynamic>{};
     return (
@@ -274,12 +285,13 @@ class ActivityApi {
       throw RegistrationCheckoutException(
         _ajaxCodeOf(body['code']),
         (body['msg'] as String?) ?? '获取支付参数失败',
+        hasServerMessage: body['msg'] is String,
       );
     }
     final data = (body['data'] as Map<String, dynamic>?) ?? <String, dynamic>{};
     final raw = data['payParams'];
     if (raw is! Map || raw.isEmpty) {
-      throw Exception('没能取得支付参数,请稍后重试');
+      throw const RegistrationReadFailure(RegistrationReadKind.paymentParameters, '没能取得支付参数,请稍后重试', hasServerMessage: false);
     }
     return raw.map((k, v) => MapEntry('$k', '${v ?? ''}'));
   }
@@ -330,7 +342,7 @@ class ActivityApi {
     );
     final body = resp.data ?? <String, dynamic>{};
     if (body['code'] != 200) {
-      throw Exception((body['msg'] as String?) ?? fallbackMsg);
+      throw RegistrationReadFailure.fromResponse(RegistrationReadKind.activityTickets, body, fallbackMsg);
     }
     final data = (body['data'] as List<dynamic>?) ?? <dynamic>[];
     return data
@@ -349,7 +361,7 @@ class ActivityApi {
     );
     final body = resp.data ?? <String, dynamic>{};
     if (body['code'] != 200) {
-      throw Exception((body['msg'] as String?) ?? fallbackMsg);
+      throw RegistrationReadFailure.fromResponse(RegistrationReadKind.routeTickets, body, fallbackMsg);
     }
     final Object? data = body['data'];
     final List<dynamic> rows = data is List<dynamic>
@@ -382,6 +394,9 @@ class ActivityApi {
       }),
     );
     final body = resp.data ?? <String, dynamic>{};
+    if ((body['code'] as num?)?.toInt() != 200) {
+      throw RegistrationReadFailure.fromResponse(RegistrationReadKind.orders, body, '订单加载失败');
+    }
     final Object? data = body['data'];
     final List<dynamic> rows = data is List<dynamic>
         ? data
@@ -404,7 +419,7 @@ class ActivityApi {
     );
     final body = resp.data ?? <String, dynamic>{};
     if ((body['code'] as num?)?.toInt() != 200) {
-      throw Exception((body['msg'] as String?) ?? '票券详情加载失败');
+      throw RegistrationReadFailure.fromResponse(RegistrationReadKind.detail, body, '票券详情加载失败');
     }
     final data = (body['data'] as Map<String, dynamic>?) ?? <String, dynamic>{};
     return RegistrationDetail.fromJson(data);
@@ -425,7 +440,7 @@ class ActivityApi {
     );
     final body = resp.data ?? <String, dynamic>{};
     if (body['code'] != 200) {
-      throw Exception((body['msg'] as String?) ?? '核销码签发失败');
+      throw RegistrationReadFailure.fromResponse(RegistrationReadKind.dynamicCode, body, '核销码签发失败');
     }
     final data = (body['data'] as Map<String, dynamic>?) ?? <String, dynamic>{};
     return DynCode.fromJson(data);
@@ -596,7 +611,9 @@ int? _ajaxCodeOf(Object? code) =>
 /// ★ `toString()` 与 `Exception: msg` 同形:各调用点现有的
 ///   `e.toString().replaceFirst('Exception: ', '')` 文案收口一行都不用改。
 class RegistrationCheckoutException implements Exception {
-  const RegistrationCheckoutException(this.code, this.message);
+  const RegistrationCheckoutException(this.code, this.message, {this.hasServerMessage = true});
+
+  final bool hasServerMessage;
 
   final int? code;
   final String message;

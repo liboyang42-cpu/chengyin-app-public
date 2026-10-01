@@ -12,6 +12,7 @@
 //   · revisit-next:没有下期也占行,写「下一期开售后会在这里出现」且点不动。
 
 import 'dart:io';
+import 'package:chengyin_app/l10n/app_localizations.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -61,7 +62,7 @@ class _FakeClubApi implements ClubApi {
   dynamic noSuchMethod(Invocation i) => super.noSuchMethod(i);
 }
 
-Future<void> _pump(WidgetTester t, _FakeApi api, {_FakeClubApi? club}) async {
+Future<void> _pump(WidgetTester t, _FakeApi api, {_FakeClubApi? club, bool english = false}) async {
   await t.binding.setSurfaceSize(const Size(390, 900));
   final router = GoRouter(
     initialLocation: '/x',
@@ -90,7 +91,16 @@ Future<void> _pump(WidgetTester t, _FakeApi api, {_FakeClubApi? club}) async {
         registrationApiProvider.overrideWithValue(api),
         clubApiProvider.overrideWithValue(club ?? _FakeClubApi()),
       ].cast(),
-      child: MaterialApp.router(routerConfig: router),
+      child: MaterialApp.router(
+        routerConfig: router,
+        locale: english ? const Locale('en') : const Locale('zh'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(english ? 2 : 1)),
+          child: child!,
+        ),
+      ),
     ),
   );
   await t.pumpAndSettle();
@@ -113,6 +123,26 @@ Map<String, dynamic> _revisit({
 };
 
 void main() {
+  // NOT_RUN locally: Flutter SDK unavailable.
+  testWidgets('English completion fallbacks preserve matching server titles at large text', (t) async {
+    addTearDown(() => t.binding.setSurfaceSize(null));
+    await _pump(t, _FakeApi(data: <String, dynamic>{
+      'completed': true,
+      'requiredChapterCount': 2,
+      'redeemedChapterCount': 2,
+      'stamps': <dynamic>[
+        <String, dynamic>{'chapterId': 1, 'collected': true},
+        <String, dynamic>{'chapterId': 2, 'title': '章节 2', 'collected': true},
+      ],
+      'revisit': <String, dynamic>{'clubId': 7, 'joined': true},
+    }), english: true);
+    expect(find.text('Chapter 1'), findsOneWidget);
+    expect(find.text('章节 2'), findsOneWidget);
+    expect(find.text('Host club'), findsOneWidget);
+    expect(find.text('Rewards are being issued. Check your medals and points history later.'), findsOneWidget);
+    expect(t.takeException(), isNull);
+  });
+
   testWidgets('★★★ 非探索票被拒 ⇒ 整块消失,不留任何痕迹', (WidgetTester t) async {
     await _pump(t, _FakeApi(err: Exception('该订单没有探店日完局面')));
     expect(find.text('探店图鉴'), findsNothing);

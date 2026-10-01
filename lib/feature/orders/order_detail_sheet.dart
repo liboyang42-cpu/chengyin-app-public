@@ -9,6 +9,10 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/map/map_launcher.dart';
 import '../../core/providers.dart';
+import '../../l10n/strings.dart';
+import 'registration_order_strings.dart';
+import '../../l10n/strings_provider.dart';
+import '../auth/auth_controller.dart';
 import '../../core/theme/cy_palette.dart';
 import '../../core/theme/cy_tokens.dart';
 import '../../core/widgets/cy_net_image.dart';
@@ -19,11 +23,18 @@ import '../../data/models/activity.dart';
 import '../../data/models/explore_completion.dart';
 import '../../core/widgets/cy_native_notice.dart';
 import 'merchant_consent_row.dart';
-import 'order_list_state.dart';
 import 'order_timeline.dart';
+import 'completion_display.dart';
+import '../team/team_map_strings.dart' show teamApiFailureText;
 
 final orderDetailProvider = FutureProvider.autoDispose
     .family<RegistrationDetail, int>((ref, int orderId) {
+      final userId = ref.watch(
+        authControllerProvider.select((auth) => auth.user?.id),
+      );
+      if (userId == null) {
+        throw Exception(ref.read(appStringsProvider).loginExpired);
+      }
       return ref.watch(activityApiProvider).ticketInfo(orderId);
     });
 
@@ -70,8 +81,8 @@ class OrderDetailSheet extends ConsumerWidget {
                 loading: () =>
                     const Center(child: CupertinoActivityIndicator()),
                 error: (Object error, _) => StatusView(
-                  message: '订单详情加载失败',
-                  sub: orderUserErrorText(error),
+                  message: stringsOf(context).registrationOrdersCouldNotLoadOrderDetails,
+                  sub: localizedOrderError(context, error),
                   large: true,
                   onRetry: () => ref.invalidate(orderDetailProvider(orderId)),
                 ),
@@ -98,11 +109,11 @@ class OrderDetailSheet extends ConsumerWidget {
         child: Stack(
           alignment: Alignment.center,
           children: <Widget>[
-            Text('订单详情', style: Theme.of(context).textTheme.titleMedium),
+            Text(stringsOf(context).registrationOrdersOrderDetails, style: Theme.of(context).textTheme.titleMedium),
             Align(
               alignment: Alignment.centerRight,
               child: Semantics(
-                label: '关闭订单详情',
+                label: stringsOf(context).registrationOrdersCloseOrderDetails,
                 button: true,
                 child: SizedBox.square(
                   key: const Key('order-detail-close'),
@@ -168,11 +179,11 @@ class _OrderDetailBodyState extends ConsumerState<_OrderDetailBody> {
     final MapLaunchResult result = await launchNavigation(
       lat: ticket?.gatherLat,
       lng: ticket?.gatherLng,
-      name: ticket?.meetingPoint ?? '集合点',
+      name: ticket?.meetingPoint ?? stringsOf(context).registrationOrdersMeetingPoint,
       address: ticket?.meetingPoint,
       isIOS: defaultTargetPlatform == TargetPlatform.iOS,
     );
-    final String message = mapLaunchMessage(result);
+    final String message = mapLaunchMessage(result, strings: stringsOf(context));
     if (message.isNotEmpty && mounted) {
       CyNativeNotice.show(
         context,
@@ -211,7 +222,7 @@ class _OrderDetailBodyState extends ConsumerState<_OrderDetailBody> {
   }
 
   void _toast(Object error) {
-    CyNativeNotice.show(context, orderUserErrorText(error), isError: true);
+    CyNativeNotice.show(context, localizedOrderError(context, error), isError: true);
   }
 
   @override
@@ -244,7 +255,7 @@ class _OrderDetailBodyState extends ConsumerState<_OrderDetailBody> {
                 _timelineCard(d),
                 if (d.paymentStatus == 2 || d.verificationStatus == 1)
                   CyMerchantConsentRow(
-                    cardTitle: '商家消息',
+                    cardTitle: stringsOf(context).registrationOrdersMerchantMessages,
                     orderId: d.id,
                     ownerMemberId: d.ownerMemberId,
                   ),
@@ -268,7 +279,7 @@ class _OrderDetailBodyState extends ConsumerState<_OrderDetailBody> {
                     padding: const EdgeInsets.only(top: CyTokens.space2),
                     child: CyNativeButton(
                       key: const Key('order-detail-primary-pay'),
-                      label: _acting ? '支付中…' : '去支付',
+                      label: _acting ? stringsOf(context).registrationOrdersPaymentInProgress : stringsOf(context).registrationOrdersGoToPayment,
                       onPressed: _acting || widget.onPay == null
                           ? null
                           : () => _act(widget.onPay!),
@@ -280,7 +291,7 @@ class _OrderDetailBodyState extends ConsumerState<_OrderDetailBody> {
                     padding: const EdgeInsets.only(top: CyTokens.space2),
                     child: CyNativeButton(
                       key: const Key('order-detail-primary-ticket'),
-                      label: '查看票夹',
+                      label: stringsOf(context).registrationOrdersViewTickets,
                       onPressed: () => _openTicket(d),
                     ),
                   ),
@@ -329,7 +340,7 @@ class _OrderDetailBodyState extends ConsumerState<_OrderDetailBody> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               Text(
-                d.ticketState.label,
+                localOrderModelText(context, d.ticketState.label),
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   color: Colors.white,
                   fontWeight: FontWeight.w700,
@@ -352,7 +363,7 @@ class _OrderDetailBodyState extends ConsumerState<_OrderDetailBody> {
   Widget _quickActions(RegistrationDetail d) => _section(
     children: <Widget>[
       _linkRow(
-        d.ownerType == 1 ? '进入路线' : '继续探索',
+        d.ownerType == 1 ? stringsOf(context).registrationOrdersOpenRoute : stringsOf(context).registrationOrdersContinueExploring,
         () => context.push(
           '/tickets?focusId=${d.id}&stype=${d.ownerType == 1 ? 0 : 2}',
         ),
@@ -363,7 +374,7 @@ class _OrderDetailBodyState extends ConsumerState<_OrderDetailBody> {
         color: CyPalette.of(context).borderSubtle,
       ),
       _linkRow(
-        d.ownerType == 1 ? '路线详情' : '回场次详情',
+        d.ownerType == 1 ? stringsOf(context).registrationOrdersRouteDetails : stringsOf(context).registrationOrdersBackToSessionDetails,
         () => context.push(
           d.ownerType == 1 ? '/topic/${d.ownerId}' : '/activity/${d.ownerId}',
         ),
@@ -374,21 +385,21 @@ class _OrderDetailBodyState extends ConsumerState<_OrderDetailBody> {
   Widget _productCard(RegistrationDetail d) {
     final OrderTicketSnapshot? ticket = d.omsTicket;
     return _section(
-      title: d.title ?? '未命名项目',
+      title: d.title ?? stringsOf(context).registrationOrdersUnnamedProject,
       subtitle: d.description,
       children: <Widget>[
-        _row('订单类型', d.ownerType == 1 ? '城市路线' : '场次'),
-        if ((d.registrationNo ?? '').isNotEmpty) _row('订单号', d.registrationNo!),
+        _row(stringsOf(context).registrationOrdersOrderType, d.ownerType == 1 ? stringsOf(context).registrationOrdersCityRoute : stringsOf(context).registrationOrdersSession),
+        if ((d.registrationNo ?? '').isNotEmpty) _row(stringsOf(context).registrationOrdersOrderNumber, d.registrationNo!),
         if ((d.eventStartDate ?? '').isNotEmpty)
-          _row('日期', _date(d.eventStartDate!)),
+          _row(stringsOf(context).registrationOrdersDate, _date(d.eventStartDate!)),
         if ((ticket?.startTime ?? '').isNotEmpty)
-          _row('场次', _timeRange(ticket!.startTime!, ticket.endTime)),
+          _row(stringsOf(context).registrationOrdersSession, _timeRange(ticket!.startTime!, ticket.endTime)),
         if ((ticket?.meetingPoint ?? '').isNotEmpty)
           _tapRow(
-            '集合点',
+            stringsOf(context).registrationOrdersMeetingPoint,
             ticket!.hasCoordinates
                 ? '${ticket.meetingPoint} ›'
-                : '${ticket.meetingPoint} · 坐标待补充',
+                : stringsOf(context).registrationOrdersCoordinatesMissing(ticket.meetingPoint.toString()),
             _openMeetingPoint,
           ),
       ],
@@ -396,22 +407,22 @@ class _OrderDetailBodyState extends ConsumerState<_OrderDetailBody> {
   }
 
   Widget _priceCard(RegistrationDetail d) => _section(
-    title: '价格明细',
+    title: stringsOf(context).registrationOrdersPriceBreakdown,
     children: <Widget>[
       if (d.ticketPrice != null)
         _row(
-          d.ticketName ?? '票',
+          d.ticketName ?? stringsOf(context).registrationOrdersTicket,
           '${_money(d.ticketPrice!)} × ${d.orderNum ?? 1}',
         ),
       if ((d.pointPaymentAmount ?? 0) > 0)
         _row(
-          d.pointUsed == null ? '积分抵扣' : '积分抵扣（${d.pointUsed}积分）',
+          d.pointUsed == null ? stringsOf(context).registrationOrdersPointsDeduction : stringsOf(context).registrationOrdersPointsUsed(d.pointUsed.toString()),
           '-${_money(d.pointPaymentAmount!)}',
         ),
       if ((d.wechatPaymentAmount ?? 0) > 0)
-        _row('微信实付', _money(d.wechatPaymentAmount!)),
+        _row(stringsOf(context).registrationOrdersAmountPaidViaWechat, _money(d.wechatPaymentAmount!)),
       if (d.payableAmount != null)
-        _row('合计', _money(d.payableAmount!), strong: true),
+        _row(stringsOf(context).registrationOrdersTotalPaid, _money(d.payableAmount!), strong: true),
     ],
   );
 
@@ -422,7 +433,7 @@ class _OrderDetailBodyState extends ConsumerState<_OrderDetailBody> {
   Widget _timelineCard(RegistrationDetail d) {
     final List<OrderTimelineRow> rows = buildOrderTimeline(d);
     return _section(
-      title: '订单进度',
+      title: stringsOf(context).registrationOrdersOrderProgress,
       children: <Widget>[
         for (final OrderTimelineRow row in rows)
           Padding(
@@ -439,10 +450,14 @@ class _OrderDetailBodyState extends ConsumerState<_OrderDetailBody> {
                       : CyPalette.of(context).textTertiary,
                 ),
                 const SizedBox(width: CyTokens.space2),
-                Expanded(child: Text(row.label)),
+                Expanded(child: Text(row.key == 'manual_refund'
+                    ? row.label
+                    : localOrderModelText(context, row.label))),
                 if (row.time.isNotEmpty)
                   Text(
-                    row.time,
+                    row.time == '完成后更新'
+                        ? localOrderModelText(context, row.time)
+                        : row.time,
                     style: CyType.footnote.copyWith(
                       color: CyPalette.of(context).textSecondary,
                     ),
@@ -456,7 +471,7 @@ class _OrderDetailBodyState extends ConsumerState<_OrderDetailBody> {
 
   /// 「和队友一起出发」卡 —— 文案逐字对齐 wxml:101-120。
   Widget _teamCard(RegistrationDetail d) => _section(
-    title: '和队友一起出发',
+    title: stringsOf(context).registrationOrdersHeadOutWithYourTeammates,
     subtitle:
         '按主理人设置的人数上限建队。默认公开，队伍会出现在漫游地图「附近的队伍」里等人申请，由你逐个同意；打开「仅邀请」后只有拿到邀请链接的人能进。组队与否不影响活动举行，也不改变订单与退款规则。',
     children: <Widget>[
@@ -464,7 +479,7 @@ class _OrderDetailBodyState extends ConsumerState<_OrderDetailBody> {
         padding: const EdgeInsets.only(bottom: CyTokens.space2),
         child: Row(
           children: <Widget>[
-            const Expanded(child: Text('仅邀请可加入')),
+            Expanded(child: Text(stringsOf(context).registrationOrdersInvitationOnly)),
             CupertinoSwitch(
               key: const Key('order-detail-team-invite-only'),
               value: _teamInviteOnly,
@@ -476,7 +491,7 @@ class _OrderDetailBodyState extends ConsumerState<_OrderDetailBody> {
       ),
       CyNativeButton(
         key: const Key('order-detail-team-create'),
-        label: _teamCreating ? '创建中…' : '叫上队友',
+        label: _teamCreating ? stringsOf(context).registrationOrdersCreating : stringsOf(context).registrationOrdersInviteTeammates,
         role: CyNativeButtonRole.secondary,
         onPressed: _teamCreating ? null : () => _chooseTeamSize(d),
         loading: _teamCreating,
@@ -489,18 +504,18 @@ class _OrderDetailBodyState extends ConsumerState<_OrderDetailBody> {
     final int? picked = await showCupertinoModalPopup<int>(
       context: context,
       builder: (BuildContext ctx) => CupertinoActionSheet(
-        title: const Text('队伍人数'),
+        title: Text(stringsOf(context).registrationOrdersGroupSize),
         actions: <Widget>[
           for (final int size in options)
             CupertinoActionSheetAction(
               key: Key('order-detail-team-size-$size'),
               onPressed: () => Navigator.of(ctx).pop(size),
-              child: Text('$size 人队伍'),
+              child: Text(stringsOf(context).registrationOrdersTeamSize(size)),
             ),
         ],
         cancelButton: CupertinoActionSheetAction(
           onPressed: () => Navigator.of(ctx).pop(),
-          child: const Text('取消'),
+          child: Text(stringsOf(context).cancel),
         ),
       ),
     );
@@ -524,7 +539,7 @@ class _OrderDetailBodyState extends ConsumerState<_OrderDetailBody> {
       context.push('/team/$teamId');
     } on TeamMapApiException catch (error) {
       if (mounted) {
-        CyNativeNotice.show(context, error.message, isError: true);
+        CyNativeNotice.show(context, teamApiFailureText(error, stringsOf(context)), isError: true);
       }
     } finally {
       if (mounted) setState(() => _teamCreating = false);
@@ -532,17 +547,17 @@ class _OrderDetailBodyState extends ConsumerState<_OrderDetailBody> {
   }
 
   Widget _paymentCard(RegistrationDetail d) => _section(
-    title: '支付信息',
+    title: stringsOf(context).registrationOrdersPaymentInformation,
     children: <Widget>[
       if ((d.paymentTime ?? '').isNotEmpty)
-        _row('支付时间', _dateTime(d.paymentTime!)),
+        _row(stringsOf(context).registrationOrdersPaymentTime, _dateTime(d.paymentTime!)),
       if ((d.paymentTypeLabel ?? '').isNotEmpty)
-        _row('支付方式', d.paymentTypeLabel!),
+        _row(stringsOf(context).registrationOrdersPaymentMethod, d.paymentTypeLabel!),
       if ((d.wechatPaymentAmount ?? 0) > 0)
-        _row('微信实付', _money(d.wechatPaymentAmount!)),
+        _row(stringsOf(context).registrationOrdersAmountPaidViaWechat, _money(d.wechatPaymentAmount!)),
       if ((d.pointPaymentAmount ?? 0) > 0)
-        _row('积分实付', _money(d.pointPaymentAmount!)),
-      if ((d.transactionId ?? '').isNotEmpty) _row('微信交易单号', d.transactionId!),
+        _row(stringsOf(context).registrationOrdersAmountPaidWithPoints, _money(d.pointPaymentAmount!)),
+      if ((d.transactionId ?? '').isNotEmpty) _row(stringsOf(context).registrationOrdersWechatTransactionId, d.transactionId!),
     ],
   );
 
@@ -552,46 +567,48 @@ class _OrderDetailBodyState extends ConsumerState<_OrderDetailBody> {
       (d.participateDate ?? '').isNotEmpty;
 
   Widget _registrantCard(RegistrationDetail d) => _section(
-    title: '报名人信息',
+    title: stringsOf(context).registrationOrdersRegistrantDetails,
     children: <Widget>[
-      if ((d.realName ?? '').isNotEmpty) _row('姓名', d.realName!),
-      if ((d.phone ?? '').isNotEmpty) _row('手机', d.phone!),
+      if ((d.realName ?? '').isNotEmpty) _row(stringsOf(context).registrationOrdersName, d.realName!),
+      if ((d.phone ?? '').isNotEmpty) _row(stringsOf(context).registrationOrdersPhone, d.phone!),
       if ((d.participateDate ?? '').isNotEmpty)
-        _row('报名日期', _date(d.participateDate!)),
+        _row(stringsOf(context).registrationOrdersRegistrationDate, _date(d.participateDate!)),
     ],
   );
 
   Widget _validityCard(RegistrationDetail d) => _section(
-    title: '凭证与有效期',
+    title: stringsOf(context).registrationOrdersReceiptAndValidity,
     children: <Widget>[
       if ((d.verificationTime ?? '').isNotEmpty)
-        _row('核销时间', _dateTime(d.verificationTime!)),
-      if ((d.expiresAt ?? '').isNotEmpty) _row('权益到期', _dateTime(d.expiresAt!)),
+        _row(stringsOf(context).registrationOrdersRedemptionTime, _dateTime(d.verificationTime!)),
+      if ((d.expiresAt ?? '').isNotEmpty) _row(stringsOf(context).registrationOrdersBenefitsExpire, _dateTime(d.expiresAt!)),
     ],
   );
 
   Widget _entitlementsCard(RegistrationDetail d) => _section(
-    title: '权益明细',
+    title: stringsOf(context).registrationOrdersBenefitDetails,
     children: <Widget>[
       for (final Entitlement entitlement in d.entitlements)
         _row(
-          entitlement.chapterName ?? '章节 ${entitlement.chapterId ?? ''}',
-          entitlement.label,
+          entitlement.chapterName ?? stringsOf(context).registrationOrdersChapter((entitlement.chapterId ?? '').toString()),
+          localizedEntitlementLabel(context, entitlement),
         ),
     ],
   );
 
   Widget _completionCard(ExploreCompletion c) {
     final ExploreRevisit? revisit = c.revisit;
+    final progress = completionProgressLabel(context, c);
+    final awardsEmpty = completionAwardsEmptyLabel(context, c);
     return Column(
       children: <Widget>[
         _section(
-          title: '探店图鉴',
+          title: stringsOf(context).registrationOrdersVisitCollection,
           children: <Widget>[
-            if (c.stampProgressText != null)
+            if (progress != null)
               Align(
                 alignment: Alignment.centerLeft,
-                child: Text(c.stampProgressText!),
+                child: Text(progress),
               ),
             const SizedBox(height: CyTokens.space2),
             Wrap(
@@ -620,7 +637,7 @@ class _OrderDetailBodyState extends ConsumerState<_OrderDetailBody> {
                           size: 16,
                         ),
                         const SizedBox(width: CyTokens.space1),
-                        Text(stamp.title),
+                        Text(completionStampLabel(context, stamp)),
                       ],
                     ),
                   ),
@@ -629,10 +646,10 @@ class _OrderDetailBodyState extends ConsumerState<_OrderDetailBody> {
           ],
         ),
         _section(
-          title: '通关奖励',
+          title: stringsOf(context).registrationOrdersCompletionRewards,
           children: <Widget>[
-            if (c.awardsEmptyText != null)
-              Text(c.awardsEmptyText!)
+            if (awardsEmpty != null)
+              Text(awardsEmpty)
             else
               for (final ExploreAward award in c.awards)
                 _row(award.title, award.amountText ?? ''),
@@ -640,22 +657,22 @@ class _OrderDetailBodyState extends ConsumerState<_OrderDetailBody> {
         ),
         if (revisit != null)
           _section(
-            title: '下次再来',
+            title: stringsOf(context).registrationOrdersComeBackNextTime,
             children: <Widget>[
-              _row('主办俱乐部', revisit.clubName),
+              _row(stringsOf(context).registrationOrdersHostClub, completionClubLabel(context, revisit)),
               Wrap(
                 spacing: CyTokens.space2,
                 children: <Widget>[
                   if (revisit.canFollow && !_followed)
                     CyNativeButton(
-                      label: _following ? '关注中…' : '关注主办俱乐部',
+                      label: _following ? stringsOf(context).registrationOrdersFollowing : stringsOf(context).registrationOrdersFollowHostClub,
                       role: CyNativeButtonRole.secondary,
                       onPressed: _following ? null : () => _follow(revisit),
                       loading: _following,
                     ),
                   if (!revisit.joined && !_joined)
                     CyNativeButton(
-                      label: _joining ? '提交中…' : '加入俱乐部',
+                      label: _joining ? stringsOf(context).registrationOrdersSubmitting : stringsOf(context).registrationOrdersJoinClub,
                       role: CyNativeButtonRole.secondary,
                       onPressed: _joining ? null : () => _join(revisit),
                       loading: _joining,
@@ -666,17 +683,17 @@ class _OrderDetailBodyState extends ConsumerState<_OrderDetailBody> {
                       horizontal: CyTokens.space2,
                     ),
                     onPressed: () => context.push('/club/${revisit.clubId}'),
-                    child: const Text('查看俱乐部'),
+                    child: Text(stringsOf(context).registrationOrdersViewClub),
                   ),
                 ],
               ),
               if (revisit.nextEdition != null)
                 _linkRow(
-                  '${revisit.nextEdition!.name}${_shortDate(revisit.nextEdition!.startDate)}',
+                  '${completionNextName(context, revisit.nextEdition!)}${_shortDate(context, revisit.nextEdition!.startDate)}',
                   () => context.push('/topic/${revisit.nextEdition!.topicId}'),
                 )
               else
-                const Text('下一期开售后会在这里出现'),
+                Text(stringsOf(context).registrationOrdersTheNextSessionWillAppearHereWhenSalesOpen),
             ],
           ),
       ],
@@ -684,18 +701,18 @@ class _OrderDetailBodyState extends ConsumerState<_OrderDetailBody> {
   }
 
   Widget _refundCard(RegistrationDetail d) => _section(
-    title: '退款与客服',
+    title: stringsOf(context).registrationOrdersRefundsAndSupport,
     children: <Widget>[
       Text(
         (d.refundDeadlineDisplay ?? '').isNotEmpty
             ? d.refundDeadlineDisplay!
-            : '支付成功后将按订单退款截止时间判断是否可原路退款。',
+            : stringsOf(context).orderDisclosureRefundDeadline,
       ),
       const SizedBox(height: CyTokens.space1),
-      const Text('退款原路退回微信（预计1-3个工作日），已用积分一并返还。'),
+      Text(stringsOf(context).orderDisclosureRefundEstimate),
       if ((d.organizerName ?? '').isNotEmpty) ...<Widget>[
         const SizedBox(height: CyTokens.space2),
-        Text('主办方：${d.organizerName}'),
+        Text(stringsOf(context).registrationOrdersOrganizerName(d.organizerName.toString())),
       ],
     ],
   );
@@ -706,7 +723,7 @@ class _OrderDetailBodyState extends ConsumerState<_OrderDetailBody> {
         Expanded(
           child: CyNativeButton(
             key: const Key('order-detail-cancel'),
-            label: _acting ? '处理中…' : (d.paymentStatus == 2 ? '取消并退款' : '取消订单'),
+            label: _acting ? stringsOf(context).registrationOrdersProcessing : (d.paymentStatus == 2 ? stringsOf(context).registrationOrdersCancelAndRequestRefund : stringsOf(context).registrationOrdersCancelOrder),
             role: CyNativeButtonRole.destructive,
             onPressed: _acting ? null : () => _act(widget.onCancel!),
             loading: _acting,
@@ -715,7 +732,7 @@ class _OrderDetailBodyState extends ConsumerState<_OrderDetailBody> {
       Expanded(
         child: CyNativeButton(
           key: const Key('order-detail-contact'),
-          label: '联系客服',
+          label: stringsOf(context).registrationOrdersContactSupport,
           role: CyNativeButtonRole.secondary,
           onPressed: () => context.push('/complaint'),
         ),
@@ -725,11 +742,11 @@ class _OrderDetailBodyState extends ConsumerState<_OrderDetailBody> {
         Expanded(
           child: CyNativeButton(
             key: const Key('order-detail-copy-no'),
-            label: '复制订单号',
+            label: stringsOf(context).registrationOrdersCopyOrderNumber,
             role: CyNativeButtonRole.secondary,
             onPressed: () {
               Clipboard.setData(ClipboardData(text: d.registrationNo!));
-              CyNativeNotice.show(context, '已复制订单号');
+              CyNativeNotice.show(context, stringsOf(context).registrationOrdersOrderNumberCopied);
             },
           ),
         ),
@@ -737,7 +754,7 @@ class _OrderDetailBodyState extends ConsumerState<_OrderDetailBody> {
         Expanded(
           child: CyNativeButton(
             key: const Key('order-detail-secondary-ticket'),
-            label: '查看票夹',
+            label: stringsOf(context).registrationOrdersViewTickets,
             onPressed: () => _openTicket(d),
           ),
         ),
@@ -848,7 +865,7 @@ String _timeRange(String start, String? end) {
   return '$s – ${_dateTime(end)}';
 }
 
-String _shortDate(String? value) {
+String _shortDate(BuildContext context, String? value) {
   if (value == null || value.isEmpty) return '';
-  return ' · ${value.length >= 10 ? value.substring(5, 10) : value} 开场';
+  return stringsOf(context).registrationOrdersStarts(value.length >= 10 ? value.substring(5, 10) : value);
 }

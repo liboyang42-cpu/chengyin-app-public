@@ -82,6 +82,7 @@ class ImApi {
     required String content,
     int msgType = kMsgText,
     String? extraJson,
+    String? clientMessageId,
   }) async {
     final resp = await _client.dio.post<Map<String, dynamic>>(
       '/api/im/send',
@@ -92,6 +93,7 @@ class ImApi {
         'content': content,
         // 只在真有内容时发 —— 空串会被后端存成一个解析不出东西的卡片。
         if ((extraJson ?? '').isNotEmpty) 'extra_json': extraJson,
+        if (clientMessageId != null) 'client_message_id': clientMessageId,
       }),
     );
     final body = resp.data ?? <String, dynamic>{};

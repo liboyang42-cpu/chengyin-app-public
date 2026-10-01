@@ -15,6 +15,14 @@ import 'package:chengyin_app/feature/payment/wechat_payment.dart'
 
 class _PayApi implements ActivityApi {
   int payAppCalls = 0;
+  int statusCalls = 0;
+  @override
+  Future<RegistrationDetail> ticketInfo(int id) async {
+    statusCalls++;
+    return RegistrationDetail(id: id, ownerType: 2, ownerId: 7,
+      entitlements: const [], paymentStatus: 4, registrationStatus: 3);
+  }
+
 
   @override
   Future<({bool ready, String message})> paymentReadiness() async =>
@@ -76,7 +84,8 @@ void main() {
       findsOneWidget,
       reason: '支付失败要进结果面板,不再只是一条 toast',
     );
-    expect(find.text('钱没有扣,可以直接重试。'), findsOneWidget);
+    expect(api.statusCalls, 1);
+    expect(find.text('请查看订单确认最终状态，暂不要重复支付。'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('payment-result-close')));
     await _pumpFrames(tester);

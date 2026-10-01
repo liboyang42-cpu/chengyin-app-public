@@ -1,5 +1,8 @@
 import 'dart:async';
 
+import '../../l10n/strings.dart';
+import '../orders/registration_order_strings.dart';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -30,7 +33,7 @@ class PassPage extends ConsumerStatefulWidget {
 
 class _PassPageState extends ConsumerState<PassPage> {
   DynCode? _code;
-  String? _error;
+  Object? _error;
   bool _loading = true;
   Timer? _ticker;
 
@@ -75,7 +78,7 @@ class _PassPageState extends ConsumerState<PassPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString().replaceFirst('Exception: ', '');
+        _error = e;
         _loading = false;
       });
     }
@@ -83,8 +86,8 @@ class _PassPageState extends ConsumerState<PassPage> {
 
   String get _countdownText {
     final s = _remaining.inSeconds;
-    if (s <= 0) return '已过期,请刷新';
-    return '${(s ~/ 60).toString().padLeft(2, '0')}:${(s % 60).toString().padLeft(2, '0')} 后过期';
+    if (s <= 0) return stringsOf(context).ticketPassExpired;
+    return stringsOf(context).ticketPassCountdown('${(s ~/ 60).toString().padLeft(2, '0')}:${(s % 60).toString().padLeft(2, '0')}');
   }
 
   @override
@@ -103,16 +106,16 @@ class _PassPageState extends ConsumerState<PassPage> {
             // 不显式 stretch 会把 58rpx 大标题推到屏幕正中,与小程序完全不同。
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              const CyPageTitle('出示核销码'),
+              CyPageTitle(stringsOf(context).ticketPassTitle),
               Expanded(
                 child: guest
                     ? StatusView(
                         key: const Key('ticket-pass-login-gate'),
-                        message: '登录后出示核销码',
-                        sub: '核销码跟着账号走，登录完就能出码。',
+                        message: stringsOf(context).ticketPassLogin,
+                        sub: stringsOf(context).ticketPassLoginDetail,
                         icon: Icons.lock_outline,
                         large: true,
-                        retryLabel: '去登录',
+                        retryLabel: stringsOf(context).ticketPassSignIn,
                         onRetry: () async {
                           if (!await requireLogin(context, ref)) return;
                           if (!mounted) return;
@@ -133,7 +136,7 @@ class _PassPageState extends ConsumerState<PassPage> {
     final err = _error;
     if (err != null) {
       return StatusView(
-        message: err,
+        message: localizedOrderError(context, err),
         icon: CupertinoIcons.exclamationmark_triangle,
         scrollable: true,
         onRetry: _issue,
@@ -142,7 +145,7 @@ class _PassPageState extends ConsumerState<PassPage> {
     final code = _code;
     if (code == null) {
       return StatusView(
-        message: '核销码签发失败',
+        message: stringsOf(context).ticketPassIssueError,
         icon: CupertinoIcons.exclamationmark_triangle,
         scrollable: true,
         onRetry: _issue,
@@ -164,7 +167,7 @@ class _PassPageState extends ConsumerState<PassPage> {
         // ★ 字级按真源 `.qr__title`:subtitle 档(= card-title 32rpx→16pt)+ w600。
         //   不写死则落 M3 `titleMedium`(14/w500)—— 全页最醒目的指令反而比真源小。
         Text(
-          '请把此码交给商家核销',
+          stringsOf(context).ticketPassShowMerchant,
           textAlign: TextAlign.center,
           style: textTheme.titleMedium?.copyWith(
             fontSize: CyTokens.typeCardTitle,
@@ -204,13 +207,13 @@ class _PassPageState extends ConsumerState<PassPage> {
             foregroundColor: palette.actionPrimaryFg,
             borderRadius: BorderRadius.circular(CyTokens.radiusLg),
             onPressed: _issue,
-            child: const Row(
+            child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
-                Icon(Icons.refresh, size: 18),
-                SizedBox(width: CyTokens.space2),
-                Text('重新获取核销码'),
+                const Icon(Icons.refresh, size: 18),
+                const SizedBox(width: CyTokens.space2),
+                Flexible(child: Text(stringsOf(context).ticketPassReload, textAlign: TextAlign.center)),
               ],
             ),
           )
@@ -222,13 +225,13 @@ class _PassPageState extends ConsumerState<PassPage> {
             foregroundColor: palette.textPrimary,
             borderRadius: BorderRadius.circular(CyTokens.radiusLg),
             onPressed: _issue,
-            child: const Row(
+            child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
-                Icon(Icons.refresh, size: 18),
-                SizedBox(width: CyTokens.space2),
-                Text('刷新核销码'),
+                const Icon(Icons.refresh, size: 18),
+                const SizedBox(width: CyTokens.space2),
+                Flexible(child: Text(stringsOf(context).ticketPassRefresh, textAlign: TextAlign.center)),
               ],
             ),
           ),
@@ -386,7 +389,7 @@ class _CodeFallback extends StatelessWidget {
             Icon(Icons.qr_code_2, size: 48, color: _kQrCardInk),
             const SizedBox(height: CyTokens.space2),
             Text(
-              '二维码加载失败,请让商家手动输入:',
+              stringsOf(context).ticketPassImageFallback,
               textAlign: TextAlign.center,
               style: Theme.of(
                 context,

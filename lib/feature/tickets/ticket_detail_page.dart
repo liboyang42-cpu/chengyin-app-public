@@ -5,6 +5,9 @@ import 'explore_completion_section.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/providers.dart';
+import '../../l10n/strings.dart';
+import '../orders/registration_order_strings.dart';
+import '../../l10n/strings_provider.dart';
 import '../../core/theme/cy_palette.dart';
 import '../../core/theme/cy_tokens.dart';
 import '../../core/widgets/status_view.dart';
@@ -17,6 +20,12 @@ import '../auth/login_gate.dart';
 /// 票卡详情:`POST /api/registration/info`。③ 探索票带 entitlements。
 final ticketDetailProvider = FutureProvider.autoDispose
     .family<RegistrationDetail, int>((ref, id) {
+      final userId = ref.watch(
+        authControllerProvider.select((auth) => auth.user?.id),
+      );
+      if (userId == null) {
+        throw Exception(ref.read(appStringsProvider).loginExpired);
+      }
       return ref.watch(activityApiProvider).ticketInfo(id);
     });
 
@@ -47,16 +56,16 @@ class TicketDetailPage extends ConsumerWidget {
             // 不显式 stretch 会把 58rpx 大标题推到屏幕正中,与小程序完全不同。
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              const CyPageTitle('票券详情'),
+              CyPageTitle(stringsOf(context).registrationOrdersTicketDetails),
               Expanded(
                 child: detail == null
                     ? StatusView(
                         key: const Key('ticket-detail-login-gate'),
-                        message: '登录后查看票券详情',
-                        sub: '票在账号里，登录完就能看到这一页。',
+                        message: stringsOf(context).registrationOrdersSignInToViewTicketDetails,
+                        sub: stringsOf(context).registrationOrdersTicketsAreSavedToYourAccountSignInToViewThisPage,
                         icon: CupertinoIcons.lock,
                         large: true,
-                        retryLabel: '去登录',
+                        retryLabel: stringsOf(context).registrationOrdersSignIn,
                         onRetry: () async {
                           if (!await requireLogin(context, ref)) return;
                         },
@@ -69,7 +78,8 @@ class TicketDetailPage extends ConsumerWidget {
                           loading: () =>
                               const CySkeleton(type: CySkeletonType.detail),
                           error: (Object err, StackTrace st) => StatusView(
-                            message: '票券详情加载失败',
+                            message: stringsOf(context).registrationOrdersCouldNotLoadTicketDetails,
+                            sub: localizedOrderError(context, err),
                             icon: CupertinoIcons.exclamationmark_triangle,
                             scrollable: true,
                             onRetry: () => ref.invalidate(
@@ -107,11 +117,11 @@ class _Body extends StatelessWidget {
   ///   「该票已核销完」—— 对前两种既是假话(票压根没用过),又堵死了用户的下一步:
   ///   待支付的人看到「已核销完」只会以为票废了。按成因分流。
   ///   registrationStatus 取值同小程序票夹 wxs:1待支付 / 2已报名 / 3已取消。
-  String get _disabledLabel {
-    if (detail.registrationStatus == 1) return '支付完成后可出示';
-    if (detail.registrationStatus == 3) return '该票已取消';
-    if (detail.registrationStatus != 2) return '该票暂不可用';
-    return '该票已全部核销';
+  String _disabledLabel(BuildContext context) {
+    if (detail.registrationStatus == 1) return stringsOf(context).registrationOrdersAvailableAfterPayment;
+    if (detail.registrationStatus == 3) return stringsOf(context).registrationOrdersThisTicketIsCancelled;
+    if (detail.registrationStatus != 2) return stringsOf(context).registrationOrdersThisTicketIsCurrentlyUnavailable;
+    return stringsOf(context).registrationOrdersThisTicketIsFullyRedeemed;
   }
 
   @override
@@ -128,7 +138,7 @@ class _Body extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Text(
-                  detail.title ?? '未命名活动',
+                  detail.title ?? stringsOf(context).registrationOrdersUnnamedActivity,
                   style: textTheme.titleMedium?.copyWith(
                     fontSize: CyTokens.typeCardTitle,
                     fontWeight: FontWeight.w700,
@@ -136,15 +146,15 @@ class _Body extends StatelessWidget {
                 ),
                 const SizedBox(height: CyTokens.space3),
                 if (detail.registrationNo != null)
-                  _KeyValue(label: '票号', value: detail.registrationNo!),
+                  _KeyValue(label: stringsOf(context).registrationOrdersTicketNumber, value: detail.registrationNo!),
                 if (detail.participateDate != null &&
                     detail.participateDate!.isNotEmpty)
-                  _KeyValue(label: '参与日期', value: detail.participateDate!),
+                  _KeyValue(label: stringsOf(context).registrationOrdersParticipationDate, value: detail.participateDate!),
                 if (detail.realName != null && detail.realName!.isNotEmpty)
-                  _KeyValue(label: '联系人', value: detail.realName!),
+                  _KeyValue(label: stringsOf(context).registrationOrdersContact, value: detail.realName!),
                 // 手机号后端已脱敏(RegistrationDetailDisplay.enrich),原样展示。
                 if (detail.phone != null && detail.phone!.isNotEmpty)
-                  _KeyValue(label: '手机号', value: detail.phone!),
+                  _KeyValue(label: stringsOf(context).registrationOrdersMobileNumber, value: detail.phone!),
               ],
             ),
           ),
@@ -165,7 +175,7 @@ class _Body extends StatelessWidget {
                     textBaseline: TextBaseline.alphabetic,
                     children: <Widget>[
                       Text(
-                        '权益明细',
+                        stringsOf(context).registrationOrdersBenefitDetails,
                         style: textTheme.titleSmall?.copyWith(
                           fontSize: CyTokens.typeBody,
                           fontWeight: FontWeight.w700,
@@ -173,7 +183,7 @@ class _Body extends StatelessWidget {
                       ),
                       SizedBox(width: CyTokens.space2),
                       Text(
-                        '还剩 ${detail.pendingCount} 章待核销',
+                        stringsOf(context).registrationOrdersPendingChapters(detail.pendingCount),
                         style: textTheme.bodySmall?.copyWith(
                           fontSize: CyTokens.typeCaption,
                           color: palette.textSecondary,
@@ -196,7 +206,7 @@ class _Body extends StatelessWidget {
         ],
         if (_canIssue)
           CyNativeButton(
-            label: '出示核销码',
+            label: stringsOf(context).registrationOrdersShowRedemptionCode,
             borderRadius: CyTokens.radiusLg,
             onPressed: () => context.push('/ticket/${detail.id}/pass'),
             // 同一个 CTA 的两个态共用一个回退字形(iOS 13–25 走 fallback,
@@ -208,7 +218,7 @@ class _Body extends StatelessWidget {
           )
         else
           CyNativeButton(
-            label: _disabledLabel,
+            label: _disabledLabel(context),
             onPressed: null,
             icon: const CyNativeButtonIcon(
               sfSymbol: 'qrcode',
@@ -263,7 +273,7 @@ class _EntitlementRow extends StatelessWidget {
             child: Padding(
               padding: EdgeInsets.only(right: CyTokens.space2),
               child: Text(
-                entitlement.chapterName ?? '章节 ${entitlement.chapterId ?? '-'}',
+                entitlement.chapterName ?? stringsOf(context).registrationOrdersChapter((entitlement.chapterId ?? '-').toString()),
                 style: textTheme.bodyMedium?.copyWith(
                   fontSize: CyTokens.typeLabel,
                   color: palette.textPrimary,
@@ -272,7 +282,7 @@ class _EntitlementRow extends StatelessWidget {
             ),
           ),
           Text(
-            entitlement.label,
+            localizedEntitlementLabel(context, entitlement),
             style: textTheme.bodySmall?.copyWith(
               fontSize: CyTokens.typeCaption,
               color: palette.textSecondary,

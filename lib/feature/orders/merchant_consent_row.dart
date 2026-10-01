@@ -1,3 +1,4 @@
+import '../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show Card, Theme;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -112,6 +113,8 @@ class _CyMerchantConsentRowState extends ConsumerState<CyMerchantConsentRow> {
       offer: offer,
       optedIn: true,
       requestId: _requestId!,
+      saveFailureText: stringsOf(context).ordersActivityConsentSaveFailed,
+      networkFailureText: stringsOf(context).ordersActivityConsentNetworkFailed,
     );
     if (!mounted) {
       return;
@@ -132,18 +135,20 @@ class _CyMerchantConsentRowState extends ConsumerState<CyMerchantConsentRow> {
   Widget build(BuildContext context) {
     final ConsentOffer? offer = _offer;
     if (offer == null) return const SizedBox.shrink();
+    final merchantName = offer.hasServerMerchantName
+        ? offer.merchantName : stringsOf(context).orderDisclosureMerchant;
     final bool checked = _mode == _Mode.saving || _mode == _Mode.saved;
     final String status = switch (_mode) {
-      _Mode.saving => '正在保存…',
-      _Mode.saved => '已同意，可在设置里随时退订',
-      _Mode.failed => _error ?? '同意没有保存成功，请重试',
+      _Mode.saving => stringsOf(context).ordersActivitySaving,
+      _Mode.saved => stringsOf(context).orderDisclosureConsentSaved,
+      _Mode.failed => _error ?? stringsOf(context).ordersActivityConsentSaveFailed,
       _ => '',
     };
     final Widget row = Semantics(
       key: const Key('order-merchant-consent'),
       container: true,
       checked: checked,
-      label: '接收「${offer.merchantName}」的活动消息',
+      label: stringsOf(context).orderDisclosureConsentLabel(merchantName),
       child: ConstrainedBox(
         constraints: const BoxConstraints(minHeight: 44),
         child: Row(
@@ -159,7 +164,7 @@ class _CyMerchantConsentRowState extends ConsumerState<CyMerchantConsentRow> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   Text(
-                    '接收「${offer.merchantName}」的活动消息（站内消息，可随时在设置里退订）',
+                    stringsOf(context).orderDisclosureConsentBody(merchantName),
                     style: CyType.footnote,
                   ),
                   if (status.isNotEmpty)
@@ -182,7 +187,7 @@ class _CyMerchantConsentRowState extends ConsumerState<CyMerchantConsentRow> {
                   horizontal: CyTokens.space2,
                 ),
                 onPressed: _submit,
-                child: const Text('重试'),
+                child: Text(stringsOf(context).retry),
               ),
           ],
         ),

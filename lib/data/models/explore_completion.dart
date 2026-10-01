@@ -77,11 +77,13 @@ class ExploreCompletion {
 
 class ExploreStamp {
   const ExploreStamp({
+    this.hasServerTitle = true,
     required this.chapterId,
     required this.title,
     required this.collected,
   });
 
+  final bool hasServerTitle;
   final int chapterId;
   final String title;
   final bool collected;
@@ -90,6 +92,7 @@ class ExploreStamp {
     final int id = (json['chapterId'] as num?)?.toInt() ?? 0;
     final String t = (json['title'] ?? '').toString();
     return ExploreStamp(
+      hasServerTitle: (json['title'] ?? '').toString().isNotEmpty,
       chapterId: id,
       // 后端没给标题时用章节号兜底,不留空行。
       title: t.isEmpty ? '章节 $id' : t,
@@ -127,6 +130,7 @@ class ExploreAward {
 
 class ExploreRevisit {
   const ExploreRevisit({
+    this.hasServerClubName = true,
     required this.clubId,
     required this.clubName,
     this.clubLeaderMemberId,
@@ -135,6 +139,7 @@ class ExploreRevisit {
     this.nextEdition,
   });
 
+  final bool hasServerClubName;
   final int clubId;
   final String clubName;
   final int? clubLeaderMemberId;
@@ -169,6 +174,7 @@ class ExploreRevisit {
   }
 
   factory ExploreRevisit.fromJson(Map<String, dynamic> json) => ExploreRevisit(
+    hasServerClubName: (json['clubName'] ?? '').toString().isNotEmpty,
     clubId: (json['clubId'] as num?)?.toInt() ?? 0,
     clubName: (json['clubName'] ?? '').toString().isEmpty
         ? '主办俱乐部'
@@ -186,12 +192,14 @@ class ExploreRevisit {
 
 class ExploreNextEdition {
   const ExploreNextEdition({
+    this.hasServerName = true,
     required this.topicId,
     required this.name,
     this.startDate,
     this.imgUrl,
   });
 
+  final bool hasServerName;
   final int topicId;
   final String name;
   final String? startDate;
@@ -199,6 +207,7 @@ class ExploreNextEdition {
 
   factory ExploreNextEdition.fromJson(Map<String, dynamic> json) {
     return ExploreNextEdition(
+      hasServerName: (json['name'] ?? '').toString().isNotEmpty,
       topicId: (json['topicId'] as num?)?.toInt() ?? 0,
       name: (json['name'] ?? '').toString().isEmpty
           ? '下一期'

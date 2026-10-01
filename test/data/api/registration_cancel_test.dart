@@ -94,6 +94,34 @@ void main() {
       throwsA(predicate((Object e) => e.toString().contains('已成团,不能取消'))),
     );
   });
+  for (final paid in [false, true]) {
+    test('typed cancellation keeps absent receipt unconfirmed (paid=$paid)', () async {
+      final client = DioClient(TokenStore(const FlutterSecureStorage()));
+      client.dio.httpClientAdapter = _StubAdapter((options) {
+        expect(options.path, paid ? '/api/registration/cancel-refund' : '/api/registration/cancel');
+        return {'code': 200};
+      });
+      final api = ActivityApi(client);
+      final result = await api.cancelRegistrationWithOutcome(registrationId: 7, paid: paid);
+      expect(result.cancellationStatus, 'UNCONFIRMED');
+      expect(result.cashRefundStatus, 'UNCONFIRMED');
+      expect(result.pointsRefundStatus, 'UNCONFIRMED');
+      expect(await api.cancelRegistration(registrationId: 7, paid: paid), '取消结果尚未确认，请查看订单');
+    });
+  }
+  for (final status in ['MANUAL_REVIEW', 'NOT_NEEDED', 'DISPATCH_PENDING', 'DISPATCHING', 'PROCESSING', 'SUCCESS', 'PENDING_MANUAL', 'MANUAL_HANDLED', 'MANUAL_VERIFIED', 'UNCONFIRMED', 'FUTURE_STATUS']) {
+    test('player paid cancellation preserves authoritative $status independently', () async {
+      final client = DioClient(TokenStore(const FlutterSecureStorage()));
+      client.dio.httpClientAdapter = _StubAdapter((_) => {'code': 200, 'msg': '  原始反馈  ', 'data': {
+        'registrationId': 7, 'cancellationStatus': 'CANCELLED', 'cashRefundStatus': status, 'pointsRefundStatus': 'PARTIAL',
+      }});
+      final result = await ActivityApi(client).cancelRegistrationWithOutcome(registrationId: 7, paid: true);
+      expect(result.cashRefundStatus, status);
+      expect(result.pointsRefundStatus, 'PARTIAL');
+      expect(result.message, '  原始反馈  ');
+    });
+  }
+
 }
 
 class _StubAdapter implements HttpClientAdapter {

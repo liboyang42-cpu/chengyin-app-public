@@ -328,6 +328,7 @@ class ActivityDetail {
     this.isGate = false,
     this.gateClubId = 0,
     this.gateMessage = '',
+    this.gateMessageIsLocal = false,
   });
 
   final int id;
@@ -373,6 +374,9 @@ class ActivityDetail {
   final int gateClubId;
   final String gateMessage;
 
+  /// Only a missing API message uses the app-owned fallback.
+  final bool gateMessageIsLocal;
+
   /// 我对这个活动的态度。三态见 [ActivityLikeState] —— 「已踩」不是「没点过」。
   final ActivityLikeState likeState;
 
@@ -414,6 +418,7 @@ class ActivityDetail {
         tickets: const <ActivityTicket>[],
         isGate: true,
         gateClubId: clubId > 0 ? clubId : 0,
+        gateMessageIsLocal: json['message'] == null,
         gateMessage: (json['message'] ?? '来自俱乐部的活动，加入后查看').toString(),
       );
     }
@@ -664,13 +669,18 @@ class RegistrationCreateResult {
     required this.registrationId,
     this.registrationNo,
     this.payParams,
+    this.payableAmount,
   });
 
   final int registrationId;
   final String? registrationNo;
 
+  /// Authoritative order amount; absent data never implies a free order.
+  final double? payableAmount;
+
   /// App 支付六元组(appId/partnerId/prepayId/packageValue/nonceStr/timeStamp/sign)。
-  /// 零元单或后端未下发时为 null —— 此时无需调起支付。
+  /// May be absent for free orders or idempotent replay. This is not proof
+  /// of payment; callers must read back the registration status.
   final Map<String, String>? payParams;
 
   bool get needsPayment => payParams != null && payParams!.isNotEmpty;
@@ -685,6 +695,7 @@ class RegistrationCreateResult {
       registrationId: (json['registrationId'] as num?)?.toInt() ?? 0,
       registrationNo: json['registrationNo'] as String?,
       payParams: params,
+      payableAmount: asDoubleOrNull(json['payableAmount']),
     );
   }
 }
