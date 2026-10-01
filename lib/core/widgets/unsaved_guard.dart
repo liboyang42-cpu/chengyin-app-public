@@ -1,3 +1,4 @@
+import '../../l10n/strings.dart';
 // 「放弃未保存修改?」—— 脏表单返回时的守卫。
 //
 // ★★ App 此前**一处都没有**。小程序在 6 个编辑面上都挂了
@@ -36,18 +37,18 @@ class UnsavedGuard extends StatefulWidget {
     super.key,
     required this.isDirty,
     required this.child,
-    this.title = kUnsavedTitle,
-    this.content = kUnsavedContent,
-    this.confirmText = kUnsavedConfirm,
-    this.cancelText = kUnsavedCancel,
+    this.title,
+    this.content,
+    this.confirmText,
+    this.cancelText,
   });
 
   /// 各编辑面在小程序里各有各的原话(如门店相册「还没有保存 / 离开后,本次相册修改不会保留。」),
   /// 缺省才是俱乐部编辑那套。
-  final String title;
-  final String content;
-  final String confirmText;
-  final String cancelText;
+  final String? title;
+  final String? content;
+  final String? confirmText;
+  final String? cancelText;
 
   /// ★ 传**函数**而不是 bool —— 表单每敲一个字都会变脏,
   ///   传值的话要求调用方每次 setState,漏一次这道闸就悄悄失效了。
@@ -71,10 +72,10 @@ class _UnsavedGuardState extends State<UnsavedGuard> {
     }
     final bool discard = await cyConfirm(
       context,
-      title: widget.title,
-      content: widget.content,
-      confirmText: widget.confirmText,
-      cancelText: widget.cancelText,
+      title: widget.title ?? stringsOf(context).discardChangesTitle,
+      content: widget.content ?? stringsOf(context).discardChangesMessage,
+      confirmText: widget.confirmText ?? stringsOf(context).discardChanges,
+      cancelText: widget.cancelText ?? stringsOf(context).keepEditing,
       danger: true,
     );
     if (discard && mounted) Navigator.of(context).pop();

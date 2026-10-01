@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import '../../l10n/strings.dart';
 import '../theme/cy_palette.dart';
 import '../theme/cy_tokens.dart';
 
@@ -30,7 +31,7 @@ class CySearchField extends StatefulWidget {
     required this.value,
     required this.onChanged,
     this.onSubmitted,
-    this.placeholder = '搜索',
+    this.placeholder,
     this.enabled = true,
     this.loading = false,
     this.autofocus = false,
@@ -39,7 +40,7 @@ class CySearchField extends StatefulWidget {
   final String value;
   final ValueChanged<String> onChanged;
   final ValueChanged<String>? onSubmitted;
-  final String placeholder;
+  final String? placeholder;
   final bool enabled;
   final bool loading;
   final bool autofocus;
@@ -122,7 +123,7 @@ class _CySearchFieldState extends State<CySearchField> {
               ),
               decoration: null,
               padding: EdgeInsets.zero,
-              placeholder: widget.placeholder,
+              placeholder: widget.placeholder ?? stringsOf(context).searchPlaceholder,
               placeholderStyle: TextStyle(
                 color: p.textPlaceholder,
                 fontSize: CyTokens.typeBody,
@@ -149,7 +150,7 @@ class _CySearchFieldState extends State<CySearchField> {
                 maxHeight: 44,
                 minHeight: 44,
                 child: Semantics(
-                  label: '清除',
+                  label: stringsOf(context).clearSearch,
                   button: true,
                   child: ExcludeSemantics(
                     child: CupertinoButton(

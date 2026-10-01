@@ -1,3 +1,4 @@
+import '../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:native_liquid_glass/native_liquid_glass.dart';
@@ -87,10 +88,10 @@ Future<CyImagePickSource?> cyChooseImageSource(
   final Rect? anchorRect = sourceRect ?? cySourceRectOf(context);
   final CyNativeImageSourceDriver driver =
       nativeDriver ?? const _LiquidGlassImageSourceDriver();
-  const List<CyNativeImageSourceAction> actions = <CyNativeImageSourceAction>[
-    CyNativeImageSourceAction(id: 'camera', title: '拍照'),
-    CyNativeImageSourceAction(id: 'gallery', title: '从相册选择'),
-    CyNativeImageSourceAction(id: 'cancel', title: '取消', isCancel: true),
+  final List<CyNativeImageSourceAction> actions = <CyNativeImageSourceAction>[
+    CyNativeImageSourceAction(id: 'camera', title: stringsOf(context).sharedTakePhoto),
+    CyNativeImageSourceAction(id: 'gallery', title: stringsOf(context).sharedChoosePhoto),
+    CyNativeImageSourceAction(id: 'cancel', title: stringsOf(context).cancel, isCancel: true),
   ];
 
   if (driver.supportsLiquidGlass) {
@@ -120,18 +121,18 @@ Future<CyImagePickSource?> cyChooseImageSource(
         CupertinoActionSheetAction(
           onPressed: () =>
               Navigator.of(sheetContext).pop(CyImagePickSource.camera),
-          child: const Text('拍照'),
+          child: Text(stringsOf(context).sharedTakePhoto),
         ),
         CupertinoActionSheetAction(
           onPressed: () =>
               Navigator.of(sheetContext).pop(CyImagePickSource.gallery),
-          child: const Text('从相册选择'),
+          child: Text(stringsOf(context).sharedChoosePhoto),
         ),
       ],
       cancelButton: CupertinoActionSheetAction(
         isDefaultAction: true,
         onPressed: () => Navigator.of(sheetContext).pop(),
-        child: const Text('取消'),
+        child: Text(stringsOf(context).cancel),
       ),
     ),
   );

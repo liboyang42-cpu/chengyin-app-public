@@ -1,3 +1,4 @@
+import '../../l10n/strings.dart';
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
@@ -180,8 +181,8 @@ class _CyScratchState extends State<CyScratch> {
                 return Semantics(
                   button: true,
                   label: widget.label.isEmpty
-                      ? '擦开看看'
-                      : '擦开看看：${widget.label}',
+                      ? stringsOf(context).sharedScratchReveal
+                      : stringsOf(context).sharedScratchRevealLabel(widget.label),
                   // 读屏用户双击 = 直接揭示,不必做「擦」这个动作
                   onTap: _finish,
                   child: ExcludeSemantics(
@@ -212,7 +213,7 @@ class _CyScratchState extends State<CyScratch> {
                               ),
                               onPressed: _finish,
                               child: Text(
-                                '直接揭示',
+                                stringsOf(context).sharedRevealDirectly,
                                 style: TextStyle(
                                   color: palette.onCoverFg,
                                   fontSize: CyTokens.typeCaption,

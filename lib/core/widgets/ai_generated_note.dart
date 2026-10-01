@@ -11,6 +11,7 @@
 //   配套门禁 ai_output_must_be_labeled 拦「有 AI 产出却没标注」。
 
 import 'package:flutter/material.dart';
+import '../../l10n/strings.dart';
 
 import '../theme/cy_palette.dart';
 import '../theme/cy_tokens.dart';
@@ -33,7 +34,7 @@ class AiGeneratedNote extends StatelessWidget {
           const SizedBox(width: 4),
           Expanded(
             child: Text(
-              kAiGeneratedNote,
+              stringsOf(context).aiGeneratedReviewNotice,
               key: const Key('ai-generated-note'),
               style: TextStyle(
                   fontSize: CyTokens.typeCaption, color: p.textTertiary),

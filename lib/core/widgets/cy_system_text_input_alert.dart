@@ -1,3 +1,4 @@
+import '../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -18,10 +19,11 @@ Future<String?> showCySystemTextInputAlert({
   required String title,
   required String placeholder,
   required String confirmText,
-  String cancelText = '取消',
+  String? cancelText,
   String initialValue = '',
   CySystemKeyboardKind keyboardKind = CySystemKeyboardKind.ascii,
 }) async {
+  cancelText ??= stringsOf(context).cancel;
   if (defaultTargetPlatform == TargetPlatform.iOS && !kIsWeb) {
     try {
       return await _nativeInputAlertChannel

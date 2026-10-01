@@ -1,0 +1,6 @@
+"NSCameraUsageDescription" = "Used to scan node QR codes, preview filters, take check-in photos, and capture city stamps.";
+"NSLocationWhenInUseUsageDescription" = "Used to check whether you have reached a node for an on-site check-in.";
+"NSPhotoLibraryUsageDescription" = "Used to choose photos for photo check-ins.";
+"NSMicrophoneUsageDescription" = "Used to record five voice samples to create a voice for your store’s AI character, and to ask questions using push-to-talk in conversations with it.";
+"NSMotionUsageDescription" = "Used to detect whether your device stays still during a stillness challenge.";
+"NSPhotoLibraryAddUsageDescription" = "Used to save your generated roaming share posters to your photo library.";

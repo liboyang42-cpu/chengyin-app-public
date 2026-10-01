@@ -1,3 +1,4 @@
+import '../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:native_liquid_glass/native_liquid_glass.dart';
@@ -147,12 +148,14 @@ Future<bool> cyConfirm(
   BuildContext context, {
   required String title,
   String? content,
-  String confirmText = '确定',
-  String cancelText = '取消',
+  String? confirmText,
+  String? cancelText,
   bool danger = false,
   bool showCancel = true,
   CyNativeConfirmPresenter? nativePresenter,
 }) async {
+  confirmText ??= stringsOf(context).ok;
+  cancelText ??= stringsOf(context).cancel;
   final CyNativeConfirmResult nativeResult =
       await (nativePresenter ?? const CyLiquidGlassConfirmPresenter()).show(
         context,
