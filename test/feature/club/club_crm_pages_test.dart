@@ -1,3 +1,7 @@
+import 'dart:async';
+import 'package:chengyin_app/feature/auth/auth_controller.dart';
+import 'package:chengyin_app/data/models/user.dart';
+import 'package:chengyin_app/data/models/registration_cancellation_outcome.dart';
 // 俱乐部 CRM / 分润 / 核销的行为门(负控)。
 //
 // 只测「该红的必须红」的判据,不碰网络 —— ClubCrmApi / ClubApi 全部 override 成
@@ -11,6 +15,7 @@
 //     按钮挂闸,再点一次也不会重复提交。
 
 import 'dart:io';
+import 'package:chengyin_app/l10n/app_localizations.dart';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
@@ -130,23 +135,35 @@ class _FakeClubCrmApi extends ClubCrmApi {
 }
 
 /// 记录 `/api/registration/cancel-by-owner` 调用次数,可注入失败。
-class _FakeClubApi extends ClubApi {
-  _FakeClubApi({this.throwOnCancel}) : super(_dummyDioClient());
+class _SessionAuth extends AuthController {
+  @override
+  AuthState build() => AuthState(initialized: true, user: User(id: 7, nickname: 'A', avatar: '', role: 'player'));
+  void switchAccount() {
+    state = AuthState(initialized: true, user: User(id: 8, nickname: 'B', avatar: '', role: 'player'));
+  }
+}
 
+class _FakeClubApi extends ClubApi {
+  _FakeClubApi({this.pending, this.throwOnCancel, this.outcome = const RegistrationCancellationOutcome()}) : super(_dummyDioClient());
+
+  final Completer<RegistrationCancellationOutcome>? pending;
   final Object? throwOnCancel;
+  final RegistrationCancellationOutcome outcome;
   int cancelCalls = 0;
 
   @override
-  Future<void> cancelRegistrationByOwner(int registrationId) async {
+  Future<RegistrationCancellationOutcome> cancelRegistrationByOwner(int registrationId) async {
     cancelCalls += 1;
     final Object? error = throwOnCancel;
     if (error != null) throw error;
+    return pending == null ? outcome : await pending!.future;
   }
 }
 
 /// 可注入结果的确认弹窗:退款是钱路径,确认与否必须能在测试里精确控制。
 class _Confirm implements CyNativeConfirmPresenter {
-  _Confirm(this.result);
+  _Confirm(this.result, {this.pending});
+  final Completer<CyNativeConfirmResult>? pending;
 
   final CyNativeConfirmResult result;
   int shown = 0;
@@ -157,11 +174,11 @@ class _Confirm implements CyNativeConfirmPresenter {
     CyNativeConfirmRequest request,
   ) async {
     shown += 1;
-    return result;
+    return pending == null ? result : await pending!.future;
   }
 }
 
-Widget _host(List<dynamic> overrides, Widget home) {
+Widget _host(List<dynamic> overrides, Widget home, {Locale locale = const Locale('zh'), _SessionAuth? auth}) {
   final GoRouter router = GoRouter(
     initialLocation: '/here',
     routes: <RouteBase>[
@@ -173,8 +190,11 @@ Widget _host(List<dynamic> overrides, Widget home) {
     ],
   );
   return ProviderScope(
-    overrides: overrides.cast(),
+    overrides: [authControllerProvider.overrideWith(() => auth ?? _SessionAuth()), ...overrides.cast()],
     child: MaterialApp.router(
+      locale: locale,
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
       theme: ThemeData(useMaterial3: true),
       debugShowCheckedModeBanner: false,
       routerConfig: router,
@@ -506,6 +526,28 @@ void main() {
   });
 
   group('核销页 · 退款是钱路径', () {
+    testWidgets('English receipt preserves backend money and cancel does not refund', (tester) async {
+      final crm = _FakeClubCrmApi(checkin: _checkinJson);
+      final club = _FakeClubApi();
+      final cancelled = _Confirm(CyNativeConfirmResult.cancelled);
+      await tester.pumpWidget(_host([
+        clubCrmApiProvider.overrideWithValue(crm),
+        clubApiProvider.overrideWithValue(club),
+      ], ClubCheckinDetailPage(clubId: 1, registrationId: 11,
+        confirmPresenter: cancelled), locale: const Locale('en')));
+      await tester.pumpAndSettle();
+      expect(find.text('Redemption details'), findsOneWidget);
+      expect(find.text('¥128.00'), findsOneWidget);
+      expect(find.text('标准单人票 ×1'), findsOneWidget);
+      await tester.ensureVisible(find.byKey(const Key('club-checkin-refund')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('club-checkin-refund')));
+      await tester.pumpAndSettle();
+      expect(cancelled.shown, 1);
+      expect(club.cancelCalls, 0);
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('确认弹窗点「取消」不发退款请求', (WidgetTester tester) async {
       final _FakeClubCrmApi crm = _FakeClubCrmApi(checkin: _checkinJson);
       final _FakeClubApi club = _FakeClubApi();
@@ -576,6 +618,77 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(club.cancelCalls, 1);
+    });
+    testWidgets('manual review response is preserved and never toasted as refunded', (tester) async {
+      final crm = _FakeClubCrmApi(checkin: _checkinJson);
+      final club = _FakeClubApi(outcome: const RegistrationCancellationOutcome(
+        cancellationStatus: 'MANUAL_REVIEW', cashRefundStatus: 'MANUAL_REVIEW',
+        message: '同单有票已核销，本单未自动退款，已转平台人工处理',
+      ));
+      await tester.pumpWidget(_host(<dynamic>[
+        clubCrmApiProvider.overrideWithValue(crm), clubApiProvider.overrideWithValue(club),
+      ], ClubCheckinDetailPage(clubId: 1, registrationId: 11,
+        confirmPresenter: _Confirm(CyNativeConfirmResult.confirmed))));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byKey(const Key('club-checkin-refund')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('club-checkin-refund')));
+      await tester.pumpAndSettle();
+      expect(club.cancelCalls, 1);
+      expect(find.textContaining('本单未自动退款'), findsWidgets);
+      expect(find.text('已退款'), findsNothing);
+      await tester.tap(find.byKey(const Key('club-checkin-refund')), warnIfMissed: false);
+      await tester.pumpAndSettle();
+      expect(club.cancelCalls, 1);
+    });
+    testWidgets('late cancellation response after account switch is discarded', (tester) async {
+      final pending = Completer<RegistrationCancellationOutcome>();
+      final club = _FakeClubApi(pending: pending);
+      final crm = _FakeClubCrmApi(checkin: _checkinJson);
+      final auth = _SessionAuth();
+      await tester.pumpWidget(_host(<dynamic>[
+        clubCrmApiProvider.overrideWithValue(crm), clubApiProvider.overrideWithValue(club),
+      ], ClubCheckinDetailPage(clubId: 1, registrationId: 11,
+        confirmPresenter: _Confirm(CyNativeConfirmResult.confirmed)), auth: auth));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byKey(const Key('club-checkin-refund')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('club-checkin-refund')));
+      await tester.pump();
+      expect(club.cancelCalls, 1);
+      final readCalls = crm.checkinCalls;
+      auth.switchAccount();
+      await tester.pump();
+      pending.complete(const RegistrationCancellationOutcome(message: 'A-private-refund-receipt'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('A-private-refund-receipt'), findsNothing);
+      expect(crm.checkinCalls, readCalls, reason: 'Do not read A registration back using B session');
+      expect(tester.takeException(), isNull);
+    });
+    testWidgets('account switch while confirming cancels the original refund intent', (tester) async {
+      final confirmation = Completer<CyNativeConfirmResult>();
+      final presenter = _Confirm(CyNativeConfirmResult.confirmed, pending: confirmation);
+      final club = _FakeClubApi();
+      final crm = _FakeClubCrmApi(checkin: _checkinJson);
+      final auth = _SessionAuth();
+      await tester.pumpWidget(_host(<dynamic>[
+        clubCrmApiProvider.overrideWithValue(crm), clubApiProvider.overrideWithValue(club),
+      ], ClubCheckinDetailPage(clubId: 1, registrationId: 11,
+        confirmPresenter: presenter), auth: auth));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byKey(const Key('club-checkin-refund')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('club-checkin-refund')));
+      await tester.pump();
+      expect(presenter.shown, 1, reason: 'The confirmation must be open before switching accounts');
+      expect(confirmation.isCompleted, isFalse);
+      expect(club.cancelCalls, 0);
+      auth.switchAccount();
+      await tester.pump();
+      confirmation.complete(CyNativeConfirmResult.confirmed);
+      await tester.pumpAndSettle();
+      expect(club.cancelCalls, 0);
+      expect(tester.takeException(), isNull);
     });
   });
 }

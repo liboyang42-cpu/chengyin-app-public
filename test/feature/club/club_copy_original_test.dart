@@ -7,6 +7,7 @@
 // 造这些态要挂网络/权限,不假造 —— 按仓内既有 gate 的做法直接钉源码字面量,改字就红。
 //
 // 真源:`~/Downloads/chengyin` 的 `github/master:chengyinhub-xcx/`,逐条见下方出处。
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -61,7 +62,7 @@ const Map<String, List<String>> _kOriginal = <String, List<String>>{
 };
 
 void main() {
-  test('★ club 域:文案批动过的原句逐字留在源码里', () {
+  test('★ club 域:原句逐字保留在页面内联文案或实际调用的中文资源中', () {
     const Map<String, String> sources = <String, String>{
       'pages/club/workbench/index': 'lib/feature/club/club_workbench_page.dart',
       'pages/club/group-code/index':
@@ -75,11 +76,14 @@ void main() {
           'lib/feature/club/club_customer_detail_page.dart',
       'pages/club/customers/index': 'lib/feature/club/club_customers_page.dart',
     };
+    final resources = jsonDecode(File('lib/l10n/app_zh.arb').readAsStringSync()) as Map<String, dynamic>;
     for (final MapEntry<String, List<String>> entry in _kOriginal.entries) {
       final String src = File(sources[entry.key]!).readAsStringSync();
+      final localized = RegExp(r'stringsOf\([^)]*\)\.(\w+)')
+          .allMatches(src).map((match) => resources[match.group(1)]).toSet();
       for (final String line in entry.value) {
         expect(
-          src.contains(line),
+          src.contains(line) || localized.contains(line),
           isTrue,
           reason: '${entry.key} 缺了小程序原句「$line」',
         );

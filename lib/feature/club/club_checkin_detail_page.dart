@@ -1,3 +1,5 @@
+import '../../l10n/strings.dart';
+import '../../core/network/request_session_scope.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -17,6 +19,9 @@ import '../../core/widgets/status_view.dart';
 import '../../data/models/club_crm.dart';
 import 'club_access_gate.dart';
 import 'club_controller.dart';
+import '../auth/auth_controller.dart';
+import 'registration_cancellation_display.dart';
+import '../../data/models/registration_cancellation_outcome.dart';
 
 /// K3 核销详情 · 俱乐部端。真源 `pages/club/checkin-detail/index`。
 ///
@@ -45,15 +50,27 @@ class ClubCheckinDetailPage extends ConsumerStatefulWidget {
 }
 
 class _ClubCheckinDetailPageState extends ConsumerState<ClubCheckinDetailPage> {
+  late final RequestSessionScope _refundScope;
+  late final int? _refundOwnerId;
+  bool get _ownsRefund => mounted && _refundScope.isCurrent();
   bool _refunding = false;
   String _refundErrorText = '';
 
   /// 「回执未知」必须与「失败」分开:失败可以直接重试,未知不行 ——
-  /// 重试就是重复退款。未知一律去回读这单的状态,读到 REFUNDED 才算完。
+  /// 重试就是重复退款。未知一律去回读这单的状态,CRM 的 REFUNDED 仅由 paymentStatus 推导，不能证明退款到账。
   bool _refundErrorUnknown = false;
 
-  /// 有一笔回执未知的退款挂着,下一次读回来要用**对端事实**收口。
-  bool _awaitingRefundReadback = false;
+  /// A successful HTTP response still requires its detailed cash/points outcome.
+  RegistrationCancellationOutcome? _submittedOutcome;
+
+  @override
+  void initState() {
+    super.initState();
+    _refundOwnerId = ref.read(authControllerProvider).user?.id;
+    _refundScope = ref.read(authControllerProvider.notifier).requestScope(
+      _refundOwnerId ?? -1,
+    );
+  }
 
   ({int clubId, int registrationId}) get _key =>
       (clubId: widget.clubId, registrationId: widget.registrationId);
@@ -66,51 +83,38 @@ class _ClubCheckinDetailPageState extends ConsumerState<ClubCheckinDetailPage> {
     context.go('/club/${widget.clubId}/enroll');
   }
 
-  void _reload() => ref.invalidate(clubCheckinDetailProvider(_key));
-
-  /// 每次读回来都拿服务端状态收口挂起的未知退款。
-  void _settleReadback(ClubCheckinDetail detail) {
-    if (!_awaitingRefundReadback) return;
-    if (detail.statusCode != 'REFUNDED') return;
-    _awaitingRefundReadback = false;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      setState(() {
-        _refundErrorUnknown = false;
-        _refundErrorText = '';
-      });
-      CyNativeNotice.show(context, '已退款');
-    });
+  void _reload() {
+    if (_ownsRefund) ref.invalidate(clubCheckinDetailProvider(_key));
   }
 
   Future<void> _refund(ClubCheckinDetail detail) async {
     // ⚠️ 未知态也要挡在这里:按钮只是灰一下,再点一次就是重复退款。
-    if (!detail.canRefund || _refunding || _refundErrorUnknown) return;
+    if (!_ownsRefund || !detail.canRefund || _refunding || _refundErrorUnknown || _submittedOutcome != null) return;
     final bool confirmed = await cyConfirm(
       context,
-      title: '清退并退款',
-      content: '确认为「${detail.displayName}」退款并移出本团?退款将按购买时冻结的政策执行,不可撤销。',
-      confirmText: '退款',
+      title: stringsOf(context).clubCheckinRefundTitle,
+      content: stringsOf(context).clubCheckinRefundBody(detail.displayName),
+      confirmText: stringsOf(context).clubCheckinRefund,
       danger: true,
       nativePresenter: widget.confirmPresenter,
     );
-    if (!confirmed || !mounted || _refunding) return;
+    if (!confirmed || !_ownsRefund || _refunding || _refundErrorUnknown || _submittedOutcome != null) return;
     setState(() {
       _refunding = true;
       _refundErrorText = '';
       _refundErrorUnknown = false;
     });
     try {
-      await ref
+      final outcome = await RequestSessionScope.run(_refundScope, () => ref
           .read(clubApiProvider)
-          .cancelRegistrationByOwner(widget.registrationId);
-      if (!mounted) return;
+          .cancelRegistrationByOwner(widget.registrationId));
+      if (!_ownsRefund) return;
       setState(() => _refunding = false);
-      _awaitingRefundReadback = false;
-      CyNativeNotice.show(context, '已退款');
+      _submittedOutcome = outcome;
+      CyNativeNotice.show(context, registrationCancellationNotice(context, outcome));
       _reload();
     } on Object catch (error) {
-      if (!mounted) return;
+      if (!_ownsRefund) return;
       if (_isUnknownOutcome(error)) {
         _markRefundUnknown();
         return;
@@ -118,38 +122,38 @@ class _ClubCheckinDetailPageState extends ConsumerState<ClubCheckinDetailPage> {
       setState(() {
         _refunding = false;
         _refundErrorUnknown = false;
-        // 业务失败照说后端原话;英文的 DioException 原文不给人看
-        // —— 那是 b1 报告点名的 P1。
-        _refundErrorText = friendlyOrBackendMessage(
-          error,
-          fallback: '退款没有完成，请重试',
-        );
+        _refundErrorText = registrationCancellationError(context, error);
       });
     }
   }
 
   /// 网络断在半路 / 5xx:请求可能已经到了服务端,一律按未知处理去回读。
   void _markRefundUnknown() {
-    _awaitingRefundReadback = true;
+
     setState(() {
       _refunding = false;
       _refundErrorUnknown = true;
-      _refundErrorText = '退款结果未确认，正在回读这单的状态；确认完成前请勿重复提交';
+      _refundErrorText = stringsOf(context).clubCheckinRefundUnknownBody;
     });
     _reload();
   }
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(authControllerProvider);
+    if (ref.read(authControllerProvider).user?.id != _refundOwnerId ||
+        (_refundOwnerId != null && !_refundScope.isCurrent())) {
+      return _scaffold(StatusView(message: stringsOf(context).loginExpired));
+    }
     if (widget.clubId <= 0 || widget.registrationId <= 0) {
       return _scaffold(
         StatusView(
-          message: '打不开这条核销记录',
-          sub: '缺少核销记录编号，请从名册或客户列表重新进入',
+          message: stringsOf(context).clubCheckinMissingTitle,
+          sub: stringsOf(context).clubCheckinMissingBody,
           icon: CupertinoIcons.doc_text_search,
           large: true,
           onRetry: _goBack,
-          retryLabel: '返回',
+          retryLabel: stringsOf(context).clubCheckinBack,
         ),
       );
     }
@@ -161,30 +165,30 @@ class _ClubCheckinDetailPageState extends ConsumerState<ClubCheckinDetailPage> {
           final failure = classifyClubCrmFailure(error);
           if (failure.auth) {
             return StatusView(
-              message: '核销记录不可见',
+              message: stringsOf(context).clubCheckinDenied,
               sub: friendlyOrBackendMessage(
                 error,
-                fallback: '当前岗位没有核销查看权限，请联系主理人',
+                fallback: stringsOf(context).clubCheckinDeniedBody,
               ),
               icon: CupertinoIcons.lock,
               large: true,
               onRetry: _goBack,
-              retryLabel: '返回',
+              retryLabel: stringsOf(context).clubCheckinBack,
             );
           }
           return StatusView(
-            message: '核销凭证没加载出来',
+            message: stringsOf(context).clubCheckinLoadFailed,
             sub: failure.network
-                ? '网络不稳定，请检查连接后重试'
-                : friendlyOrBackendMessage(error, fallback: '核销凭证没能加载，请稍后重试'),
+                ? stringsOf(context).clubCheckinNetworkRetry
+                : friendlyOrBackendMessage(error, fallback: stringsOf(context).clubCheckinRetryLater),
             icon: CupertinoIcons.cloud,
             large: true,
             onRetry: _reload,
-            retryLabel: '重新加载',
+            retryLabel: stringsOf(context).clubCheckinReload,
           );
         },
         data: (ClubCheckinDetail value) {
-          _settleReadback(value);
+
           return _body(context, value);
         },
       ),
@@ -202,7 +206,7 @@ class _ClubCheckinDetailPageState extends ConsumerState<ClubCheckinDetailPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              const CyPageTitle('核销详情'),
+              CyPageTitle(stringsOf(context).clubCheckinTitle),
               Expanded(child: child),
             ],
           ),
@@ -221,6 +225,8 @@ class _ClubCheckinDetailPageState extends ConsumerState<ClubCheckinDetailPage> {
       ),
       children: <Widget>[
         _head(context, palette, detail),
+        if (_submittedOutcome != null)
+          Text(registrationCancellationNotice(context, _submittedOutcome!)),
         const SizedBox(height: CyTokens.space4),
         _voucherCard(context, palette, detail),
         if (detail.canRefund) ...<Widget>[
@@ -228,32 +234,32 @@ class _ClubCheckinDetailPageState extends ConsumerState<ClubCheckinDetailPage> {
           if (_refundErrorUnknown)
             _inlineError(
               palette,
-              title: '退款结果待确认',
+              title: stringsOf(context).clubCheckinRefundUnknown,
               sub: _refundErrorText,
-              actionLabel: '重新查询',
+              actionLabel: stringsOf(context).clubCheckinQueryAgain,
               onAction: _reload,
             )
           else if (_refundErrorText.isNotEmpty)
             _inlineError(
               palette,
-              title: '退款没有完成',
+              title: stringsOf(context).clubCheckinRefundFailed,
               sub: _refundErrorText,
-              actionLabel: '重试',
+              actionLabel: stringsOf(context).clubCheckinRetry,
               onAction: () => _refund(detail),
             ),
           const SizedBox(height: CyTokens.space3),
           CyNativeButton(
             key: const Key('club-checkin-refund'),
-            label: _refunding ? '正在退款…' : '清退并退款',
+            label: _refunding ? stringsOf(context).clubCheckinRefunding : stringsOf(context).clubCheckinRefundTitle,
             loading: _refunding,
             role: CyNativeButtonRole.destructive,
-            onPressed: _refunding || _refundErrorUnknown
+            onPressed: _refunding || _refundErrorUnknown || _submittedOutcome != null
                 ? null
                 : () => _refund(detail),
           ),
           const SizedBox(height: CyTokens.space2),
           Text(
-            '退款按购买时冻结的政策执行；已核销的单退不了。',
+            stringsOf(context).clubCheckinRefundPolicy,
             style: CyType.caption1.copyWith(color: palette.textTertiary),
           ),
         ],
@@ -356,7 +362,7 @@ class _ClubCheckinDetailPageState extends ConsumerState<ClubCheckinDetailPage> {
                       ),
                     ),
                     Text(
-                      detail.topicName.isEmpty ? '未命名主题' : detail.topicName,
+                      detail.topicName.isEmpty ? stringsOf(context).clubCheckinUnnamedTopic : detail.topicName,
                       style: TextStyle(
                         color: palette.textPrimary,
                         fontWeight: FontWeight.w600,
@@ -364,7 +370,7 @@ class _ClubCheckinDetailPageState extends ConsumerState<ClubCheckinDetailPage> {
                     ),
                     if (detail.orderNo.isNotEmpty)
                       Text(
-                        '单号 ${detail.orderNo}',
+                        stringsOf(context).clubCheckinOrderNumber(detail.orderNo),
                         style: CyType.caption1.copyWith(
                           color: palette.textTertiary,
                         ),
@@ -375,11 +381,11 @@ class _ClubCheckinDetailPageState extends ConsumerState<ClubCheckinDetailPage> {
             ],
           ),
           _divider(palette),
-          _kv(palette, '票种', detail.ticketText),
-          _kv(palette, '下单时间', detail.orderTimeText),
+          _kv(palette, stringsOf(context).clubCheckinTicket, detail.ticketText),
+          _kv(palette, stringsOf(context).clubCheckinOrderTime, detail.orderTimeText),
           _kv(
             palette,
-            '实付',
+            stringsOf(context).clubCheckinPaid,
             detail.paidAmountText,
             // 已退款把实付压成中性:这笔钱已经不在账上了。
             valueColor: refunded ? palette.textTertiary : palette.textPrimary,
@@ -387,20 +393,20 @@ class _ClubCheckinDetailPageState extends ConsumerState<ClubCheckinDetailPage> {
           ),
           _kv(
             palette,
-            '核销时间',
+            stringsOf(context).clubCheckinVerifiedTime,
             detail.verifyTimeText,
             valueColor: detail.statusCode == 'VERIFIED'
                 ? CyTokens.statusSuccess
                 : palette.textPrimary,
           ),
-          _kv(palette, '核销门店', detail.storeName),
-          _kv(palette, '操作人', detail.operatorName),
+          _kv(palette, stringsOf(context).clubCheckinStore, detail.storeName),
+          _kv(palette, stringsOf(context).clubCheckinOperator, detail.operatorName),
           _divider(palette),
           _rail(palette, detail),
           if (refunded) ...<Widget>[
             const SizedBox(height: CyTokens.space2),
             Text(
-              '这单已退款，履约轨迹不再推进。',
+              stringsOf(context).clubCheckinRefundedRail,
               style: CyType.caption1.copyWith(color: palette.textTertiary),
             ),
           ],
@@ -408,6 +414,14 @@ class _ClubCheckinDetailPageState extends ConsumerState<ClubCheckinDetailPage> {
       ),
     );
   }
+
+  String _railLabel(ClubCheckinRailStep step) => switch (step.key) {
+    'signed' => stringsOf(context).clubCheckinRailSigned,
+    'contacted' => stringsOf(context).clubCheckinRailContacted,
+    'verified' => stringsOf(context).clubCheckinRailVerified,
+    'reviewed' => stringsOf(context).clubCheckinRailReviewed,
+    _ => step.label,
+  };
 
   Widget _rail(CyPalette palette, ClubCheckinDetail detail) {
     return Row(
@@ -426,7 +440,7 @@ class _ClubCheckinDetailPageState extends ConsumerState<ClubCheckinDetailPage> {
                 ),
                 const SizedBox(height: CyTokens.space1),
                 Text(
-                  step.label,
+                  _railLabel(step),
                   style: CyType.caption1.copyWith(
                     color: _toneColor(palette, step.tone),
                     fontWeight: step.current
