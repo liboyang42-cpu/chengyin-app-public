@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import '../../../core/theme/cy_palette.dart';
 import '../../../core/theme/cy_tokens.dart';
@@ -51,15 +52,15 @@ class _CountdownTextState extends State<CountdownText> {
   }
 
   String _format() {
-    if (widget.target == null) return '待定';
-    if (_remaining == Duration.zero) return '已开始';
+    if (widget.target == null) return stringsOf(context).feedCountdownTbd;
+    if (_remaining == Duration.zero) return stringsOf(context).feedCountdownStarted;
     final d = _remaining.inDays;
     final h = _remaining.inHours % 24;
     final m = _remaining.inMinutes % 60;
     final s = _remaining.inSeconds % 60;
-    if (d > 0) return '$d天 $h时 $m分';
-    if (h > 0) return '$h时 $m分 $s秒';
-    return '$m分 $s秒';
+    if (d > 0) return stringsOf(context).feedCountdownDays(d, h, m);
+    if (h > 0) return stringsOf(context).feedCountdownHours(h, m, s);
+    return stringsOf(context).feedCountdownMinutes(m, s);
   }
 
   @override

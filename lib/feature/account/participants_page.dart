@@ -15,6 +15,9 @@ import '../../data/api/participant_api.dart';
 import '../activity/participant_picker.dart';
 import '../../core/widgets/cy_native_notice.dart';
 import 'account_login_gate.dart';
+import '../../core/widgets/localized_error_status.dart';
+import '../../l10n/error_presentation.dart';
+import '../../l10n/strings.dart';
 
 /// 参与人信息管理。
 ///
@@ -42,7 +45,7 @@ class ParticipantsPage extends ConsumerWidget {
         ? null
         : ref.watch(participantsProvider);
     return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(),
+      navigationBar: CupertinoNavigationBar(),
       child: Material(
         color: Colors.transparent,
         child: SafeArea(
@@ -53,13 +56,13 @@ class ParticipantsPage extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: <Widget>[
-                    const CyPageTitle('参与人信息'),
+                    CyPageTitle(stringsOf(context).accountPeopleTitle),
                     Expanded(
                       child: guest
                           ? AccountLoginGate(
                               key: const Key('participants-login-gate'),
-                              message: '登录后查看参与人信息',
-                              sub: '参与人存在账号里,登录完就能看到。',
+                              message: stringsOf(context).accountPeopleLogin,
+                              sub: stringsOf(context).accountPeopleLoginHint,
                               onSignedIn: () =>
                                   ref.invalidate(participantsProvider),
                             )
@@ -72,26 +75,23 @@ class ParticipantsPage extends ConsumerWidget {
                               ),
                               error: (Object e, _) => accountLoginRequired(e)
                                   ? AccountLoginGate(
-                                      message: '登录后查看参与人信息',
-                                      sub: '参与人存在账号里,登录完就能看到。',
+                                      message: stringsOf(context).accountPeopleLogin,
+                                      sub: stringsOf(context).accountPeopleLoginHint,
                                       onSignedIn: () =>
                                           ref.invalidate(participantsProvider),
                                     )
-                                  : StatusView(
-                                      message: accountFailureCopy(
-                                        e,
-                                        networkFallback: '参与人没能加载出来',
-                                      ),
-                                      sub: '请检查网络后再进来，数据不会丢失',
-                                      large: true,
-                                      onRetry: () =>
-                                          ref.invalidate(participantsProvider),
+                                  : LocalizedErrorStatus(
+                                      error: e,
+                                      fallback: stringsOf(context).errorParticipantsLoad,
+                                      originalApiMessage: legacyApiMessage(e),
+                                      hint: stringsOf(context).errorParticipantsHint,
+                                      onRetry: () => ref.invalidate(participantsProvider),
                                     ),
                               data: (List<Participant> rows) {
                                 if (rows.isEmpty) {
-                                  return const StatusView(
-                                    message: '还没有参与人信息',
-                                    sub: '报名活动需要填写联系人；新增后可在报名时直接选用',
+                                  return StatusView(
+                                    message: stringsOf(context).accountPeopleEmpty,
+                                    sub: stringsOf(context).accountPeopleEmptyHint,
                                     large: true,
                                   );
                                 }
@@ -127,7 +127,7 @@ class ParticipantsPage extends ConsumerWidget {
                     ),
                     child: CyNativeButton(
                       key: const Key('participant-add'),
-                      label: '新增参与人信息',
+                      label: stringsOf(context).accountPeopleAdd,
                       icon: const CyNativeButtonIcon(
                         sfSymbol: 'person.badge.plus',
                         fallback: CupertinoIcons.person_add,
@@ -168,9 +168,9 @@ class _ParticipantTileState extends ConsumerState<_ParticipantTile> {
     //   用户在多条之间分不清删的是哪一个。
     final bool ok = await cyConfirm(
       context,
-      title: '删除「${p.fullName}」?',
-      content: '删除后报名时就选不到这位参与人了,可以重新添加。',
-      confirmText: '删除',
+      title: stringsOf(context).accountPeopleDeleteNamed(p.fullName),
+      content: stringsOf(context).accountPeopleDeleteHint,
+      confirmText: stringsOf(context).accountPeopleDelete,
       danger: true,
     );
     if (!ok || !mounted) return;
@@ -179,12 +179,14 @@ class _ParticipantTileState extends ConsumerState<_ParticipantTile> {
       await ref.read(participantApiProvider).remove(p.id);
       ref.invalidate(participantsProvider);
       if (!mounted) return;
-      CyNativeNotice.show(context, '已删除');
+      CyNativeNotice.show(context, stringsOf(context).accountPeopleDeleted);
     } catch (e) {
       if (!mounted) return;
       CyNativeNotice.show(
         context,
-        accountFailureCopy(e, networkFallback: '删除没有成功,请稍后重试'),
+        presentError(e, stringsOf(context),
+          fallback: stringsOf(context).errorParticipantDelete,
+          originalApiMessage: legacyApiMessage(e)).noticeText,
         isError: true,
       );
     } finally {
@@ -216,7 +218,7 @@ class _ParticipantTileState extends ConsumerState<_ParticipantTile> {
           // 但不在 `mode=participant` 的页面增加额外入口。
           Semantics(
             container: true,
-            label: '编辑${p.fullName}',
+            label: stringsOf(context).accountPeopleEditNamed(p.fullName),
             button: true,
             enabled: !_busy,
             onTap: _busy ? null : _edit,
@@ -228,13 +230,13 @@ class _ParticipantTileState extends ConsumerState<_ParticipantTile> {
                   horizontal: CyTokens.space2,
                 ),
                 onPressed: _busy ? null : _edit,
-                child: const Text('编辑'),
+                child: Text(stringsOf(context).accountPeopleEdit),
               ),
             ),
           ),
           Semantics(
             container: true,
-            label: '删除${p.fullName}',
+            label: stringsOf(context).accountPeopleRemoveNamed(p.fullName),
             button: true,
             enabled: !_busy,
             onTap: _busy ? null : _remove,

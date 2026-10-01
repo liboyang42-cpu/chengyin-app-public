@@ -1,3 +1,4 @@
+import '../models/account_local_failure.dart';
 import 'dart:math';
 
 import 'package:dio/dio.dart';
@@ -66,7 +67,7 @@ class AccountApi {
     final Object? value = data is Map<String, dynamic> ? data['qr'] : null;
     final String qr = value is String ? value.trim() : '';
     if (qr.isEmpty) {
-      throw Exception('个人码暂不可用，请稍后重试');
+      throw const AccountLocalFailure(AccountLocalFailureKind.playerCode, '个人码暂不可用，请稍后重试');
     }
     return qr;
   }
@@ -223,7 +224,7 @@ class AccountApi {
         latest.scopeType == null &&
         latest.scopeId == null;
     if (!matched) {
-      throw Exception('漫游定位撤回状态未确认，请重试');
+      throw const AccountLocalFailure(AccountLocalFailureKind.roamRevocation, '漫游定位撤回状态未确认，请重试');
     }
     return latest;
   }
@@ -260,7 +261,7 @@ class AccountApi {
         latest.scopeId == merchantId &&
         latest.eventType == eventType;
     if (!matched) {
-      throw Exception('门店授权状态未确认，核销码未打开');
+      throw const AccountLocalFailure(AccountLocalFailureKind.merchantConsent, '门店授权状态未确认，核销码未打开');
     }
     return latest;
   }

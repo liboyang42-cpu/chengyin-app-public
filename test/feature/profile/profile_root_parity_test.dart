@@ -475,7 +475,7 @@ void main() {
     );
     expect(router, contains("path: '/merchant/team'"));
     // 右侧那半句取的是 access/me 的岗位与管理位,不是本地 role。
-    expect(page, contains("access.canManageOperators ? '管理' : '查看'"));
+    expect(page, contains("access.canManageOperators ? stringsOf(context).profileManage : stringsOf(context).profileView"));
   });
 
   // 商城是 App 独有域(小程序没有对应页),入口只能挂在积分块里 —— 这条守住

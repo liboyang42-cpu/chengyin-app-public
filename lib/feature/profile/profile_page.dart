@@ -1,3 +1,6 @@
+import '../../l10n/strings.dart';
+import '../../l10n/profile_error_display.dart';
+import '../../core/widgets/localized_error_status.dart';
 import 'dart:ui' as ui;
 
 import 'package:flutter/cupertino.dart';
@@ -55,6 +58,7 @@ enum ProfileDestination {
   badges,
   stamps,
   participations,
+  objectCards,
 }
 
 void openProfileDestination(
@@ -104,6 +108,7 @@ void openProfileDestination(
     ProfileDestination.tickets => '/tickets',
     ProfileDestination.points => '/points',
     ProfileDestination.mall => '/mall',
+    ProfileDestination.objectCards => '/object-cards',
     ProfileDestination.growth => '/growth',
     ProfileDestination.badges => '/badges',
     ProfileDestination.stamps => '/roam/stamp-album',
@@ -224,6 +229,7 @@ class _ProfileRootViewState extends State<ProfileRootView> {
               tab: _tab,
               merchant: _merchant,
               background: palette.bgPage,
+              textScale: MediaQuery.textScalerOf(context).scale(17) / 17,
               onChanged: (ProfileRootTab value) => setState(() => _tab = value),
             ),
           ),
@@ -275,8 +281,8 @@ class _ProfileRootViewState extends State<ProfileRootView> {
     final String? team = widget.merchantTeam;
     return <Widget>[
       _SectionHeader(
-        title: '我的订单',
-        action: '查看详情 ›',
+        title: stringsOf(context).profileOrders,
+        action: stringsOf(context).profileDetails,
         actionKey: const ValueKey<String>('profile-orders'),
         onAction: () => widget.onDestination(ProfileDestination.orders),
       ),
@@ -287,8 +293,8 @@ class _ProfileRootViewState extends State<ProfileRootView> {
       ),
       const SizedBox(height: CyTokens.space5),
       _SectionHeader(
-        title: '我的项目',
-        action: '管理全部 ›',
+        title: stringsOf(context).profileProjects,
+        action: stringsOf(context).profileManageAll,
         actionKey: const ValueKey<String>('profile-projects'),
         onAction: () => widget.onDestination(ProfileDestination.projects),
       ),
@@ -299,8 +305,8 @@ class _ProfileRootViewState extends State<ProfileRootView> {
       ),
       const SizedBox(height: CyTokens.space5),
       _SectionHeader(
-        title: '我的资产',
-        action: '查看详情 ›',
+        title: stringsOf(context).profileAssets,
+        action: stringsOf(context).profileDetails,
         actionKey: const ValueKey<String>('profile-assets'),
         onAction: () => widget.onDestination(ProfileDestination.assets),
       ),
@@ -334,22 +340,22 @@ class _BenefitsSection extends StatelessWidget {
   final RoleInfo role;
   final VoidCallback onOpenEarnings;
 
-  List<_Benefit> get _benefits {
+  List<_Benefit> _benefits(BuildContext context) {
     final int? maxThemes = role.quota('maxThemes');
     return <_Benefit>[
       _Benefit(
-        text: '发布路线 · 上限 ${maxThemes == null ? '不限' : '$maxThemes'}',
+        text: stringsOf(context).profileThemeLimit(maxThemes == null ? stringsOf(context).profileUnlimited : '$maxThemes'),
         unlocked: maxThemes == null || maxThemes > 0,
       ),
-      _Benefit(text: '发布优惠券', unlocked: role.can('canPublishCoupon')),
-      _Benefit(text: '到店核销', unlocked: role.can('canRedeemCoupon')),
-      _Benefit(text: '分支 / 条件玩法', unlocked: role.can('canBranch')),
-      _Benefit(text: '博弈机制（竞速/对抗/协作）', unlocked: role.can('canGameMechanic')),
-      _Benefit(text: '开放门店为城市节点', unlocked: role.can('canOpenAsNode')),
-      _Benefit(text: '勋章设计', unlocked: role.can('canDesignMedal')),
-      _Benefit(text: '建群', unlocked: role.can('canCreateGroup')),
+      _Benefit(text: stringsOf(context).profileBenefitCoupons, unlocked: role.can('canPublishCoupon')),
+      _Benefit(text: stringsOf(context).profileBenefitRedeem, unlocked: role.can('canRedeemCoupon')),
+      _Benefit(text: stringsOf(context).profileBenefitBranch, unlocked: role.can('canBranch')),
+      _Benefit(text: stringsOf(context).profileBenefitGame, unlocked: role.can('canGameMechanic')),
+      _Benefit(text: stringsOf(context).profileBenefitNode, unlocked: role.can('canOpenAsNode')),
+      _Benefit(text: stringsOf(context).profileBenefitMedal, unlocked: role.can('canDesignMedal')),
+      _Benefit(text: stringsOf(context).profileBenefitGroup, unlocked: role.can('canCreateGroup')),
       _Benefit(
-        text: '我的收益',
+        text: stringsOf(context).profileEarnings,
         unlocked: role.can('withdrawable'),
         onTap: onOpenEarnings,
       ),
@@ -359,11 +365,12 @@ class _BenefitsSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = CyPalette.of(context);
+    final benefits = _benefits(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Text(
-          '当前权益',
+          stringsOf(context).profileBenefits,
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
             color: palette.textPrimary,
             fontWeight: FontWeight.w800,
@@ -378,7 +385,7 @@ class _BenefitsSection extends StatelessWidget {
           ),
           child: Column(
             children: <Widget>[
-              for (int i = 0; i < _benefits.length; i++) ...<Widget>[
+              for (int i = 0; i < benefits.length; i++) ...<Widget>[
                 if (i > 0)
                   Divider(
                     height: 1,
@@ -386,7 +393,7 @@ class _BenefitsSection extends StatelessWidget {
                     indent: CyTokens.space4,
                     color: palette.borderSubtle,
                   ),
-                _benefitRow(context, palette, _benefits[i]),
+                _benefitRow(context, palette, benefits[i]),
               ],
             ],
           ),
@@ -463,13 +470,15 @@ class ProfilePage extends ConsumerWidget {
         : null;
     final String? merchantTeam = access == null || !access.active
         ? null
-        : '${access.roleName} · ${access.canManageOperators ? '管理' : '查看'}';
+        : '${access.roleName} · ${access.canManageOperators ? stringsOf(context).profileManage : stringsOf(context).profileView}';
     return detail.when(
+      skipLoadingOnReload: false,
+      skipLoadingOnRefresh: false,
       loading: () => const Scaffold(body: CySkeleton()),
       error: (Object error, StackTrace stack) => Scaffold(
         body: StatusView(
-          message: '用户信息拉取失败',
-          sub: '检查网络后重试',
+          message: stringsOf(context).profileLoadError,
+          sub: stringsOf(context).profileRetryNetwork,
           icon: CupertinoIcons.cloud,
           onRetry: () => ref.invalidate(profileDetailProvider),
         ),
@@ -497,7 +506,7 @@ class ProfilePage extends ConsumerWidget {
         onRetryMerchant: () => ref.invalidate(merchantInfoProvider),
         onPost: (int id) {
           if (!communityOpen) {
-            CyNativeNotice.show(context, '社区广场灰度中，动态详情暂不开放');
+            CyNativeNotice.show(context, stringsOf(context).profileCommunityClosed);
             return;
           }
           context.push('/square/$id');
@@ -507,7 +516,7 @@ class ProfilePage extends ConsumerWidget {
         onProject: (MyProject project) {
           if (project.detailRoute == null) {
             // 纯告知不弹 alert(手册 S7)。
-            CyNativeNotice.show(context, '暂时无法打开这个项目：项目类型还未同步，请稍后再试。');
+            CyNativeNotice.show(context, stringsOf(context).profileProjectUnavailable);
             return;
           }
           context.push(project.detailRoute!);
@@ -539,12 +548,12 @@ class _GuestPrompt extends ConsumerWidget {
     return Scaffold(
       backgroundColor: CyPalette.of(context).bgPage,
       body: StatusView(
-        message: '登录后查看我的资料',
-        sub: '报名记录、积分、优惠券、消息都在这里',
+        message: stringsOf(context).profileLoginTitle,
+        sub: stringsOf(context).profileLoginDetail,
         icon: CupertinoIcons.person_crop_circle,
         large: true,
         onRetry: () => showLoginSheet(context),
-        retryLabel: '登录 / 注册',
+        retryLabel: stringsOf(context).profileSignIn,
       ),
     );
   }
@@ -639,7 +648,7 @@ class _ProfileHero extends StatelessWidget {
                   Row(
                     children: <Widget>[
                       Semantics(
-                        label: '设置',
+                        label: stringsOf(context).profileSettings,
                         button: true,
                         excludeSemantics: true,
                         onTap: () => onDestination(ProfileDestination.settings),
@@ -656,7 +665,7 @@ class _ProfileHero extends StatelessWidget {
                       ),
                       Expanded(
                         child: Text(
-                          '主页',
+                          stringsOf(context).profileHome,
                           textAlign: TextAlign.center,
                           // T3:强调上限 bold(700),w800 属堆重。
                           style: Theme.of(context).textTheme.headlineSmall
@@ -676,7 +685,7 @@ class _ProfileHero extends StatelessWidget {
                         clipBehavior: Clip.none,
                         children: <Widget>[
                           Semantics(
-                            label: '编辑个人资料',
+                            label: stringsOf(context).profileEdit,
                             button: true,
                             excludeSemantics: true,
                             onTap: () =>
@@ -722,9 +731,9 @@ class _ProfileHero extends StatelessWidget {
                           children: <Widget>[
                             Text(
                               merchant
-                                  ? (merchantName.isEmpty ? '商家' : merchantName)
+                                  ? (merchantName.isEmpty ? stringsOf(context).profileMerchant : merchantName)
                                   : (user.nickname.isEmpty
-                                        ? '探索者'
+                                        ? stringsOf(context).profileExplorer
                                         : user.nickname),
                               style: Theme.of(context).textTheme.headlineSmall
                                   ?.copyWith(
@@ -737,9 +746,9 @@ class _ProfileHero extends StatelessWidget {
                             Text(
                               merchant
                                   ? (merchantRole.isEmpty
-                                        ? '城市合作商家'
+                                        ? stringsOf(context).profileCityMerchant
                                         : merchantRole)
-                                  : 'Lv.${user.levelId} 城市探索者',
+                                  : stringsOf(context).profileExplorerLevel(user.levelId),
                               style: Theme.of(context).textTheme.bodyMedium
                                   ?.copyWith(color: palette.textSecondary),
                             ),
@@ -749,7 +758,7 @@ class _ProfileHero extends StatelessWidget {
                             if (!merchant) ...<Widget>[
                               const SizedBox(height: CyTokens.space1),
                               Text(
-                                '连续探索：${streakDays ?? '—'}天',
+                                stringsOf(context).profileStreak(streakDays?.toString() ?? '—'),
                                 style: Theme.of(context).textTheme.bodySmall
                                     ?.copyWith(color: palette.textSecondary),
                               ),
@@ -758,10 +767,10 @@ class _ProfileHero extends StatelessWidget {
                             Text(
                               merchant
                                   ? (merchantSlogan.isEmpty
-                                        ? '连接城市探索与在地体验'
+                                        ? stringsOf(context).profileMerchantSlogan
                                         : merchantSlogan)
                                   : (user.introduction.isEmpty
-                                        ? '寻找下一条城市路线'
+                                        ? stringsOf(context).profileIntroductionFallback
                                         : user.introduction),
                               maxLines: usesAccessibilityTextSize ? 3 : 1,
                               overflow: TextOverflow.ellipsis,
@@ -779,9 +788,9 @@ class _ProfileHero extends StatelessWidget {
                       // ★ 三格 = 好友 / 关注 / 粉丝(小程序 cy-profile
                       //   index.wxml:76-82)。「获赞」不在这三格里 —— 它归
                       //   「发布内容 / 获赞 / 粉丝」那组公开统计。
-                      _Stat(value: user.friendNum, label: '好友'),
-                      _Stat(value: user.followNum, label: '关注'),
-                      _Stat(value: user.fansNum, label: '粉丝'),
+                      _Stat(value: user.friendNum, label: stringsOf(context).profileFriends),
+                      _Stat(value: user.followNum, label: stringsOf(context).profileFollowing),
+                      _Stat(value: user.fansNum, label: stringsOf(context).profileFollowers),
                     ],
                   ),
                   const SizedBox(height: CyTokens.space3),
@@ -801,7 +810,7 @@ class _ProfileHero extends StatelessWidget {
                                       : ProfileDestination.explore,
                                 ),
                           child: Text(
-                            merchant ? '核销' : '开始探索',
+                            merchant ? stringsOf(context).profileRedeem : stringsOf(context).profileExplore,
                             style: TextStyle(
                               color: !merchant && !exploreEnabled
                                   ? palette.textPlaceholder
@@ -822,7 +831,7 @@ class _ProfileHero extends StatelessWidget {
                             onPressed: () =>
                                 onDestination(ProfileDestination.tickets),
                             child: Text(
-                              '票夹',
+                              stringsOf(context).profileTickets,
                               style: TextStyle(
                                 color: palette.actionPrimaryFg,
                                 fontWeight: FontWeight.w700,
@@ -872,19 +881,21 @@ class _TabsHeader extends SliverPersistentHeaderDelegate {
     required this.tab,
     required this.merchant,
     required this.background,
+    required this.textScale,
     required this.onChanged,
   });
 
   final ProfileRootTab tab;
   final bool merchant;
   final Color background;
+  final double textScale;
   final ValueChanged<ProfileRootTab> onChanged;
 
   @override
-  double get minExtent => CyTokens.btnH + CyTokens.space2 + CyTokens.space1 / 2;
+  double get minExtent => (CyTokens.btnH + CyTokens.space2 + CyTokens.space1 / 2) * textScale.clamp(1, 3);
 
   @override
-  double get maxExtent => CyTokens.btnH + CyTokens.space2 + CyTokens.space1 / 2;
+  double get maxExtent => minExtent;
 
   @override
   Widget build(
@@ -895,8 +906,10 @@ class _TabsHeader extends SliverPersistentHeaderDelegate {
     final palette = CyPalette.of(context);
     Widget item(ProfileRootTab value, String label) {
       final selected = tab == value;
-      return Expanded(
+      return SizedBox(
+        width: MediaQuery.sizeOf(context).width / (merchant ? 3 : 4) * textScale.clamp(1, 3),
         child: CupertinoButton(
+          key: ValueKey('profile-tab-${value.name}'),
           padding: EdgeInsets.zero,
           onPressed: () => onChanged(value),
           child: Column(
@@ -930,13 +943,16 @@ class _TabsHeader extends SliverPersistentHeaderDelegate {
 
     return ColoredBox(
       color: background,
-      child: Row(
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
         children: <Widget>[
-          item(ProfileRootTab.mine, '我的'),
-          item(ProfileRootTab.posts, '推文'),
-          if (!merchant) item(ProfileRootTab.achievements, '成就'),
-          item(ProfileRootTab.about, '关于'),
+          item(ProfileRootTab.mine, stringsOf(context).profileTabMine),
+          item(ProfileRootTab.posts, stringsOf(context).profileTabPosts),
+          if (!merchant) item(ProfileRootTab.achievements, stringsOf(context).profileTabAchievements),
+          item(ProfileRootTab.about, stringsOf(context).profileTabAbout),
         ],
+        ),
       ),
     );
   }
@@ -945,7 +961,8 @@ class _TabsHeader extends SliverPersistentHeaderDelegate {
   bool shouldRebuild(covariant _TabsHeader oldDelegate) =>
       oldDelegate.tab != tab ||
       oldDelegate.merchant != merchant ||
-      oldDelegate.background != background;
+      oldDelegate.background != background ||
+      oldDelegate.textScale != textScale;
 }
 
 class _SectionHeader extends StatelessWidget {
@@ -966,6 +983,20 @@ class _SectionHeader extends StatelessWidget {
     final palette = CyPalette.of(context);
     // 区块标题走共用层 CySectionTitle(L2/T3:Title3 Semibold + Semantics header),
     // 不再页内手搓 titleLarge w800。
+    if (MediaQuery.textScalerOf(context).scale(17) > 22) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CySectionTitle(title),
+          CupertinoButton(
+            key: actionKey,
+            padding: const EdgeInsets.symmetric(vertical: CyTokens.space2),
+            onPressed: onAction,
+            child: Text(action, style: TextStyle(color: palette.textSecondary)),
+          ),
+        ],
+      );
+    }
     return CySectionTitle(
       title,
       trailing: CupertinoButton(
@@ -993,19 +1024,19 @@ class _OrdersPreview extends StatelessWidget {
   Widget build(BuildContext context) => orders.when(
     loading: () => const CySkeleton(type: CySkeletonType.card, count: 1),
     error: (Object error, StackTrace stack) => StatusView(
-      message: '订单没加载出来',
-      sub: '已报名的订单都还在，只是这次没取到',
+      message: stringsOf(context).profileOrdersError,
+      sub: stringsOf(context).profileOrdersErrorDetail,
       onRetry: onRetry,
     ),
     data: (List<MyRegistration> rows) => rows.isEmpty
-        ? const _CompactEmpty(title: '暂无订单', subtitle: '去探索城市活动，报名后即可在这里查看')
+        ? _CompactEmpty(title: stringsOf(context).profileOrdersEmpty, subtitle: stringsOf(context).profileOrdersEmptyDetail)
         : Column(
             children: rows
                 .take(2)
                 .map(
                   (MyRegistration order) => _PreviewRow(
-                    title: (order.title ?? '').isEmpty ? '未命名订单' : order.title!,
-                    subtitle: order.participateDate ?? '查看订单详情',
+                    title: (order.title ?? '').isEmpty ? stringsOf(context).profileUnnamedOrder : order.title!,
+                    subtitle: order.participateDate ?? stringsOf(context).profileOrderDetails,
                     onTap: () => onOpen(order),
                   ),
                 )
@@ -1028,19 +1059,19 @@ class _ProjectsPreview extends StatelessWidget {
   Widget build(BuildContext context) => projects.when(
     loading: () => const CySkeleton(type: CySkeletonType.card, count: 1),
     error: (Object error, StackTrace stack) => StatusView(
-      message: '项目没加载出来',
-      sub: '你发布的项目都还在，只是这次没取到',
+      message: stringsOf(context).profileProjectsError,
+      sub: stringsOf(context).profileProjectsErrorDetail,
       onRetry: onRetry,
     ),
     data: (List<MyProject> rows) => rows.isEmpty
-        ? const _CompactEmpty(title: '还没有项目', subtitle: '发布路线与场次，在这里统一管理')
+        ? _CompactEmpty(title: stringsOf(context).profileProjectsEmpty, subtitle: stringsOf(context).profileProjectsEmptyDetail)
         : Column(
             children: rows
                 .take(2)
                 .map(
                   (MyProject project) => _PreviewRow(
                     title: project.title,
-                    subtitle: project.stateText ?? '查看项目',
+                    subtitle: project.stateText ?? stringsOf(context).profileProjectDetails,
                     onTap: () => onOpen(project),
                   ),
                 )
@@ -1065,8 +1096,8 @@ class _AchievementsTab extends StatelessWidget {
     // 真源 components/cy/profile 成长记录档:`type="list" count="2"`。
     loading: () => const CySkeleton(type: CySkeletonType.list, count: 2),
     error: (Object error, StackTrace stack) => StatusView(
-      message: '成长记录没加载出来',
-      sub: '记录都还在，只是这次没取到',
+      message: stringsOf(context).profileGrowthError,
+      sub: stringsOf(context).profileGrowthErrorDetail,
       onRetry: onRetry,
     ),
     data: (GrowthCenter value) => Column(
@@ -1074,7 +1105,7 @@ class _AchievementsTab extends StatelessWidget {
       children: <Widget>[
         _AchievementLink(
           actionKey: const ValueKey<String>('profile-points'),
-          title: '城瘾积分',
+          title: stringsOf(context).profilePoints,
           subtitle: '${value.points}',
           onTap: () => onDestination(ProfileDestination.points),
         ),
@@ -1087,39 +1118,46 @@ class _AchievementsTab extends StatelessWidget {
         //   没有它时全仓只有购物车空态一处跳 /mall,商城是个够不着的孤岛。
         _AchievementLink(
           actionKey: const ValueKey<String>('profile-mall'),
-          title: '积分商城',
-          subtitle: '用城瘾积分兑换商品',
+          title: stringsOf(context).profileMall,
+          subtitle: stringsOf(context).profileMallDetail,
           onTap: () => onDestination(ProfileDestination.mall),
         ),
         const SizedBox(height: CyTokens.space3),
         _AchievementLink(
           actionKey: const ValueKey<String>('profile-growth'),
-          title: '成长中心',
+          title: stringsOf(context).profileGrowth,
           subtitle: 'Lv.${value.levelNo} · ${value.expValue} EXP',
           onTap: () => onDestination(ProfileDestination.growth),
         ),
         const SizedBox(height: CyTokens.space3),
         _AchievementLink(
           actionKey: const ValueKey<String>('profile-badges'),
-          title: '勋章墙',
-          subtitle: '实时数字装置 · 查看全部勋章',
+          title: stringsOf(context).profileBadges,
+          subtitle: stringsOf(context).profileBadgesDetail,
           onTap: () => onDestination(ProfileDestination.badges),
         ),
         const SizedBox(height: CyTokens.space3),
         _AchievementLink(
           actionKey: const ValueKey<String>('profile-stamps'),
-          title: '集邮册',
-          subtitle: '上街拍到的城市 · 查看全部邮票',
+          title: stringsOf(context).profileStamps,
+          subtitle: stringsOf(context).profileStampsDetail,
           onTap: () => onDestination(ProfileDestination.stamps),
+        ),
+        const SizedBox(height: CyTokens.space3),
+        _AchievementLink(
+          actionKey: const ValueKey<String>('profile-object-cards'),
+          title: stringsOf(context).objectCardsTitle,
+          subtitle: stringsOf(context).objectCardsProfileHint,
+          onTap: () => onDestination(ProfileDestination.objectCards),
         ),
         const SizedBox(height: CyTokens.space5),
         Text(
-          '城市勋章 · ${value.badges.length}',
+          stringsOf(context).profileMedalCount(value.badges.length),
           style: Theme.of(context).textTheme.titleLarge,
         ),
         const SizedBox(height: CyTokens.space3),
         if (value.badges.isEmpty)
-          const _CompactEmpty(title: '还没有点亮的勋章', subtitle: '完成城市节点即可点亮')
+          _CompactEmpty(title: stringsOf(context).profileBadgesEmpty, subtitle: stringsOf(context).profileBadgesEmptyDetail)
         else
           for (final MedalBadge badge in value.badges)
             ListTile(
@@ -1294,7 +1332,7 @@ class _AssetCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   Text(
-                    '账户余额',
+                    stringsOf(context).profileBalance,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: palette.textSecondary,
                     ),
@@ -1346,8 +1384,8 @@ class _MerchantTeamEntry extends StatelessWidget {
         ),
         child: CyCell(
           key: const ValueKey<String>('profile-merchant-team'),
-          title: '经营团队',
-          subtitle: '岗位权限、员工邀请与离职回收',
+          title: stringsOf(context).profileMerchantTeam,
+          subtitle: stringsOf(context).profileMerchantTeamDetail,
           trailing: Text(
             value,
             style: CyType.caption1.copyWith(color: palette.textSecondary),
@@ -1371,15 +1409,19 @@ class _PostsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => posts.when(
+    skipLoadingOnReload: false,
+    skipLoadingOnRefresh: false,
     loading: () => const CySkeleton(type: CySkeletonType.card, count: 2),
-    error: (Object error, StackTrace stack) => StatusView(
-      message: '动态没加载出来',
-      sub: '已发布的动态都还在，只是这次没取到',
+    error: (Object error, StackTrace stack) => LocalizedErrorStatus(
+      error: error,
+      fallback: profileFailureSummary(error, stringsOf(context)) ?? stringsOf(context).profilePostsError,
+      originalApiMessage: profileOriginalMessage(error),
+      hint: stringsOf(context).profilePostsErrorDetail,
       onRetry: onRetry,
     ),
     data: (List<SquarePost> rows) => rows.isEmpty
         // 副标逐字对齐真源 `cy-profile`(index.wxml:223,isSelf 分支)。
-        ? const _CompactEmpty(title: '还没有推文', subtitle: '你还没有发布过推文')
+        ? _CompactEmpty(title: stringsOf(context).profilePostsEmpty, subtitle: stringsOf(context).profilePostsEmptyDetail)
         : Column(
             children: rows
                 .map(
@@ -1433,7 +1475,7 @@ class _PostCard extends StatelessWidget {
             ],
             const SizedBox(height: CyTokens.space2),
             Text(
-              '${post.likeNum} 赞 · ${post.commentCount} 评论',
+              stringsOf(context).profilePostCounts(post.likeNum, post.commentCount),
               style: Theme.of(
                 context,
               ).textTheme.bodySmall?.copyWith(color: palette.textTertiary),
@@ -1476,7 +1518,7 @@ class _AboutTab extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        const CySectionTitle('个人介绍'),
+        CySectionTitle(stringsOf(context).profileIntroduction),
         const SizedBox(height: CyTokens.space3),
         Container(
           width: double.infinity,
@@ -1487,7 +1529,7 @@ class _AboutTab extends StatelessWidget {
             border: Border.all(color: palette.borderSubtle),
           ),
           child: Text(
-            user.introduction.isEmpty ? '还没有写个人介绍，完善资料后可展示' : user.introduction,
+            user.introduction.isEmpty ? stringsOf(context).profileIntroductionEmpty : user.introduction,
             style: Theme.of(context).textTheme.bodyMedium,
           ),
         ),
@@ -1495,19 +1537,19 @@ class _AboutTab extends StatelessWidget {
         ..._benefitsChildren(context),
         ...<Widget>[
           const SizedBox(height: CyTokens.space5),
-          const CySectionTitle('探索与更多'),
+          CySectionTitle(stringsOf(context).profileMore),
           const SizedBox(height: CyTokens.space3),
           GridView.count(
             crossAxisCount: 3,
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            childAspectRatio: 1.2,
+            mainAxisExtent: CyTokens.space8 * 3 * (MediaQuery.textScalerOf(context).scale(17) / 17).clamp(1, 3),
             children: <Widget>[
               _AboutEntry(
                 icon: CupertinoIcons.group,
                 label: role == 'club'
-                    ? (clubOwnedCount > 0 ? '俱乐部' : '创建俱乐部')
-                    : '成为主理人',
+                    ? (clubOwnedCount > 0 ? stringsOf(context).profileClub : stringsOf(context).profileCreateClub)
+                    : stringsOf(context).profileBecomeLeader,
                 onTap: () => onDestination(
                   role == 'club'
                       ? ProfileDestination.club
@@ -1516,34 +1558,34 @@ class _AboutTab extends StatelessWidget {
               ),
               _AboutEntry(
                 icon: CupertinoIcons.money_yen_circle,
-                label: '我的收益',
+                label: stringsOf(context).profileEarnings,
                 onTap: () => onDestination(ProfileDestination.assets),
               ),
               // 真源「我的」根场景挂有「我的参与」(utils/scene-registry.js
               // member-participation-history → subpackageMember/mycanyu)。
               _AboutEntry(
                 icon: CupertinoIcons.square_list,
-                label: '我的参与',
+                label: stringsOf(context).profileParticipations,
                 onTap: () => onDestination(ProfileDestination.participations),
               ),
               _AboutEntry(
                 icon: CupertinoIcons.pencil,
-                label: '创作者中心',
+                label: stringsOf(context).profileCreator,
                 onTap: () => onDestination(ProfileDestination.creator),
               ),
               _AboutEntry(
                 icon: CupertinoIcons.ticket,
-                label: '优惠券',
+                label: stringsOf(context).profileCoupons,
                 onTap: () => onDestination(ProfileDestination.coupons),
               ),
               _AboutEntry(
                 icon: CupertinoIcons.gift,
-                label: '邀请好友',
+                label: stringsOf(context).profileInvites,
                 onTap: () => onDestination(ProfileDestination.invites),
               ),
               _AboutEntry(
                 icon: CupertinoIcons.exclamationmark_bubble,
-                label: '投诉建议',
+                label: stringsOf(context).profileComplaints,
                 onTap: () => onDestination(ProfileDestination.complaints),
               ),
             ],
@@ -1570,7 +1612,7 @@ class _AboutTab extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: CyTokens.space3),
             onPressed: onRetryRoleInfo,
             child: Text(
-              '当前权益没加载出来，点此重试',
+              stringsOf(context).profileBenefitsError,
               style: Theme.of(
                 context,
               ).textTheme.bodyMedium?.copyWith(color: palette.textSecondary),
@@ -1603,7 +1645,7 @@ class _MerchantAbout extends StatelessWidget {
     return value.when(
       loading: () => const CySkeleton(type: CySkeletonType.list, count: 2),
       error: (Object error, StackTrace stack) =>
-          StatusView(message: '资料没加载出来', sub: '这次没取到，重试一下', onRetry: onRetry),
+          StatusView(message: stringsOf(context).profileMerchantError, sub: stringsOf(context).profileMerchantErrorDetail, onRetry: onRetry),
       data: (Map<String, dynamic> merchant) {
         final description = (merchant['description'] ?? '').toString().trim();
         final businessStatus = (merchant['businessStatusText'] ?? '')
@@ -1614,19 +1656,19 @@ class _MerchantAbout extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            const _AboutHeading('品牌故事'),
+            _AboutHeading(stringsOf(context).profileBrandStory),
             const SizedBox(height: CyTokens.space3),
             description.isEmpty
-                ? const _CompactEmpty(
-                    title: '还没有品牌故事',
-                    subtitle: '商家完善资料后，这里会展示品牌介绍',
+                ? _CompactEmpty(
+                    title: stringsOf(context).profileBrandStoryEmpty,
+                    subtitle: stringsOf(context).profileBrandStoryEmptyDetail,
                   )
                 : _AboutSurface(text: description),
             if (businessStatus.isNotEmpty ||
                 businessTime.isNotEmpty ||
                 address.isNotEmpty) ...<Widget>[
               const SizedBox(height: CyTokens.space5),
-              const _AboutHeading('营业信息'),
+              _AboutHeading(stringsOf(context).profileBusinessInformation),
               const SizedBox(height: CyTokens.space3),
               _MerchantInfoRows(
                 businessStatus: businessStatus,
@@ -1683,9 +1725,9 @@ class _MerchantInfoRows extends StatelessWidget {
   Widget build(BuildContext context) {
     return _AboutSurface(
       text: <String>[
-        if (businessStatus.isNotEmpty) '营业状态  $businessStatus',
-        if (businessTime.isNotEmpty) '营业时间  $businessTime',
-        if (address.isNotEmpty) '门店地址  $address',
+        if (businessStatus.isNotEmpty) stringsOf(context).profileBusinessStatus(businessStatus),
+        if (businessTime.isNotEmpty) stringsOf(context).profileBusinessTime(businessTime),
+        if (address.isNotEmpty) stringsOf(context).profileBusinessAddress(address),
       ].join('\n'),
     );
   }
@@ -1714,7 +1756,8 @@ class _AboutEntry extends StatelessWidget {
           const SizedBox(height: CyTokens.space1),
           Text(
             label,
-            maxLines: 1,
+            maxLines: 3,
+            textAlign: TextAlign.center,
             overflow: TextOverflow.ellipsis,
             style: Theme.of(
               context,

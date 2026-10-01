@@ -1,3 +1,4 @@
+import '../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -25,7 +26,7 @@ class PlayGuidePage extends ConsumerWidget {
     final async = ref.watch(infomationsProvider);
 
     return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(middle: Text('城瘾玩法')),
+      navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).accountGuideTitle)),
       child: Material(
         color: Colors.transparent,
         child: SafeArea(
@@ -33,10 +34,10 @@ class PlayGuidePage extends ConsumerWidget {
           child: ListView(
             padding: const EdgeInsets.all(CyTokens.pageX),
             children: <Widget>[
-              Text('三种玩法,即开即玩', style: CyType.title2),
+              Text(stringsOf(context).accountGuideIntro, style: CyType.title2),
               const SizedBox(height: CyTokens.space1),
               Text(
-                '不用先学规则。挑一种出发方式,城市自己会讲下去。',
+                stringsOf(context).accountGuideHint,
                 style: CyType.body.copyWith(color: CyTokens.textSecondary),
               ),
               const SizedBox(height: CyTokens.space4),
@@ -44,7 +45,7 @@ class PlayGuidePage extends ConsumerWidget {
               //   路由由 test/router_targets_exist_test.dart 保证存在。
               ...kPlayModes.map((PlayMode m) => _ModeCard(mode: m)),
               const SizedBox(height: CyTokens.space4),
-              const CySectionTitle('了解更多'),
+              CySectionTitle(stringsOf(context).accountGuideMore),
               const SizedBox(height: CyTokens.space2),
               // 三态对齐真源 subpackageA/pages/infomation/infomation.wxml:68-80
               // (加载 = `cy-skeleton type="list" count="2"` / 失败给重试 /
@@ -55,15 +56,15 @@ class PlayGuidePage extends ConsumerWidget {
                 loading: () =>
                     const CySkeleton(type: CySkeletonType.list, count: 2),
                 error: (Object e, _) => StatusView(
-                  message: '玩法文档没能加载出来',
+                  message: stringsOf(context).accountGuideError,
                   sub: e.toString().replaceFirst('Exception: ', ''),
                   large: true,
                   onRetry: () => ref.invalidate(infomationsProvider),
                 ),
                 data: (List<Infomation> rows) => rows.isEmpty
-                    ? const StatusView(
-                        message: '暂无玩法说明',
-                        sub: '内容上线后会出现在这里',
+                    ? StatusView(
+                        message: stringsOf(context).accountGuideEmpty,
+                        sub: stringsOf(context).accountGuideEmptyHint,
                         large: true,
                       )
                     : Column(
@@ -107,15 +108,17 @@ class _ModeCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Row(
+          Wrap(
+            spacing: CyTokens.space2,
+            runSpacing: CyTokens.space1,
             children: <Widget>[
-              Expanded(child: Text(mode.name, style: CyType.headline)),
-              CyTag(label: mode.tag),
+              Text(_modeCopy(context, mode).name, style: CyType.headline),
+              CyTag(label: _modeCopy(context, mode).tag),
             ],
           ),
           const SizedBox(height: CyTokens.space2),
           Text(
-            mode.desc,
+            _modeCopy(context, mode).desc,
             style: CyType.footnote.copyWith(color: CyTokens.textSecondary),
           ),
           const SizedBox(height: CyTokens.space2),
@@ -123,7 +126,7 @@ class _ModeCard extends StatelessWidget {
             alignment: Alignment.centerLeft,
             child: CyNativeButton(
               role: CyNativeButtonRole.secondary,
-              label: '去${mode.name}',
+              label: stringsOf(context).accountGuideGo(_modeCopy(context, mode).name),
               // 源是 switchTab(App 语义 = go 到 tab),不是压栈。
               onPressed: () => context.go(mode.route),
             ),
@@ -132,4 +135,14 @@ class _ModeCard extends StatelessWidget {
       ),
     );
   }
+}
+
+({String name, String tag, String desc}) _modeCopy(BuildContext context, PlayMode mode) {
+  final s = stringsOf(context);
+  return switch (mode.key) {
+    'classic' => (name: s.accountGuideClassicName, tag: s.accountGuideClassicTag, desc: s.accountGuideClassicDesc),
+    'free' => (name: s.accountGuideFreeName, tag: s.accountGuideFreeTag, desc: s.accountGuideFreeDesc),
+    'roam' => (name: s.accountGuideRoamName, tag: s.accountGuideRoamTag, desc: s.accountGuideRoamDesc),
+    _ => (name: mode.name, tag: mode.tag, desc: mode.desc),
+  };
 }

@@ -1,3 +1,4 @@
+import '../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -25,7 +26,7 @@ class InfomationDetailPage extends ConsumerWidget {
 
     return CupertinoPageScaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      navigationBar: const CupertinoNavigationBar(),
+      navigationBar: CupertinoNavigationBar(),
       child: Material(
         color: Colors.transparent,
         child: SafeArea(
@@ -34,11 +35,11 @@ class InfomationDetailPage extends ConsumerWidget {
           // —— 真源 `infomationdetail` 的 missing 态同样是零假重试。
           child: id <= 0
               ? StatusView(
-                  message: '这篇玩法说明打不开',
-                  sub: '链接里没有玩法编号，请从玩法列表重新进入',
+                  message: stringsOf(context).accountGuideMissing,
+                  sub: stringsOf(context).accountGuideMissingHint,
                   large: true,
                   onRetry: () => context.go('/play-guide'),
-                  retryLabel: '返回玩法列表',
+                  retryLabel: stringsOf(context).accountGuideReturn,
                 )
               : ref
                     .watch(infomationDetailProvider(id))
@@ -46,7 +47,7 @@ class InfomationDetailPage extends ConsumerWidget {
                       loading: () =>
                           const Center(child: CupertinoActivityIndicator()),
                       error: (Object e, _) => StatusView(
-                        message: '打不开这篇',
+                        message: stringsOf(context).accountGuideDetailError,
                         sub: e.toString().replaceFirst('Exception: ', ''),
                         large: true,
                         onRetry: () =>
@@ -60,11 +61,11 @@ class InfomationDetailPage extends ConsumerWidget {
                         //   所以出口是「去玩法列表看看其它的」。
                         if (x.id <= 0) {
                           return StatusView(
-                            message: '这篇玩法说明不在了',
-                            sub: '它可能已被下架。去玩法列表看看其它的。',
+                            message: stringsOf(context).accountGuideRemoved,
+                            sub: stringsOf(context).accountGuideRemovedHint,
                             large: true,
                             onRetry: () => context.go('/play-guide'),
-                            retryLabel: '返回玩法列表',
+                            retryLabel: stringsOf(context).accountGuideReturn,
                           );
                         }
                         // ★ 后端详情接口**不做可读性过滤**(那是列表侧 usable 的事),
@@ -72,9 +73,9 @@ class InfomationDetailPage extends ConsumerWidget {
                         if (body.isEmpty) {
                           return StatusView(
                             message: x.title.trim().isEmpty
-                                ? '这篇还没有内容'
+                                ? stringsOf(context).accountGuideNoContent
                                 : x.title,
-                            sub: '正文还没写好,过一阵再来',
+                            sub: stringsOf(context).accountGuideNoContentHint,
                             large: true,
                           );
                         }

@@ -1,3 +1,5 @@
+import '../../l10n/app_localizations.dart';
+import '../../l10n/strings.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -18,8 +20,8 @@ bool accountLoginRequired(Object error) => isUnauthorizedError(error);
 ///  · **401** → 后端原话「登录状态已失效，请重新登录」;
 ///  · 其余 DioException(断网/5xx…) → 不吐异常原文,给调用方点名的中文兜底;
 ///  · 业务失败(`Exception(后端中文 msg)`) → 后端中文原话照说,可行动信息不吞。
-String accountFailureCopy(Object error, {required String networkFallback}) {
-  if (accountLoginRequired(error)) return '登录状态已失效，请重新登录';
+String accountFailureCopy(Object error, {required String networkFallback, AppLocalizations? strings}) {
+  if (accountLoginRequired(error)) return strings?.loginExpired ?? '登录状态已失效，请重新登录';
   if (error is DioException) return networkFallback;
   return error.toString().replaceFirst('Exception: ', '');
 }
@@ -47,10 +49,10 @@ class AccountLoginGate extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return StatusView(
       message: message,
-      sub: sub ?? '这一步需要登录，登录完会自动回到这一页。',
+      sub: sub ?? stringsOf(context).loginGateResume,
       icon: CupertinoIcons.lock,
       large: true,
-      retryLabel: '去登录',
+      retryLabel: stringsOf(context).goSignIn,
       onRetry: () async {
         if (!await requireLogin(context, ref)) return;
         onSignedIn();

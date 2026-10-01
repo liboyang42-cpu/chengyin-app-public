@@ -1,3 +1,5 @@
+import '../../l10n/account_local_failure.dart';
+import '../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -55,23 +57,23 @@ class AboutPage extends ConsumerWidget {
     return showCupertinoModalPopup<_ContactAction>(
       context: context,
       builder: (BuildContext sheetContext) => CupertinoActionSheet(
-        title: const Text('联系我们'),
-        message: const Text('客服电话 15229020419'),
+        title: Text(stringsOf(context).settingsResidualContact),
+        message: Text(stringsOf(context).settingsResidualPhone(_contactPhone)),
         actions: <CupertinoActionSheetAction>[
           CupertinoActionSheetAction(
             onPressed: () =>
                 Navigator.of(sheetContext).pop(_ContactAction.call),
-            child: const Text('拨打 15229020419'),
+            child: Text(stringsOf(context).settingsResidualCall(_contactPhone)),
           ),
           CupertinoActionSheetAction(
             onPressed: () =>
                 Navigator.of(sheetContext).pop(_ContactAction.copy),
-            child: const Text('复制电话号码'),
+            child: Text(stringsOf(context).settingsResidualCopyPhone),
           ),
         ],
         cancelButton: CupertinoActionSheetAction(
           onPressed: () => Navigator.of(sheetContext).pop(),
-          child: const Text('取消'),
+          child: Text(stringsOf(context).settingsResidualCancel),
         ),
       ),
     );
@@ -87,12 +89,12 @@ class AboutPage extends ConsumerWidget {
           Uri(scheme: 'tel', path: _contactPhone),
         );
         if (!launched && context.mounted) {
-          _toast(context, '无法打开电话应用');
+          _toast(context, stringsOf(context).settingsResidualPhoneUnavailable);
         }
       case _ContactAction.copy:
         await copyContactText(_contactPhone);
         if (context.mounted) {
-          _toast(context, '电话号码已复制');
+          _toast(context, stringsOf(context).settingsResidualPhoneCopied);
         }
     }
   }
@@ -109,7 +111,7 @@ class AboutPage extends ConsumerWidget {
           child: ListView(
             padding: const EdgeInsets.only(bottom: CyTokens.space7),
             children: <Widget>[
-              const CyPageTitle('关于'),
+              CyPageTitle(stringsOf(context).settingsResidualAbout),
               const _AppInfo(),
               Padding(
                 padding: const EdgeInsets.symmetric(
@@ -120,7 +122,7 @@ class AboutPage extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     Text(
-                      '我的二维码',
+                      stringsOf(context).settingsResidualMyCode,
                       style: TextStyle(
                         fontSize: CyTokens.typeCardTitle,
                         fontWeight: FontWeight.w600,
@@ -129,7 +131,7 @@ class AboutPage extends ConsumerWidget {
                     ),
                     const SizedBox(height: CyTokens.space1_5),
                     Text(
-                      '用于在活动现场展示你的城瘾玩家身份。',
+                      stringsOf(context).settingsResidualCodeHint,
                       style: TextStyle(
                         fontSize: CyTokens.typeBody,
                         height: CyTokens.leadingNormal,
@@ -157,8 +159,8 @@ class AboutPage extends ConsumerWidget {
                 child: Column(
                   children: <Widget>[
                     CyCell(
-                      title: '用户服务协议',
-                      subtitle: '查看服务条款',
+                      title: stringsOf(context).settingsResidualTerms,
+                      subtitle: stringsOf(context).settingsResidualViewTerms,
                       leading: Icon(
                         CupertinoIcons.doc_text,
                         size: 20,
@@ -169,8 +171,8 @@ class AboutPage extends ConsumerWidget {
                       ),
                     ),
                     CyCell(
-                      title: '联系我们',
-                      subtitle: '客服电话 15229020419',
+                      title: stringsOf(context).settingsResidualContact,
+                      subtitle: stringsOf(context).settingsResidualPhone(_contactPhone),
                       leading: Icon(
                         CupertinoIcons.phone,
                         size: 20,
@@ -209,7 +211,7 @@ class _PlayerCodeLoginGate extends StatelessWidget {
           CupertinoButton.tinted(
             sizeStyle: CupertinoButtonSize.small,
             onPressed: onPressed,
-            child: const Text('登录后查看'),
+            child: Text(stringsOf(context).settingsResidualLoginView),
           ),
         ],
       ),
@@ -220,13 +222,9 @@ class _PlayerCodeLoginGate extends StatelessWidget {
 class _PlayerCodePanel extends ConsumerWidget {
   const _PlayerCodePanel();
 
-  String _message(Object error) {
-    final String message = error
-        .toString()
-        .replaceFirst(RegExp(r'^Exception:\s*'), '')
-        .trim();
-    return message.isEmpty ? '个人码暂不可用，请稍后重试' : message;
-  }
+  String _message(BuildContext context, Object error) => accountFailureMessage(
+    context, error, fallback: stringsOf(context).settingsResidualCodeUnavailable,
+  );
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -235,7 +233,7 @@ class _PlayerCodePanel extends ConsumerWidget {
       child: code.when(
         loading: () => const Center(child: CupertinoActivityIndicator()),
         error: (Object error, StackTrace stackTrace) => _CodeFailure(
-          message: _message(error),
+          message: _message(context, error),
           onRetry: () => ref.invalidate(playerCodeProvider),
         ),
         data: (String qr) => Column(
@@ -243,7 +241,7 @@ class _PlayerCodePanel extends ConsumerWidget {
           children: <Widget>[
             Semantics(
               image: true,
-              label: '我的城瘾玩家身份码',
+              label: stringsOf(context).settingsResidualCodeIdentity,
               child: Image.network(
                 qr,
                 key: const Key('player-code-image'),
@@ -257,7 +255,7 @@ class _PlayerCodePanel extends ConsumerWidget {
                         height: 104,
                         child: Center(
                           child: Text(
-                            '身份码图片加载失败',
+                            stringsOf(context).settingsResidualCodeImageFailed,
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: CyTokens.typeCaption,
@@ -273,7 +271,7 @@ class _PlayerCodePanel extends ConsumerWidget {
               sizeStyle: CupertinoButtonSize.small,
               padding: const EdgeInsets.symmetric(horizontal: CyTokens.space2),
               onPressed: () => ref.invalidate(playerCodeProvider),
-              child: const Text('刷新身份码'),
+              child: Text(stringsOf(context).settingsResidualRefreshCode),
             ),
           ],
         ),
@@ -306,7 +304,7 @@ class _CodeFailure extends StatelessWidget {
           CupertinoButton(
             sizeStyle: CupertinoButtonSize.small,
             onPressed: onRetry,
-            child: const Text('重试'),
+            child: Text(stringsOf(context).settingsResidualRetry),
           ),
         ],
       ),
@@ -363,7 +361,7 @@ class _AppInfo extends StatelessWidget {
           ),
           const SizedBox(height: CyTokens.space3),
           Text(
-            '城瘾',
+            stringsOf(context).appName,
             style: TextStyle(
               fontSize: CyTokens.typeDisplay,
               height: CyTokens.leadingTight,
@@ -374,7 +372,7 @@ class _AppInfo extends StatelessWidget {
           const SizedBox(height: CyTokens.space1),
           // ★ 版本号随 pubspec 一起维护;接入 package_info 后改为运行时读取。
           Text(
-            '版本 1.0.0',
+            stringsOf(context).settingsResidualVersion('1.0.0'),
             style: TextStyle(
               fontSize: CyTokens.typeLabel,
               color: CyPalette.of(context).textSecondary,
@@ -382,7 +380,7 @@ class _AppInfo extends StatelessWidget {
           ),
           const SizedBox(height: CyTokens.space2),
           Text(
-            '发现城市，也发现新的自己',
+            stringsOf(context).settingsResidualTagline,
             style: TextStyle(
               fontSize: CyTokens.typeBody,
               color: CyPalette.of(context).textSecondary,

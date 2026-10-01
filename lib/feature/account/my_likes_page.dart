@@ -1,3 +1,9 @@
+import '../../l10n/strings.dart';
+import '../../l10n/strings_provider.dart';
+import '../../l10n/app_localizations.dart';
+import '../../l10n/app_localizations_zh.dart';
+import '../../l10n/error_presentation.dart';
+import '../auth/auth_controller.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -19,6 +25,7 @@ import 'account_login_gate.dart';
 const int _kMyLikesPageSize = 10;
 
 final myLikesProvider = FutureProvider.autoDispose<List<Topic>>((ref) {
+  ref.watch(authControllerProvider.select((state) => state.user?.id));
   return ref.watch(topicApiProvider).likeList(pageSize: _kMyLikesPageSize);
 });
 
@@ -28,19 +35,22 @@ abstract interface class TopicShareActions {
 }
 
 final topicShareActionsProvider = Provider<TopicShareActions>((ref) {
-  return const SystemTopicShareActions();
+  return SystemTopicShareActions(ref.watch(appStringsProvider));
 });
 
 final class SystemTopicShareActions implements TopicShareActions {
-  const SystemTopicShareActions();
+  const SystemTopicShareActions([this.strings]);
+  final AppLocalizations? strings;
 
   @override
   Future<void> share({required Topic topic, required Rect origin}) {
-    final String title = topic.name.trim().isEmpty ? '城瘾主题' : topic.name;
+    final s = strings ?? AppLocalizationsZh();
+    final String title = topic.name.trim().isEmpty ? s.likesUnnamed : topic.name;
+    final subject = s.likesRecommendation(title);
     return SharePlus.instance.share(
       ShareParams(
-        subject: '推荐路线：$title',
-        text: '推荐路线：$title\nhttps://api.example.invalid/topic/${topic.id}',
+        subject: subject,
+        text: '$subject\nhttps://api.example.invalid/topic/${topic.id}',
         // iPad 的系统 Activity View 必须锚定触发控件；不能退回屏幕中央。
         sharePositionOrigin: origin,
       ),
@@ -68,6 +78,7 @@ class _MyLikesPageState extends ConsumerState<MyLikesPage> {
   bool _loadingMore = false;
   bool _loadMoreFailed = false;
   int _page = 1;
+  int _generation = 0;
 
   void _adoptFirstPage(List<Topic> rows) {
     if (_seeded) return;
@@ -81,6 +92,7 @@ class _MyLikesPageState extends ConsumerState<MyLikesPage> {
   }
 
   Future<void> _refresh() async {
+    final generation = ++_generation;
     setState(() {
       _seeded = false;
       _loadingMore = false;
@@ -91,7 +103,7 @@ class _MyLikesPageState extends ConsumerState<MyLikesPage> {
     ref.invalidate(myLikesProvider);
     try {
       final List<Topic> first = await ref.read(myLikesProvider.future);
-      if (!mounted) return;
+      if (!mounted || generation != _generation) return;
       setState(() => _adoptFirstPage(first));
     } catch (_) {
       // FutureProvider 的 error 分支会显示原始服务端回执，别改成泛化成功态。
@@ -99,6 +111,7 @@ class _MyLikesPageState extends ConsumerState<MyLikesPage> {
   }
 
   Future<void> _loadMore() async {
+    final generation = _generation;
     if (_loadingMore || !_hasMore) return;
     final int requestedPage = _page + 1;
     setState(() {
@@ -109,43 +122,44 @@ class _MyLikesPageState extends ConsumerState<MyLikesPage> {
       final List<Topic> next = await ref
           .read(topicApiProvider)
           .likeList(pageNum: requestedPage, pageSize: _kMyLikesPageSize);
-      if (!mounted || requestedPage != _page + 1) return;
+      if (!mounted || generation != _generation || requestedPage != _page + 1) return;
       setState(() {
         _page = requestedPage;
         _hasMore = next.length >= _kMyLikesPageSize;
         _rows.addAll(next);
       });
     } catch (_) {
-      if (mounted) setState(() => _loadMoreFailed = true);
+      if (mounted && generation == _generation) setState(() => _loadMoreFailed = true);
     } finally {
-      if (mounted) setState(() => _loadingMore = false);
+      if (mounted && generation == _generation) setState(() => _loadingMore = false);
     }
   }
 
   Future<void> _unlike(Topic topic) async {
+    final generation = _generation;
     final bool ok = await cyConfirm(
       context,
-      title: '取消收藏「${topic.name}」?',
-      confirmText: '取消收藏',
-      cancelText: '再想想',
+      title: stringsOf(context).likesRemoveNamed(topic.name),
+      confirmText: stringsOf(context).likesRemove,
+      cancelText: stringsOf(context).likesKeep,
       danger: true,
     );
-    if (!ok || !mounted) return;
+    if (!ok || !mounted || generation != _generation) return;
     setState(() => _busy.add(topic.id));
     try {
       // `/api/topic/like` 是切换语义；成功回执前绝不先删，也绝不自动重试。
       await ref.read(topicApiProvider).toggleLike(topic.id);
-      if (!mounted) return;
+      if (!mounted || generation != _generation) return;
       setState(() => _rows.removeWhere((Topic row) => row.id == topic.id));
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || generation != _generation) return;
       CyNativeNotice.show(
         context,
-        accountFailureCopy(e, networkFallback: '取消收藏没有成功,请稍后再试'),
+        presentError(e, stringsOf(context), fallback: stringsOf(context).likesRemoveError, originalApiMessage: legacyApiMessage(e)).noticeText,
         isError: true,
       );
     } finally {
-      if (mounted) setState(() => _busy.remove(topic.id));
+      if (mounted && generation == _generation) setState(() => _busy.remove(topic.id));
     }
   }
 
@@ -171,6 +185,20 @@ class _MyLikesPageState extends ConsumerState<MyLikesPage> {
   @override
   Widget build(BuildContext context) {
     // 游客短路:不发注定 401 的请求,页内给登录门(B1 报告 P1-1)。
+    ref.listen<int?>(authControllerProvider.select((state) => state.user?.id), (previous, next) {
+      if (previous == next) return;
+      setState(() {
+        _generation++;
+        _rows.clear();
+        _busy.clear();
+        _openRow = null;
+        _seeded = false;
+        _loadingMore = false;
+        _loadMoreFailed = false;
+        _hasMore = true;
+        _page = 1;
+      });
+    });
     final bool guest = accountGuest(ref);
     final AsyncValue<List<Topic>>? async = guest
         ? null
@@ -185,13 +213,13 @@ class _MyLikesPageState extends ConsumerState<MyLikesPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              const CyPageTitle('我的收藏'),
+              CyPageTitle(stringsOf(context).likesTitle),
               Expanded(
                 child: guest
                     ? AccountLoginGate(
                         key: const Key('my-likes-login-gate'),
-                        message: '登录后查看我的收藏',
-                        sub: '收藏存在账号里,登录完就能看到。',
+                        message: stringsOf(context).likesLogin,
+                        sub: stringsOf(context).likesLoginHint,
                         onSignedIn: _refresh,
                       )
                     : async!.when(
@@ -206,27 +234,24 @@ class _MyLikesPageState extends ConsumerState<MyLikesPage> {
                         error: (Object error, StackTrace stackTrace) =>
                             accountLoginRequired(error)
                             ? AccountLoginGate(
-                                message: '登录后查看我的收藏',
-                                sub: '收藏存在账号里,登录完就能看到。',
+                                message: stringsOf(context).likesLogin,
+                                sub: stringsOf(context).likesLoginHint,
                                 onSignedIn: _refresh,
                               )
                             : _seeded
                             ? _list()
                             : StatusView(
-                                message: '收藏没能加载出来',
-                                sub: accountFailureCopy(
-                                  error,
-                                  networkFallback: '请检查网络后再进来，收藏不会丢失',
-                                ),
+                                message: stringsOf(context).likesError,
+                                sub: presentError(error, stringsOf(context), fallback: stringsOf(context).likesErrorHint, originalApiMessage: legacyApiMessage(error)).noticeText,
                                 large: true,
                                 onRetry: _refresh,
                               ),
                         data: (List<Topic> rows) {
                           _adoptFirstPage(rows);
                           if (_rows.isEmpty) {
-                            return const StatusView(
-                              message: '暂无收藏的主题',
-                              sub: '遇到想体验的城市主题，可以先收藏，之后从这里找回。',
+                            return StatusView(
+                              message: stringsOf(context).likesEmpty,
+                              sub: stringsOf(context).likesEmptyHint,
                               large: true,
                             );
                           }
@@ -286,15 +311,15 @@ class _MyLikesPageState extends ConsumerState<MyLikesPage> {
                 trailing: <CyContextualAction>[
                   CyContextualAction(
                     id: 'share-${topic.id}',
-                    label: '分享',
-                    semanticLabel: '分享${topic.name}',
+                    label: stringsOf(context).likesShare,
+                    semanticLabel: stringsOf(context).likesShareNamed(topic.name),
                     icon: CupertinoIcons.share,
                     onPressed: () => _share(topic, rowContext),
                   ),
                   CyContextualAction(
                     id: 'unlike-${topic.id}',
-                    label: '取消收藏',
-                    semanticLabel: '取消收藏${topic.name}',
+                    label: stringsOf(context).likesRemove,
+                    semanticLabel: stringsOf(context).likesUnsaveNamed(topic.name),
                     // 小程序真源是描边 heart；滑动动作位上是破坏性动作，
                     // 用 iOS 的 heart.slash（实心红心读作「收藏」，语义反了）。
                     icon: CupertinoIcons.heart_slash,
@@ -330,7 +355,7 @@ class _LikeCard extends StatelessWidget {
       aspectRatio: 16 / 9,
       child: Semantics(
         button: true,
-        label: '打开${topic.name}',
+        label: stringsOf(context).likesOpenNamed(topic.name),
         onTap: onOpen,
         child: ExcludeSemantics(
           child: CupertinoButton(
@@ -373,7 +398,7 @@ class _LoadMoreFooter extends StatelessWidget {
         child: CupertinoButton(
           minimumSize: const Size(44, 44),
           onPressed: onRetry,
-          child: const Text('加载失败，点我重试'),
+          child: Text(stringsOf(context).likesMoreError),
         ),
       );
     }

@@ -1,3 +1,4 @@
+import '../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -20,6 +21,7 @@ import '../play/advanced/fullscreen/playkit_timer_logic.dart'
 import 'feed_controller.dart';
 import 'feed_sections_controller.dart';
 import 'widgets/countdown_text.dart';
+import 'widgets/home_activity_live.dart';
 
 /// 玩家首页。区块顺序镜像小程序首页(index.wxml 的 sec-* 声明顺序):
 /// Hero -> 推荐主题 -> 继续探索 -> 附近活动 -> 即将上线 -> 主题流。
@@ -109,17 +111,17 @@ class _FeedPageState extends ConsumerState<FeedPage> {
         loading: () => const SliverToBoxAdapter(child: LoadingView()),
         error: (Object error, StackTrace stack) => SliverToBoxAdapter(
           child: StatusView(
-            message: '活动列表没有加载出来',
-            sub: '下拉刷新或点重试再拉一次',
+            message: stringsOf(context).feedActivityError,
+            sub: stringsOf(context).feedPullRetry,
             icon: Icons.cloud_off,
             onRetry: () => ref.invalidate(feedActivityStreamProvider),
           ),
         ),
         data: (List<Activity> rows) => rows.isEmpty
-            ? const SliverToBoxAdapter(
+            ? SliverToBoxAdapter(
                 child: StatusView(
-                  message: '还没有能参加的活动',
-                  sub: '换个时间再来逛逛',
+                  message: stringsOf(context).feedActivitiesEmpty,
+                  sub: stringsOf(context).feedComeBack,
                   icon: Icons.event_outlined,
                 ),
               )
@@ -155,18 +157,18 @@ class _FeedPageState extends ConsumerState<FeedPage> {
         ),
         error: (Object err, StackTrace st) => SliverToBoxAdapter(
           child: StatusView(
-            message: '主题列表没有加载出来',
-            sub: '下拉刷新或点重试再拉一次',
+            message: stringsOf(context).feedTopicError,
+            sub: stringsOf(context).feedPullRetry,
             icon: Icons.cloud_off,
             onRetry: () => ref.invalidate(feedProvider),
           ),
         ),
         data: (List<Topic> list) {
           if (list.isEmpty) {
-            return const SliverToBoxAdapter(
+            return SliverToBoxAdapter(
               child: StatusView(
-                message: '还没有能推给你的主题',
-                sub: '换个时间再来逛逛',
+                message: stringsOf(context).feedTopicsEmpty,
+                sub: stringsOf(context).feedComeBack,
                 icon: Icons.route_outlined,
               ),
             );
@@ -237,9 +239,9 @@ class _FeedTabs extends StatelessWidget {
         child: CyTabs(
           key: const Key('home-feed-tabs'),
           variant: CyTabsVariant.segmented,
-          tabs: const <CyTab>[
-            CyTab(key: 'topic', label: '主题'),
-            CyTab(key: 'activity', label: '活动'),
+          tabs: <CyTab>[
+            CyTab(key: 'topic', label: stringsOf(context).feedTopics),
+            CyTab(key: 'activity', label: stringsOf(context).feedActivities),
           ],
           active: activities ? 'activity' : 'topic',
           onChanged: (String key) {
@@ -268,7 +270,7 @@ class _HomeSearchEntry extends StatelessWidget {
       ),
       child: Semantics(
         button: true,
-        label: '搜索主题、活动、俱乐部、商家',
+        label: stringsOf(context).feedSearch,
         excludeSemantics: true,
         child: CupertinoButton(
           key: const Key('home-search'),
@@ -277,20 +279,20 @@ class _HomeSearchEntry extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: CyTokens.space3),
           color: CyTokens.inputBgEmpty,
           borderRadius: BorderRadius.circular(CyTokens.radiusPill),
-          child: const Row(
+          child: Row(
             children: <Widget>[
-              Icon(
+              const Icon(
                 CupertinoIcons.search,
                 size: 16,
                 color: CyTokens.textPlaceholder,
               ),
-              SizedBox(width: CyTokens.space2),
+              const SizedBox(width: CyTokens.space2),
               Expanded(
                 child: Text(
-                  '搜索主题、活动、俱乐部、商家',
+                  stringsOf(context).feedSearch,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: CyTokens.typeBody,
                     color: CyTokens.textPlaceholder,
                   ),
@@ -339,7 +341,7 @@ class _HeroSectionState extends ConsumerState<_HeroSection> {
     void open() => context.push('/official-events');
     return Semantics(
       button: true,
-      label: '打开和朋友报名活动',
+      label: stringsOf(context).feedOpenFriends,
       onTap: open,
       excludeSemantics: true,
       child: CupertinoButton(
@@ -369,7 +371,7 @@ class _HeroSectionState extends ConsumerState<_HeroSection> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     Text(
-                      '和朋友报名活动',
+                      stringsOf(context).feedFriends,
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         color: CyTokens.textPrimary,
                         fontWeight: FontWeight.w700,
@@ -377,7 +379,7 @@ class _HeroSectionState extends ConsumerState<_HeroSection> {
                     ),
                     const SizedBox(height: CyTokens.space1),
                     Text(
-                      '和朋友一起，发现附近正在发生的有趣体验',
+                      stringsOf(context).feedFriendsDetail,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: CyTokens.textSecondary,
                       ),
@@ -399,7 +401,7 @@ class _HeroSectionState extends ConsumerState<_HeroSection> {
     final user = ref.watch(authControllerProvider).user;
     final String nickname = user?.nickname.trim().isNotEmpty == true
         ? user!.nickname.trim()
-        : '旅人';
+        : stringsOf(context).feedTraveler;
     final double height = (MediaQuery.sizeOf(context).height * 6 / 7)
         .clamp(520.0, 760.0)
         .toDouble();
@@ -430,7 +432,7 @@ class _HeroSectionState extends ConsumerState<_HeroSection> {
               if (!canOpen) {
                 return Semantics(
                   image: true,
-                  label: '推荐内容',
+                  label: stringsOf(context).feedRecommendedContent,
                   excludeSemantics: true,
                   child: cover,
                 );
@@ -438,7 +440,7 @@ class _HeroSectionState extends ConsumerState<_HeroSection> {
               void open() => _onBannerTap(banner);
               return Semantics(
                 button: true,
-                label: '打开推荐内容',
+                label: stringsOf(context).feedOpenRecommendation,
                 onTap: open,
                 excludeSemantics: true,
                 child: CupertinoButton(
@@ -487,7 +489,7 @@ class _HeroSectionState extends ConsumerState<_HeroSection> {
                       ),
                       const SizedBox(width: CyTokens.space2),
                       Text(
-                        '城瘾',
+                        stringsOf(context).feedBrand,
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           color: CyTokens.textPrimary,
                           fontWeight: FontWeight.w700,
@@ -504,7 +506,7 @@ class _HeroSectionState extends ConsumerState<_HeroSection> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: <Widget>[
                             Text(
-                              'Hi, $nickname!',
+                              stringsOf(context).feedGreeting(nickname),
                               style: Theme.of(context).textTheme.displaySmall
                                   ?.copyWith(
                                     color: CyTokens.textPrimary,
@@ -514,14 +516,14 @@ class _HeroSectionState extends ConsumerState<_HeroSection> {
                                   ),
                             ),
                             const SizedBox(height: CyTokens.space1_5),
-                            const Row(
+                            Row(
                               mainAxisSize: MainAxisSize.min,
                               children: <Widget>[
-                                _MemberBadge(),
-                                SizedBox(width: CyTokens.space1_5),
+                                const _MemberBadge(),
+                                const SizedBox(width: CyTokens.space1_5),
                                 Text(
-                                  '玩家',
-                                  style: TextStyle(
+                                  stringsOf(context).feedPlayer,
+                                  style: const TextStyle(
                                     color: CyTokens.textSecondary,
                                     fontSize: CyTokens.typeLabel,
                                     fontWeight: FontWeight.w500,
@@ -589,7 +591,7 @@ class _AvatarButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
-      label: '打开我的主页',
+      label: stringsOf(context).feedOpenProfile,
       onTap: onTap,
       excludeSemantics: true,
       child: CupertinoButton(
@@ -655,7 +657,7 @@ class _ContinueSection extends ConsumerWidget {
         ref.watch(playRunSessionsProvider).value ?? const <PlayRunSession>[];
     final PlayRunSession? run = runs.isEmpty ? null : runs.first;
     if (run != null) {
-      final String title = run.title.isEmpty ? '继续游戏' : run.title;
+      final String title = run.title.isEmpty ? stringsOf(context).feedContinueGame : run.title;
       return Padding(
         padding: const EdgeInsets.fromLTRB(
           CyTokens.pageX,
@@ -665,11 +667,11 @@ class _ContinueSection extends ConsumerWidget {
         ),
         child: _ContinueCard(
           cardKey: const Key('home-continue-game'),
-          kicker: '继续游戏',
+          kicker: stringsOf(context).feedContinueGame,
           title: title,
           subtitle: run.elapsedSeconds == null
-              ? '已暂停'
-              : '已暂停 · 已用时 ${formatPlayClock(run.elapsedSeconds!)}',
+              ? stringsOf(context).feedPaused
+              : stringsOf(context).feedPausedElapsed(formatPlayClock(run.elapsedSeconds!)),
           coverUrl: run.cover,
           fallbackIcon: Icons.sports_esports_outlined,
           onTap: () => context.push(
@@ -695,7 +697,7 @@ class _ContinueSection extends ConsumerWidget {
     final String subtitle =
         (registration.participateDate ?? '').trim().isNotEmpty
         ? registration.participateDate!.trim()
-        : '你的活动还在等待参加';
+        : stringsOf(context).feedWaiting;
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         CyTokens.pageX,
@@ -705,9 +707,9 @@ class _ContinueSection extends ConsumerWidget {
       ),
       child: _ContinueCard(
         cardKey: const Key('home-continue'),
-        kicker: '继续探索',
+        kicker: stringsOf(context).feedContinueExplore,
         title: (registration.title ?? '').trim().isEmpty
-            ? '继续探索'
+            ? stringsOf(context).feedContinueExplore
             : registration.title!.trim(),
         subtitle: subtitle,
         coverUrl: registration.imgUrl,
@@ -809,9 +811,9 @@ class _ContinueCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: CyTokens.space2),
-                const Text(
-                  '继续',
-                  style: TextStyle(
+                Text(
+                  stringsOf(context).feedContinue,
+                  style: const TextStyle(
                     color: CyTokens.textPrimary,
                     fontSize: CyTokens.typeLabel,
                   ),
@@ -842,20 +844,20 @@ class _NearbySection extends ConsumerWidget {
       key: const Key('home-nearby'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        const _SectionTitle(title: '附近活动'),
+        _SectionTitle(title: stringsOf(context).feedNearby),
         async.when(
           loading: () => const SizedBox(height: 220, child: LoadingView()),
           error: (Object err, StackTrace st) => StatusView(
-            message: '附近活动没能加载出来',
-            sub: '网络请求失败，重试会重新拉取一次',
+            message: stringsOf(context).feedNearbyError,
+            sub: stringsOf(context).feedNetworkRetry,
             icon: Icons.cloud_off,
             onRetry: () => ref.invalidate(feedNearbyProvider),
           ),
           data: (List<Activity> list) {
             if (list.isEmpty) {
-              return const StatusView(
-                message: '你附近暂时没有可点亮的节点',
-                sub: '换个时间再来,或看看下面的推荐主题',
+              return StatusView(
+                message: stringsOf(context).feedNearbyEmpty,
+                sub: stringsOf(context).feedNearbyEmptyDetail,
                 icon: Icons.location_off_outlined,
               );
             }
@@ -927,7 +929,7 @@ class _NearbyCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     Text(
-                      activity.name.isEmpty ? '未命名活动' : activity.name,
+                      activity.name.isEmpty ? stringsOf(context).feedUnnamedActivity : activity.name,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -936,6 +938,7 @@ class _NearbyCard extends StatelessWidget {
                         height: 1.1,
                       ),
                     ),
+                    HomeActivityLive(startDate: activity.startDate),
                     if ((activity.addressName ?? '').isNotEmpty) ...<Widget>[
                       const SizedBox(height: CyTokens.space2),
                       Row(
@@ -981,20 +984,20 @@ class _RecommendSection extends ConsumerWidget {
       key: const Key('home-recommend'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        const _SectionTitle(title: '推荐主题'),
+        _SectionTitle(title: stringsOf(context).feedRecommendations),
         async.when(
           loading: () => const SizedBox(height: 372, child: LoadingView()),
           error: (Object err, StackTrace st) => StatusView(
-            message: '推荐主题没能加载出来',
-            sub: '网络请求失败，重试会重新拉取一次',
+            message: stringsOf(context).feedRecommendationsError,
+            sub: stringsOf(context).feedNetworkRetry,
             icon: Icons.cloud_off,
             onRetry: () => ref.invalidate(feedRecommendProvider),
           ),
           data: (List<Topic> list) {
             if (list.isEmpty) {
-              return const StatusView(
-                message: '还没有能推给你的主题',
-                sub: '下面的主题列表里先逛逛',
+              return StatusView(
+                message: stringsOf(context).feedTopicsEmpty,
+                sub: stringsOf(context).feedRecommendationsEmptyDetail,
                 icon: Icons.route_outlined,
               );
             }
@@ -1057,8 +1060,12 @@ class _RecommendHero extends StatelessWidget {
                         const _RecommendBadge(),
                         const SizedBox(height: CyTokens.space2),
                       ],
+                      if (topic.betaFlag == 1) ...<Widget>[
+                        CyTag(label: stringsOf(context).feedBeta),
+                        const SizedBox(height: CyTokens.space2),
+                      ],
                       Text(
-                        topic.name.isEmpty ? '未命名路线' : topic.name,
+                        topic.name.isEmpty ? stringsOf(context).feedUnnamedRoute : topic.name,
                         maxLines: 3,
                         overflow: TextOverflow.ellipsis,
                         style: CyType.title1.copyWith(
@@ -1106,13 +1113,13 @@ class _UpcomingSection extends ConsumerWidget {
       key: const Key('home-upcoming'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        const _SectionTitle(title: '即将上线'),
+        _SectionTitle(title: stringsOf(context).feedUpcoming),
         async.when(
           loading: () =>
               SizedBox(height: railHeight, child: const LoadingView()),
           error: (Object err, StackTrace st) => StatusView(
-            message: '即将上线没能加载出来',
-            sub: '网络请求失败，重试会重新拉取一次',
+            message: stringsOf(context).feedUpcomingError,
+            sub: stringsOf(context).feedNetworkRetry,
             icon: Icons.cloud_off,
             onRetry: () => ref.invalidate(feedUpcomingProvider),
           ),
@@ -1180,7 +1187,7 @@ class _UpcomingCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
                       Text(
-                        activity.name.isEmpty ? '未命名活动' : activity.name,
+                        activity.name.isEmpty ? stringsOf(context).feedUnnamedActivity : activity.name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: CyType.body.copyWith(
@@ -1253,7 +1260,7 @@ class _ActivityFeedCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
                       Text(
-                        activity.name.isEmpty ? '未命名活动' : activity.name,
+                        activity.name.isEmpty ? stringsOf(context).feedUnnamedActivity : activity.name,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
@@ -1333,7 +1340,7 @@ class _TopicCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
                       Text(
-                        topic.name.isEmpty ? '未命名路线' : topic.name,
+                        topic.name.isEmpty ? stringsOf(context).feedUnnamedRoute : topic.name,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
@@ -1432,16 +1439,16 @@ class _FeedStatusRows extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         _row(
-          '价格',
-          price == null ? '— 起' : '¥${price!.toStringAsFixed(2)} 起',
+          stringsOf(context).feedPrice,
+          stringsOf(context).feedPriceFrom(price == null ? '—' : '¥${price!.toStringAsFixed(2)}'),
           label,
           value,
         ),
         const SizedBox(height: 2),
-        _row('时间', when, label, value),
+        _row(stringsOf(context).feedTime, when, label, value),
         const SizedBox(height: 2),
         _row(
-          '地点',
+          stringsOf(context).feedPlace,
           addressName.trim().isEmpty ? '—' : addressName,
           label,
           value,
@@ -1490,7 +1497,7 @@ class _RecommendBadge extends StatelessWidget {
         border: Border.all(color: CyTokens.borderStrong),
       ),
       child: Text(
-        '推荐',
+        stringsOf(context).feedRecommended,
         style: Theme.of(
           context,
         ).textTheme.labelSmall?.copyWith(color: CyTokens.textPrimary),
@@ -1546,33 +1553,33 @@ class _FeedFooter extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
           Text(
-            '更多主题没有加载出来',
+            stringsOf(context).feedMoreError,
             style: CyType.subhead.copyWith(color: CyTokens.textPrimary),
           ),
           const SizedBox(height: CyTokens.space1),
           Text(
-            '已加载的主题仍可查看',
+            stringsOf(context).feedMoreErrorDetail,
             style: CyType.caption1.copyWith(color: CyTokens.textTertiary),
           ),
           CupertinoButton(
             onPressed: onRetry,
             minimumSize: const Size(44, 44),
-            child: const Text('重试'),
+            child: Text(stringsOf(context).feedRetry),
           ),
         ],
       );
     } else if (hasMore) {
-      child = const Row(
+      child = Row(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          CupertinoActivityIndicator(),
-          SizedBox(width: CyTokens.space2),
-          Text('正在加载更多'),
+          const CupertinoActivityIndicator(),
+          const SizedBox(width: CyTokens.space2),
+          Text(stringsOf(context).feedLoadingMore),
         ],
       );
     } else {
       child = Text(
-        '· 没有更多了 ·',
+        stringsOf(context).feedNoMore,
         style: Theme.of(
           context,
         ).textTheme.bodySmall?.copyWith(color: CyTokens.textSecondary),

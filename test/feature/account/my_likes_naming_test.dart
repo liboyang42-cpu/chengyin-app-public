@@ -5,17 +5,16 @@
 //   这类不一致看不出报错、测试也不会红,但它让人怀疑自己点错了地方。
 
 import 'package:flutter_test/flutter_test.dart';
+import 'dart:convert';
+import 'dart:io';
 
 import '../../support/source_text.dart';
 
 void main() {
   test('★★ 同一页里不许「喜欢」和「收藏」混着叫', () {
-    final String src = codeOf('lib/feature/account/my_likes_page.dart');
-    // 只看**用户看得见的字**(单引号字面量),不看文件名/类名 ——
-    // MyLikesPage 这个类名是历史,改它会牵动路由,不值当。
-    final List<String> visible = RegExp(
-      r"'([^']*[一-龥][^']*)'",
-    ).allMatches(src).map((RegExpMatch m) => m.group(1)!).toList();
+    final resources = jsonDecode(File('lib/l10n/app_zh.arb').readAsStringSync()) as Map<String, dynamic>;
+    final visible = resources.entries.where((entry) => entry.key.startsWith('likes') && entry.value is String)
+        .map((entry) => entry.value as String).toList();
     expect(visible, isNotEmpty, reason: '一条中文字面量都没抽到 —— 断言写法失效了');
     final bool hasLike = visible.any((String s) => s.contains('喜欢'));
     expect(

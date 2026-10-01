@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import '../../core/network/dio_client.dart';
+import '../../core/network/request_session_scope.dart';
 
 /// 登录相关接口。**契约对齐真实后端 `ApiLoginController`(RuoYi,/api 前缀,参数走表单)**。
 /// 后端用裸 String 形参绑定请求参数,故这里用 `FormData` 提交。
@@ -65,7 +66,9 @@ class AuthApi {
 
   /// 当前用户信息:`POST /api/userInfo`(需带 token)。
   Future<Map<String, dynamic>> userInfo() async {
-    final resp = await _client.dio.post<Map<String, dynamic>>('/api/userInfo');
+    final resp = await _client.dio.post<Map<String, dynamic>>(
+      '/api/userInfo', options: RequestSessionScope.options(),
+    );
     return resp.data ?? <String, dynamic>{};
   }
 

@@ -1,3 +1,4 @@
+import '../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -126,7 +127,7 @@ class _AddressEditPageState extends ConsumerState<AddressEditPage> {
       if (!mounted) return;
       setState(() {
         _saving = false;
-        _error = accountFailureCopy(e, networkFallback: '保存没有成功,请稍后重试');
+        _error = accountFailureCopy(e, strings: stringsOf(context), networkFallback: stringsOf(context).accountParticipantSaveError);
       });
     }
   }
@@ -138,13 +139,13 @@ class _AddressEditPageState extends ConsumerState<AddressEditPage> {
     if (!ref.watch(authControllerProvider).isLoggedIn ||
         (loadError != null && accountLoginRequired(loadError))) {
       return CupertinoPageScaffold(
-        navigationBar: const CupertinoNavigationBar(middle: Text('参与人信息')),
+        navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).accountParticipants)),
         child: SafeArea(
           bottom: false,
           child: AccountLoginGate(
             key: const Key('address-edit-login-gate'),
-            message: '登录后填写参与人信息',
-            sub: '参与人存在账号里,登录完就能继续。',
+            message: stringsOf(context).accountParticipantEditLogin,
+            sub: stringsOf(context).accountParticipantEditLoginHint,
             onSignedIn: () {
               if (widget.addressId != null) {
                 _loadError = null;
@@ -158,9 +159,9 @@ class _AddressEditPageState extends ConsumerState<AddressEditPage> {
     if (_loading) {
       // 真源 pages/addressinfo/addressinfo.wxml:11 =
       // `cy-skeleton type="form-section" count="2"` —— 与表单字段同构,不是封面卡。
-      return const CupertinoPageScaffold(
-        navigationBar: CupertinoNavigationBar(middle: Text('参与人信息')),
-        child: SafeArea(
+      return CupertinoPageScaffold(
+        navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).accountParticipants)),
+        child: const SafeArea(
           bottom: false,
           child: CySkeleton(type: CySkeletonType.formSection, count: 2),
         ),
@@ -172,21 +173,22 @@ class _AddressEditPageState extends ConsumerState<AddressEditPage> {
     // 只留「重新加载」一个出口,底部保存条也一并收起。
     if (loadError != null) {
       return CupertinoPageScaffold(
-        navigationBar: const CupertinoNavigationBar(middle: Text('参与人信息')),
+        navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).accountParticipants)),
         child: StatusView(
-          message: '参与人信息没能加载出来',
+          message: stringsOf(context).accountParticipantDetailsLoadError,
           sub: accountFailureCopy(
             loadError,
-            networkFallback: '请检查网络后再进来，数据不会丢失',
+            strings: stringsOf(context),
+            networkFallback: stringsOf(context).accountDataSafeRetry,
           ),
           large: true,
           onRetry: _load,
-          retryLabel: '重新加载',
+          retryLabel: stringsOf(context).accountReload,
         ),
       );
     }
     return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(middle: Text('参与人信息')),
+      navigationBar: CupertinoNavigationBar(middle: Text(stringsOf(context).accountParticipants)),
       child: Material(
         color: Colors.transparent,
         child: Column(
@@ -200,7 +202,7 @@ class _AddressEditPageState extends ConsumerState<AddressEditPage> {
                   padding: const EdgeInsets.all(CyTokens.space4),
                   children: <Widget>[
                     Text(
-                      '用于报名联系和到场核验，不会公开展示，也不用于配送。',
+                      stringsOf(context).accountParticipantFullPurpose,
                       // 辅助说明行 = Footnote 13;系统语义色随主题解析。
                       style: CyType.footnote.copyWith(
                         color: CupertinoColors.secondaryLabel,
@@ -214,8 +216,8 @@ class _AddressEditPageState extends ConsumerState<AddressEditPage> {
                           CupertinoTextFormFieldRow(
                             controller: _name,
                             focusNode: _nameFocus,
-                            prefix: const Text('姓名'),
-                            placeholder: '输入姓名',
+                            prefix: Text(stringsOf(context).accountName),
+                            placeholder: stringsOf(context).accountNameHint,
                             textInputAction: TextInputAction.next,
                             autofillHints: const <String>[AutofillHints.name],
                             onFieldSubmitted: (_) => _phoneFocus.requestFocus(),
@@ -224,8 +226,8 @@ class _AddressEditPageState extends ConsumerState<AddressEditPage> {
                           CupertinoTextFormFieldRow(
                             controller: _phone,
                             focusNode: _phoneFocus,
-                            prefix: const Text('手机号'),
-                            placeholder: '输入手机号',
+                            prefix: Text(stringsOf(context).accountPhone),
+                            placeholder: stringsOf(context).accountPhoneHint,
                             keyboardType: TextInputType.phone,
                             textInputAction: TextInputAction.done,
                             autofillHints: const <String>[
@@ -248,7 +250,7 @@ class _AddressEditPageState extends ConsumerState<AddressEditPage> {
                       // 真源 cy-inline-error:标题说清「什么没保存」,
                       // 原话透传做副标,动作给「重试保存」。
                       Text(
-                        '参与人信息没有保存',
+                        stringsOf(context).accountParticipantUnsaved,
                         style: CyType.subhead.copyWith(
                           fontWeight: FontWeight.w600,
                           color: CyPalette.of(context).statusDanger,
@@ -269,7 +271,7 @@ class _AddressEditPageState extends ConsumerState<AddressEditPage> {
                           minimumSize: const Size(44, 44),
                           padding: EdgeInsets.zero,
                           onPressed: _canSave ? _save : null,
-                          child: const Text('重试保存'),
+                          child: Text(stringsOf(context).accountRetrySave),
                         ),
                       ),
                     ],
@@ -283,7 +285,7 @@ class _AddressEditPageState extends ConsumerState<AddressEditPage> {
                 key: const Key('address-save-participant'),
                 onPressed: _canSave ? _save : null,
                 minimumSize: const Size.fromHeight(CyTokens.btnH),
-                child: Text(_saving ? '保存中…' : '保存参与人信息'),
+                child: Text(_saving ? stringsOf(context).accountSaving : stringsOf(context).accountParticipantSave),
               ),
             ),
           ],

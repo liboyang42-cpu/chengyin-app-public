@@ -16755,5 +16755,10 @@
   "advancedContractOperation": "高级玩法操作失败",
   "advancedContractTransportUnknown": "结果尚未确认，请核对服务端状态",
   "advancedContractTransportNetwork": "网络连接失败，请稍后重试",
-  "playPackContinueStatic": "继续开卡"
+  "playPackContinueStatic": "继续开卡",
+  "accountDeleteConfirmBody": "提交后进入冷静期,到期将永久注销:账号无法再登录,个人信息会被匿名化处理,该操作不可恢复。\n\n冷静期内你可以随时回到本页撤销。",
+  "accountDeleteNoticeIrreversible": "注销后账号无法再登录,个人信息将被匿名化处理,操作不可恢复。",
+  "accountDeleteNoticeCoolingOff": "提交后进入七日冷静期,到期才真正执行;这七天内可随时撤销。",
+  "accountDeleteNoticeOutstanding": "账户有余额、在途提现、进行中的订单或有效报名时不能注销,请先处理完。",
+  "accountDeleteNoticeRoles": "已开通商家或俱乐部身份的账号需先完成相应退出流程。"
 }

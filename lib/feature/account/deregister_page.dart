@@ -1,3 +1,4 @@
+import '../../l10n/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
@@ -81,7 +82,7 @@ class _DeregisterPageState extends ConsumerState<DeregisterPage> {
         // 401 不再吐英文 DioException(B1 报告 P1-1 同口径):
         // 后端中文原话照说,英文栈换成能行动的中文。
         setState(
-          () => _error = accountFailureCopy(e, networkFallback: '操作没有成功,请稍后重试'),
+          () => _error = accountFailureCopy(e, strings: stringsOf(context), networkFallback: stringsOf(context).accountActionError),
         );
       }
     } finally {
@@ -126,7 +127,7 @@ class _DeregisterPageState extends ConsumerState<DeregisterPage> {
       return; // 显式在途锁，对齐真源 deregister-flow.js:116 if (smsSending) return
     final phone = _phone.text.trim();
     if (phone.isEmpty) {
-      setState(() => _error = '请先填写手机号');
+      setState(() => _error = stringsOf(context).accountPhoneRequired);
       return;
     }
     // 真源 sendSms 起手就把 smsSent 归零:重发失败要退回「获取验证码」。
@@ -137,7 +138,7 @@ class _DeregisterPageState extends ConsumerState<DeregisterPage> {
     await _run(() async {
       await ref.read(authApiProvider).sendSmsCode(phone);
       if (!mounted) return;
-      CyNativeNotice.show(context, '验证码已发送');
+      CyNativeNotice.show(context, stringsOf(context).smsCodeSent);
       setState(() {
         _smsSending = false;
         _smsSent = true;
@@ -149,18 +150,15 @@ class _DeregisterPageState extends ConsumerState<DeregisterPage> {
   Future<void> _confirmAndApply() async {
     final code = _code.text.trim();
     if (code.isEmpty) {
-      setState(() => _error = '请填写验证码');
+      setState(() => _error = stringsOf(context).accountCodeRequired);
       return;
     }
     final bool ok = await cyConfirm(
       context,
-      title: '确认注销账号?',
-      content:
-          '提交后进入冷静期,到期将永久注销:账号无法再登录,'
-          '个人信息会被匿名化处理,该操作不可恢复。\n\n'
-          '冷静期内你可以随时回到本页撤销。',
-      cancelText: '再想想',
-      confirmText: '确认注销',
+      title: stringsOf(context).accountDeleteConfirmTitle,
+      content: stringsOf(context).accountDeleteConfirmBody,
+      cancelText: stringsOf(context).accountDeleteReconsider,
+      confirmText: stringsOf(context).accountDeleteConfirm,
       danger: true,
     );
     if (!ok) return;
@@ -180,7 +178,7 @@ class _DeregisterPageState extends ConsumerState<DeregisterPage> {
         //   —— 表现成「点了没反应」,却以为注销还能撤回。
         await ref.read(authControllerProvider.notifier).logout();
         if (!mounted) return;
-        CyNativeNotice.show(context, '申请已提交,你已退出登录;冷静期内重新登录可撤销');
+        CyNativeNotice.show(context, stringsOf(context).accountDeleteSubmitted);
       }
     });
   }
@@ -196,7 +194,7 @@ class _DeregisterPageState extends ConsumerState<DeregisterPage> {
         // 撤销后重开流程,换一个幂等标识,避免与上一轮申请撞 requestId。
         _requestId = AccountApi.newRequestId();
       });
-      CyNativeNotice.show(context, '已撤销注销申请');
+      CyNativeNotice.show(context, stringsOf(context).accountDeleteCancelled);
     });
   }
 
@@ -214,13 +212,13 @@ class _DeregisterPageState extends ConsumerState<DeregisterPage> {
             // 不显式 stretch 会把 58rpx 大标题推到屏幕正中,与小程序完全不同。
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              const CyPageTitle('注销账号'),
+              CyPageTitle(stringsOf(context).accountDeleteAccount),
               Expanded(
                 child: !ref.watch(authControllerProvider).isLoggedIn
                     ? AccountLoginGate(
                         key: const Key('deregister-login-gate'),
-                        message: '登录后注销账号',
-                        sub: '注销涉及账号数据安全,必须先确认是你本人。',
+                        message: stringsOf(context).accountDeleteLogin,
+                        sub: stringsOf(context).accountDeleteLoginHint,
                         onSignedIn: _loadStatus,
                       )
                     : _step == _Step.loading
@@ -262,7 +260,7 @@ class _DeregisterPageState extends ConsumerState<DeregisterPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Text('账号注销须知', style: textTheme.titleMedium),
+        Text(stringsOf(context).legalDraftCancellationNoticeTitle, style: textTheme.titleMedium),
         const SizedBox(height: CyTokens.space3),
         const _NoticeBody(),
         // 上面四条是摘要,不是须知全文。合规上「我已阅读并同意」必须真的**能读到
@@ -275,7 +273,7 @@ class _DeregisterPageState extends ConsumerState<DeregisterPage> {
           button: true,
           enabled: !_busy,
           checked: _agreed,
-          label: '我已阅读并同意账号注销须知',
+          label: stringsOf(context).accountDeletionConsentSemantics,
           onTap: _busy ? null : () => setState(() => _agreed = !_agreed),
           child: ExcludeSemantics(
             child: GestureDetector(
@@ -292,7 +290,7 @@ class _DeregisterPageState extends ConsumerState<DeregisterPage> {
                           : (bool? v) => setState(() => _agreed = v ?? false),
                     ),
                     const SizedBox(width: CyTokens.space2),
-                    const Expanded(child: Text('我已阅读并同意《账号注销须知》')),
+                    Expanded(child: Text(stringsOf(context).accountDeletionConsentText)),
                   ],
                 ),
               ),
@@ -302,7 +300,7 @@ class _DeregisterPageState extends ConsumerState<DeregisterPage> {
         const SizedBox(height: CyTokens.space2),
         CyNativeButton(
           onPressed: (_agreed && !_busy) ? _precheckThenAgree : null,
-          label: _busy ? '检查中…' : '下一步',
+          label: _busy ? stringsOf(context).accountChecking : stringsOf(context).accountNext,
           loading: _busy,
         ),
       ],
@@ -314,15 +312,15 @@ class _DeregisterPageState extends ConsumerState<DeregisterPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Text('短信验证', style: textTheme.titleMedium),
+        Text(stringsOf(context).accountSmsVerification, style: textTheme.titleMedium),
         const SizedBox(height: CyTokens.space2),
         Text(
-          '请填写你账号绑定的手机号,验证码需与绑定号一致才能通过。',
+          stringsOf(context).accountBoundPhoneExplanation,
           style: textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
         ),
         const SizedBox(height: CyTokens.space4),
         CyField(
-          label: '绑定手机号',
+          label: stringsOf(context).accountBoundPhone,
           child: CupertinoTextField(
             key: const Key('deregister-phone-field'),
             controller: _phone,
@@ -334,7 +332,7 @@ class _DeregisterPageState extends ConsumerState<DeregisterPage> {
             inputFormatters: <TextInputFormatter>[
               FilteringTextInputFormatter.digitsOnly,
             ],
-            placeholder: '输入账号绑定的手机号',
+            placeholder: stringsOf(context).accountBoundPhoneHint,
             padding: const EdgeInsets.all(CyTokens.space3),
           ),
         ),
@@ -344,7 +342,7 @@ class _DeregisterPageState extends ConsumerState<DeregisterPage> {
           children: <Widget>[
             Expanded(
               child: CyField(
-                label: '验证码',
+                label: stringsOf(context).verificationCode,
                 child: CupertinoTextField(
                   key: const Key('deregister-code-field'),
                   controller: _code,
@@ -356,7 +354,7 @@ class _DeregisterPageState extends ConsumerState<DeregisterPage> {
                   inputFormatters: <TextInputFormatter>[
                     FilteringTextInputFormatter.digitsOnly,
                   ],
-                  placeholder: '输入 6 位验证码',
+                  placeholder: stringsOf(context).accountCodeHint,
                   padding: const EdgeInsets.all(CyTokens.space3),
                   onSubmitted: (_) {
                     if (!_busy) _confirmAndApply();
@@ -374,7 +372,7 @@ class _DeregisterPageState extends ConsumerState<DeregisterPage> {
               padding: const EdgeInsets.only(left: CyTokens.space3),
               onPressed: _busy ? null : _sendCode,
               child: Text(
-                _smsSending ? '发送中…' : (_smsSent ? '重新发送' : '获取验证码'),
+                _smsSending ? stringsOf(context).sendingCode : (_smsSent ? stringsOf(context).resendCode : stringsOf(context).getCode),
                 style: TextStyle(
                   fontSize: CyTokens.typeLabel,
                   color: _smsSending
@@ -392,7 +390,7 @@ class _DeregisterPageState extends ConsumerState<DeregisterPage> {
         const SizedBox(height: 20),
         CyNativeButton(
           onPressed: _busy ? null : _confirmAndApply,
-          label: _busy ? '提交中…' : '提交注销申请',
+          label: _busy ? stringsOf(context).accountSubmitting : stringsOf(context).accountDeleteSubmit,
           role: CyNativeButtonRole.destructive,
           loading: _busy,
         ),
@@ -415,9 +413,9 @@ class _NoticeLink extends StatelessWidget {
         alignment: Alignment.centerLeft,
         onPressed: () =>
             context.push(LegalDocPage.routeOf(LegalDocType.cancellationNotice)),
-        child: const Text(
-          '查看《账号注销须知》',
-          style: TextStyle(
+        child: Text(
+          stringsOf(context).accountViewDeletionNotice,
+          style: const TextStyle(
             fontSize: CyTokens.typeBody,
             color: CyTokens.textPrimary,
             decoration: TextDecoration.underline,
@@ -440,11 +438,12 @@ class _NoticeBody extends StatelessWidget {
     // ★「七日」是从定稿的《账号注销须知》里取的(legal_docs.dart 第二节标题即
     //   「二、申请与七日冷静期」)。原文案只说「有冷静期」——而「几天内还能反悔」
     //   正是用户决定要不要按下这一步时最需要的那个数,含糊等于没说。
-    const List<String> points = <String>[
-      '注销后账号无法再登录,个人信息将被匿名化处理,操作不可恢复。',
-      '提交后进入七日冷静期,到期才真正执行;这七天内可随时撤销。',
-      '账户有余额、在途提现、进行中的订单或有效报名时不能注销,请先处理完。',
-      '已开通商家或俱乐部身份的账号需先完成相应退出流程。',
+    final strings = stringsOf(context);
+    final List<String> points = <String>[
+      strings.accountDeleteNoticeIrreversible,
+      strings.accountDeleteNoticeCoolingOff,
+      strings.accountDeleteNoticeOutstanding,
+      strings.accountDeleteNoticeRoles,
     ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -496,14 +495,14 @@ class _PendingCard extends StatelessWidget {
                   children: <Widget>[
                     const Icon(Icons.hourglass_top, color: AppColors.primary),
                     const SizedBox(width: CyTokens.space2),
-                    Text('注销申请处理中', style: textTheme.titleMedium),
+                    Text(stringsOf(context).accountDeletionPending, style: textTheme.titleMedium),
                   ],
                 ),
                 const SizedBox(height: CyTokens.space3),
                 Text(
                   status?.executeAfter != null
-                      ? '将于 ${status!.executeAfter} 执行注销'
-                      : '正在冷静期内',
+                      ? stringsOf(context).accountDeletionScheduled(status!.executeAfter!)
+                      : stringsOf(context).accountCoolingOff,
                   style: textTheme.bodyMedium,
                 ),
                 const SizedBox(height: CyTokens.space2),
@@ -513,7 +512,7 @@ class _PendingCard extends StatelessWidget {
                   //   用户会被踢下线。小程序文案是「账号功能已冻结」,以它为准。
                   //   (账号本身没被停用:markMemberPending 只改 deregister_status,
                   //    不动 status/del_flag,而登录只看后两者 ⇒ 仍可重新登录来撤销。)
-                  '账号功能已冻结。冷静期结束前重新登录可撤销本次申请。',
+                  stringsOf(context).accountDeletionFrozen,
                   style: textTheme.bodySmall?.copyWith(
                     color: AppColors.textSecondary,
                   ),
@@ -525,7 +524,7 @@ class _PendingCard extends StatelessWidget {
         const SizedBox(height: CyTokens.space4),
         CyNativeButton(
           onPressed: busy ? null : onCancel,
-          label: busy ? '处理中…' : '撤销注销申请',
+          label: busy ? stringsOf(context).processing : stringsOf(context).accountCancelDeletion,
           loading: busy,
         ),
       ],
@@ -553,12 +552,12 @@ class _BlockedCard extends StatelessWidget {
         // 阻断态标题用 danger:这是「你现在不能注销」的告知,
         // 与下方中性色的阻断原因列表要有主次,否则整屏一个灰度读不出结论。
         Text(
-          '暂时无法注销',
+          stringsOf(context).accountDeletionBlocked,
           style: textTheme.titleMedium?.copyWith(color: AppColors.danger),
         ),
         const SizedBox(height: CyTokens.space2),
         Text(
-          '请先处理以下事项,处理完再回来重试:',
+          stringsOf(context).accountDeletionResolveBlockers,
           style: textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
         ),
         const SizedBox(height: CyTokens.space3),
@@ -589,11 +588,11 @@ class _BlockedCard extends StatelessWidget {
             ),
           ),
         if (blockers.isEmpty)
-          Text('没能取得处理结果,请稍后重试。', style: textTheme.bodyMedium),
+          Text(stringsOf(context).accountDeletionResultError, style: textTheme.bodyMedium),
         const SizedBox(height: CyTokens.space2),
         CyNativeButton(
           onPressed: busy ? null : onRecheck,
-          label: '重新检查',
+          label: stringsOf(context).accountRecheck,
           role: CyNativeButtonRole.secondary,
         ),
       ],

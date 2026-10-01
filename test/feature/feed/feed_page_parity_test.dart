@@ -15,6 +15,8 @@ import 'package:chengyin_app/feature/feed/feed_controller.dart';
 import 'package:chengyin_app/feature/feed/feed_page.dart';
 import 'package:chengyin_app/feature/feed/feed_sections_controller.dart';
 import 'package:chengyin_app/feature/feed/recommendation.dart';
+import 'package:chengyin_app/l10n/app_localizations.dart';
+import 'package:chengyin_app/feature/feed/widgets/home_activity_live.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -54,6 +56,7 @@ List<dynamic> _overrides({
   List<MyRegistration> registrations = const [],
   List<PlayRunSession> playRuns = const <PlayRunSession>[],
   List<HomeBanner>? banners,
+  bool sourceMarkers = false,
 }) => <dynamic>[
   authControllerProvider.overrideWith(
     () => _FixedAuth(
@@ -73,11 +76,12 @@ List<dynamic> _overrides({
   ),
   feedNearbyProvider.overrideWith(
     (ref) async => <Activity>[
-      Activity(id: 21, name: '外滩夜行', addressName: '外滩'),
+      Activity(id: 21, name: '外滩夜行', addressName: '外滩',
+          startDate: sourceMarkers ? '2000-01-01 00:00:00' : null),
     ],
   ),
   feedRecommendProvider.overrideWith(
-    (ref) async => <Topic>[Topic(id: 31, name: '城市夜跑')],
+    (ref) async => <Topic>[Topic(id: 31, name: '城市夜跑', betaFlag: sourceMarkers ? 1 : 0)],
   ),
   feedUpcomingProvider.overrideWith(
     (ref) async => <UpcomingActivity>[
@@ -118,6 +122,8 @@ Future<GoRouter> _pumpHome(
   List<MyRegistration> registrations = const [],
   List<PlayRunSession> playRuns = const <PlayRunSession>[],
   List<HomeBanner>? banners,
+  Locale locale = const Locale('zh'),
+  bool sourceMarkers = false,
   double width = 390,
   double height = 844,
   bool disableAnimations = false,
@@ -163,8 +169,12 @@ Future<GoRouter> _pumpHome(
         registrations: registrations,
         playRuns: playRuns,
         banners: banners,
+        sourceMarkers: sourceMarkers,
       ).cast(),
       child: MaterialApp.router(
+        locale: locale,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
         theme: AppTheme.dark(),
         routerConfig: router,
         builder: (BuildContext context, Widget? child) => MediaQuery(
@@ -198,6 +208,35 @@ Future<void> _scrollToSection(WidgetTester tester, Key key) async {
 }
 
 void main() {
+  test('Home markers retain source beta flag and China-time start semantics', () {
+    expect(Topic.fromJson({'id': 1, 'name': '', 'betaFlag': 1}).betaFlag, 1);
+    expect(Topic.fromJson({'id': 1, 'name': ''}).betaFlag, 0);
+    final boundary = DateTime.utc(2026, 9, 30, 2);
+    expect(homeActivityStarted('2026-09-30 10:00:00', boundary), isTrue);
+    expect(homeActivityStarted('2026-09-30T10:00:00+08:00', boundary), isTrue);
+    expect(homeActivityStarted('2026-09-30 10:00:01', boundary), isFalse);
+    expect(homeActivityStarted(null, boundary), isFalse);
+    expect(homeActivityStarted('2026-02-30 10:00:00', boundary), isFalse);
+    expect(homeActivityStarted('invalid', boundary), isFalse);
+  });
+
+  testWidgets('English Home at large text preserves UGC and source Beta/LIVE markers', (tester) async {
+    await _pumpHome(tester, locale: const Locale('en'), sourceMarkers: true,
+        textScaler: const TextScaler.linear(2), disableAnimations: true);
+    expect(find.text('Hi, 阿兰!'), findsOneWidget);
+    expect(find.text('Player'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await _scrollToSection(tester, const Key('home-recommend'));
+    expect(find.text('Beta trial'), findsOneWidget);
+    expect(find.text('城市夜跑'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await _scrollToSection(tester, const Key('home-nearby'));
+    expect(find.text('LIVE'), findsOneWidget);
+    expect(find.text('外滩夜行'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('首页在 200% Dynamic Type 下保留 Hero 与关键入口', (
     WidgetTester tester,
   ) async {
